@@ -28,10 +28,12 @@ Do not nitpick style the linters already enforce (ruff/eslint run separately).
 
 ## Verdict protocol
 
-End your final message with exactly one of:
+End your final message with exactly one of the two lines below, ON ITS OWN
+LINE with nothing else on that line (a parser greps for it verbatim) — put a
+blank line after it before any list or prose:
 
 - `VERDICT: APPROVE` — the diff is safe, in scope, and correct.
-- `VERDICT: FIX` — followed by a numbered list of concrete, actionable
-  problems (file, what is wrong, what to change). Only list problems that
-  genuinely block the merge; anything cosmetic goes in a final "Notes
-  (non-blocking)" paragraph instead.
+- `VERDICT: FIX` — followed by a blank line, then a numbered list of
+  concrete, actionable problems (file, what is wrong, what to change). Only
+  list problems that genuinely block the merge; anything cosmetic goes in a
+  final "Notes (non-blocking)" paragraph instead.
