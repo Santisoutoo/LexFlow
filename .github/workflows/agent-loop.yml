@@ -333,7 +333,8 @@ jobs:
           GH_TOKEN: ${{ secrets.AGENT_GH_PAT }}
           ISSUE_TITLE: ${{ steps.pick.outputs.title }}
         run: |
-          git push "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" HEAD
+          branch=$(git branch --show-current)
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" "HEAD:refs/heads/$branch"
           {
             echo "## Descripción"
             echo "Implementación autónoma del issue #${{ steps.pick.outputs.number }} por el agent loop (modelo \`${{ steps.pick.outputs.model }}\`)."
@@ -349,9 +350,14 @@ jobs:
             echo
             echo "_Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}_"
           } > "$RUNNER_TEMP/pr-body.md"
+          # --head explicit: the push above went to an inline-credential URL
+          # rather than a named remote, so git never recorded a tracking
+          # branch — gh pr create's autodetection fails without --head
+          # ("you must first push the current branch to a remote").
           gh pr create \
             --title "${{ steps.pick.outputs.branch_prefix }}: resolve #${{ steps.pick.outputs.number }} — $ISSUE_TITLE" \
             --body-file "$RUNNER_TEMP/pr-body.md" \
+            --head "$branch" \
             --label agent-pr --label do-not-rebase
           gh pr merge --auto --merge
 
@@ -396,5 +402,12 @@ jobs:
           branch=$(git branch --show-current)
           if [ "$branch" != "main" ] && [ -n "$branch" ]; then
             pr=$(gh pr list --state open --head "$branch" --json number --jq '.[0].number // empty' || true)
-            if [ -n "$pr" ]; then gh pr close "$pr" --delete-branch || true; fi
+            if [ -n "$pr" ]; then
+              gh pr close "$pr" --delete-branch || true
+            else
+              # The implement step can push before PR creation fails (e.g.
+              # gh pr create autodetection issues) — remove the orphan
+              # remote branch directly when there is no PR to close it via.
+              git push "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" ":refs/heads/$branch" 2>/dev/null || true
+            fi
           fi
