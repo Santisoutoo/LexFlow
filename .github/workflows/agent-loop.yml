@@ -198,7 +198,11 @@ jobs:
             | tee "$RUNNER_TEMP/worker-output.txt"
           rc=${PIPESTATUS[0]}
           set -e
-          result=$(grep -o 'AGENT_RESULT: [A-Z_]*' "$RUNNER_TEMP/worker-output.txt" | tail -1 | cut -d' ' -f2 || true)
+          # Explicit alternation, not a greedy [A-Z_]* class: a model that
+          # runs prose directly after the marker with no whitespace (e.g.
+          # "AGENT_RESULT: DONESprint 4 ...") would otherwise glob capitals
+          # from the next word into the token and match no case branch.
+          result=$(grep -oE 'AGENT_RESULT: (ALREADY_DONE|DONE|BLOCKED)' "$RUNNER_TEMP/worker-output.txt" | tail -1 | cut -d' ' -f2 || true)
           commits=$(git rev-list --count origin/main..HEAD)
           echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
           echo "result=${result:-NONE}" >> "$GITHUB_OUTPUT"
@@ -274,7 +278,7 @@ jobs:
             # (it is captured with $(...)), while the log still shows the review.
             opencode run --model "opencode-go/kimi-k3" "$(cat "$RUNNER_TEMP/review-prompt.txt")" \
               | tee "$RUNNER_TEMP/review-output.txt" >&2
-            grep -o 'VERDICT: [A-Z]*' "$RUNNER_TEMP/review-output.txt" | tail -1 | cut -d' ' -f2
+            grep -oE 'VERDICT: (APPROVE|FIX)' "$RUNNER_TEMP/review-output.txt" | tail -1 | cut -d' ' -f2
           }
           verdict=$(run_review)
           if [ "$verdict" = "APPROVE" ]; then exit 0; fi

@@ -91,9 +91,12 @@ explain the failure — do not commit broken code on top and do not skip checks.
 ## Finish protocol
 
 Leave the working tree fully committed (`git status` clean). End your final
-message with exactly one of:
+message with exactly one of the three lines below, ON ITS OWN LINE with
+nothing else on that line (a parser greps for it verbatim) — put a blank
+line after it before any summary prose:
 
 - `AGENT_RESULT: DONE` — implemented and all verification green. Follow with
-  a 3-6 line summary: what changed, which files, test evidence.
+  a blank line, then a 3-6 line summary: what changed, which files, test
+  evidence.
 - `AGENT_RESULT: ALREADY_DONE` — nothing to implement (see Step 0).
 - `AGENT_RESULT: BLOCKED` — could not complete safely; explain why.
