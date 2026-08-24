@@ -21,7 +21,10 @@ ALLOWED_AUTHORS='["VforVitorio", "Santisoutoo"]'
 EXCLUDED_LABELS='["epic", "agent:wip", "agent:blocked", "area: ci-cd", "question", "wontfix", "duplicate", "invalid"]'
 MODEL_TOP="opencode-go/kimi-k3"
 MODEL_CHEAP="opencode-go/minimax-m3"
-MODEL_CURSOR="gpt-5.3-codex"
+# Composer is Cursor's agent-native model: fastest and lightest on the Pro
+# quota. If weekly metrics show quality lagging on frontend issues, upgrade
+# to claude-sonnet-5-thinking-medium here.
+MODEL_CURSOR="composer-2.5"
 
 fetch_candidates() {
   gh issue list --state open --limit 200 \
