@@ -69,6 +69,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.AGENT_GH_PAT }}
           FORCED_ISSUE: ${{ inputs.issue }}
+          # Cursor routing is best-effort: without the secret every issue
+          # falls back to the OpenCode engine.
+          CURSOR_AVAILABLE: ${{ secrets.CURSOR_API_KEY != '' }}
         run: bash .github/agent/pick-issue.sh
 
       - name: Claim issue
@@ -128,6 +131,12 @@ jobs:
         if: steps.pick.outputs.empty == 'false'
         run: npm install -g opencode-ai@1.18.3
 
+      - name: Install Cursor CLI
+        if: steps.pick.outputs.engine == 'cursor'
+        run: |
+          curl -fsS https://cursor.com/install | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
       - name: Install OpenCode credential
         if: steps.pick.outputs.empty == 'false'
         env:
@@ -170,6 +179,9 @@ jobs:
         env:
           OPENCODE_CONFIG: ${{ github.workspace }}/.github/agent/opencode.json
           ISSUE_TITLE: ${{ steps.pick.outputs.title }}
+          # Model credential for the cursor engine (same exposure class as
+          # opencode's auth.json on disk); GitHub-write creds stay excluded.
+          CURSOR_API_KEY: ${{ steps.pick.outputs.engine == 'cursor' && secrets.CURSOR_API_KEY || '' }}
         run: |
           {
             cat .github/agent/worker-prompt.md
@@ -182,7 +194,7 @@ jobs:
             echo "</issue>"
           } > "$RUNNER_TEMP/prompt.txt"
           set +e
-          opencode run --model "${{ steps.pick.outputs.model }}" "$(cat "$RUNNER_TEMP/prompt.txt")" \
+          bash .github/agent/run-engine.sh "${{ steps.pick.outputs.engine }}" "${{ steps.pick.outputs.model }}" "$RUNNER_TEMP/prompt.txt" \
             | tee "$RUNNER_TEMP/worker-output.txt"
           rc=${PIPESTATUS[0]}
           set -e
@@ -237,6 +249,7 @@ jobs:
         env:
           OPENCODE_CONFIG: ${{ github.workspace }}/.github/agent/opencode.json
           ISSUE_TITLE: ${{ steps.pick.outputs.title }}
+          CURSOR_API_KEY: ${{ steps.pick.outputs.engine == 'cursor' && secrets.CURSOR_API_KEY || '' }}
         run: |
           compose_review_prompt() {
             {
@@ -254,9 +267,12 @@ jobs:
           }
           run_review() {
             compose_review_prompt
+            # Reviewer is ALWAYS OpenCode top model, regardless of the
+            # implementing engine — cross-engine review, and the picked model
+            # id may not even exist on opencode (cursor models).
             # tee to stderr: this function's stdout must carry ONLY the verdict
             # (it is captured with $(...)), while the log still shows the review.
-            opencode run --model "${{ steps.pick.outputs.model }}" "$(cat "$RUNNER_TEMP/review-prompt.txt")" \
+            opencode run --model "opencode-go/kimi-k3" "$(cat "$RUNNER_TEMP/review-prompt.txt")" \
               | tee "$RUNNER_TEMP/review-output.txt" >&2
             grep -o 'VERDICT: [A-Z]*' "$RUNNER_TEMP/review-output.txt" | tail -1 | cut -d' ' -f2
           }
@@ -275,7 +291,7 @@ jobs:
             echo
             sed -n '/VERDICT: FIX/,$p' "$RUNNER_TEMP/review-output.txt"
           } > "$RUNNER_TEMP/fix-prompt.txt"
-          opencode run --model "${{ steps.pick.outputs.model }}" "$(cat "$RUNNER_TEMP/fix-prompt.txt")"
+          bash .github/agent/run-engine.sh "${{ steps.pick.outputs.engine }}" "${{ steps.pick.outputs.model }}" "$RUNNER_TEMP/fix-prompt.txt"
           verdict=$(run_review)
           if [ "$verdict" != "APPROVE" ]; then
             echo "::error::Reviewer still not satisfied after one fix round."
