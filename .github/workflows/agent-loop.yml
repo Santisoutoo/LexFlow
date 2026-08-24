@@ -134,8 +134,19 @@ jobs:
           OPENCODE_AUTH_JSON: ${{ secrets.OPENCODE_AUTH_JSON }}
         run: |
           mkdir -p "$RUNNER_TEMP/ocdata/opencode"
-          printf '%s' "$OPENCODE_AUTH_JSON" | base64 -d > "$RUNNER_TEMP/ocdata/opencode/auth.json"
-          chmod 600 "$RUNNER_TEMP/ocdata/opencode/auth.json"
+          dest="$RUNNER_TEMP/ocdata/opencode/auth.json"
+          # Accept the secret as base64 OR as raw JSON — whichever decodes to
+          # valid JSON wins, so a mis-pasted secret fails loudly here instead
+          # of as a cryptic auth error in the implement step.
+          if printf '%s' "$OPENCODE_AUTH_JSON" | base64 -d 2>/dev/null | jq -e . >/dev/null 2>&1; then
+            printf '%s' "$OPENCODE_AUTH_JSON" | base64 -d > "$dest"
+          elif printf '%s' "$OPENCODE_AUTH_JSON" | jq -e . >/dev/null 2>&1; then
+            printf '%s' "$OPENCODE_AUTH_JSON" > "$dest"
+          else
+            echo "::error::OPENCODE_AUTH_JSON is neither valid base64-of-JSON nor raw JSON."
+            exit 1
+          fi
+          chmod 600 "$dest"
           echo "XDG_DATA_HOME=$RUNNER_TEMP/ocdata" >> "$GITHUB_ENV"
 
       - name: Git identity + work branch
