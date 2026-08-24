@@ -135,7 +135,11 @@ jobs:
         # Needed whenever the secret exists, not only when the worker routes
         # to Cursor: the reviewer's frontier cascade (below) tries Cursor's
         # "Other Models" pool first regardless of which engine implemented.
-        if: steps.pick.outputs.empty == 'false' && secrets.CURSOR_API_KEY != ''
+        # Gated on steps.pick.outputs.cursor_available, NOT `secrets.` directly:
+        # GitHub rejects a step `if:` that references the secrets context with
+        # "Unrecognized named-value: 'secrets'" at workflow-dispatch validation
+        # time (broke this exact line in PR #101, discovered 2026-08-24).
+        if: steps.pick.outputs.empty == 'false' && steps.pick.outputs.cursor_available == 'true'
         run: |
           curl -fsS https://cursor.com/install | bash
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
