@@ -14,16 +14,43 @@
 # Engine routing: frontend issues go to Cursor (Codex-class models on the
 # Cursor subscription); everything else goes to OpenCode Go. If CURSOR_API_KEY
 # is not configured the workflow falls back to OpenCode, so the cursor route
-# is best-effort. The reviewer always runs on OpenCode (cross-engine review).
+# is best-effort. The reviewer runs its own frontier-first cascade (Cursor's
+# "Other Models" pool, then OpenCode kimi-k3) — see agent-loop.yml's Review
+# step, not this file.
 set -euo pipefail
 
 ALLOWED_AUTHORS='["VforVitorio", "Santisoutoo"]'
 EXCLUDED_LABELS='["epic", "agent:wip", "agent:blocked", "area: ci-cd", "question", "wontfix", "duplicate", "invalid"]'
+
+# Implementation (worker), general issues — Chinese OSS models via OpenCode
+# Go, cheapest-first among flagship-class options. Fallback chain if kimi-k3's
+# $-cap is exhausted (manual swap here, no auto-retry):
+#   1) opencode-go/kimi-k3     Moonshot, flagship, $3.00/$15.00 per M (current)
+#   2) opencode-go/glm-5.2     Zhipu,    $1.40/$4.40 per M  — cheaper flagship-class alt
+#   3) opencode-go/qwen3.7-max Alibaba,  $2.50/$7.50 per M  — architecture-leaning alt
 MODEL_TOP="opencode-go/kimi-k3"
-MODEL_CHEAP="opencode-go/minimax-m3"
-# Composer is Cursor's agent-native model: fastest and lightest on the Pro
-# quota. If weekly metrics show quality lagging on frontend issues, upgrade
-# to claude-sonnet-5-thinking-medium here.
+
+# Implementation for area: docs — prose-heavy, cheapest tier. Fallback chain:
+#   1) opencode-go/minimax-m3        MiniMax, $0.30/$1.20 per M (current)
+#   2) opencode-go/deepseek-v4-flash DeepSeek, $0.14/$0.22-0.66 per M — cheapest, high volume
+#   3) opencode-go/mimo-v2.5         Xiaomi,  $0.14/$0.28 per M — equally cheap, different vendor
+MODEL_DOCS="opencode-go/minimax-m3"
+
+# Implementation for area: tests — needs to read real code (asserts, mocks,
+# edge cases), not pure prose, so it gets an escalation option docs doesn't.
+# Fallback chain:
+#   1) opencode-go/minimax-m3        MiniMax, $0.30/$1.20 per M (current) — mechanical fixtures/asserts
+#   2) opencode-go/glm-5.2           Zhipu,   $1.40/$4.40 per M — escalate for tests needing complex logic
+#   3) opencode-go/deepseek-v4-flash DeepSeek, $0.14/$0.22-0.66 per M — ultra-cheap for large/simple batches
+MODEL_TESTS="opencode-go/minimax-m3"
+
+# Cursor engine (area: frontend), all in the Pro plan's included "Cursor
+# Models" pool (no draw on the $20/mo "Other Models" allowance). Fallback:
+#   1) composer-2.5      agent-native, cheapest in the included pool (current)
+#   2) grok-4.5 / grok-4.6  same included pool, alt if Composer quality/quota lags
+# Escalating further to gpt-5.3-codex (Other Models pool) is possible but
+# competes with the reviewer's frontier budget in agent-loop.yml — reserve
+# for genuinely hard frontend issues, not a routine swap.
 MODEL_CURSOR="composer-2.5"
 
 fetch_candidates() {
@@ -70,8 +97,10 @@ derive_model() {
   local engine="$1" labels="$2"
   if [ "$engine" = "cursor" ]; then
     echo "$MODEL_CURSOR"
-  elif echo "$labels" | jq -e 'index("area: docs") or index("area: tests")' >/dev/null; then
-    echo "$MODEL_CHEAP"
+  elif echo "$labels" | jq -e 'index("area: tests")' >/dev/null; then
+    echo "$MODEL_TESTS"
+  elif echo "$labels" | jq -e 'index("area: docs")' >/dev/null; then
+    echo "$MODEL_DOCS"
   else
     echo "$MODEL_TOP"
   fi
