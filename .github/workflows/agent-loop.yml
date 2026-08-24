@@ -129,7 +129,7 @@ jobs:
 
       - name: Install OpenCode (pinned)
         if: steps.pick.outputs.empty == 'false'
-        run: npm install -g opencode-ai@1.18.3
+        run: npm install -g opencode-ai@1.18.21
 
       - name: Install Cursor CLI
         if: steps.pick.outputs.engine == 'cursor'
