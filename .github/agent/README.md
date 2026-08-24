@@ -38,10 +38,38 @@ supervises: daily report, stuck-PR detector, watchdog (prompts under
 3. Run `scripts/setup-github.sh` (or `gh label create`) so the labels
    `agent-pr`, `agent:wip`, `agent:failed`, `agent:blocked` exist.
 4. **`CURSOR_API_KEY`** (Actions secret, OPTIONAL): API key from the Cursor
-   dashboard. With it, `area: frontend` issues are implemented by the Cursor
-   CLI (`gpt-5.3-codex`) instead of OpenCode; without it every issue falls
-   back to OpenCode automatically. The reviewer always runs on OpenCode
-   (cross-engine review by design).
+   dashboard. With it: (a) `area: frontend` issues are implemented by the
+   Cursor CLI (`composer-2.5`, Cursor's agent-native model — cheapest in the
+   Pro plan's included "Cursor Models" pool) instead of OpenCode, and (b) the
+   reviewer tries frontier judgment first (`gpt-5.3-codex`, then `gpt-5.6-sol`,
+   both from Cursor's paid "Other Models" pool) before falling back to
+   OpenCode's `kimi-k3`. Without the secret, every issue implements on
+   OpenCode and the reviewer goes straight to `kimi-k3`.
+
+## Model routing
+
+Full fallback chains (2-3 models per task, cheapest-viable-first except where
+judgment quality matters more than cost) are documented as comments next to
+the constants in `pick-issue.sh` and in the Review step of
+`agent-loop.yml`. Summary:
+
+| Task | Primary | Fallback(s) | Rationale |
+|---|---|---|---|
+| Review (judgment/security) | `gpt-5.3-codex` (Cursor) | `gpt-5.6-sol` (Cursor) → `kimi-k3` (OpenCode) | Frontier reasoning first, "chino premium" as the guaranteed final attempt |
+| Implementation (general) | `kimi-k3` (OpenCode) | `glm-5.2` → `qwen3.7-max` | Chinese OSS models, flagship-class |
+| Implementation (`area: docs`) | `minimax-m3` (OpenCode) | `deepseek-v4-flash` → `mimo-v2.5` | Cheapest tier, prose-heavy work |
+| Implementation (`area: tests`) | `minimax-m3` (OpenCode) | `glm-5.2` → `deepseek-v4-flash` | Cheap but escalates for logic-heavy tests |
+| Implementation (`area: frontend`) | `composer-2.5` (Cursor) | `grok-4.5`/`grok-4.6` | Included pool, no draw on the paid allowance |
+
+The Review cascade and the frontend fallback both draw from Cursor's same
+$20/mo "Other Models" allowance when they escalate past the included pool —
+if both escalate heavily in the same billing window they compete for it.
+Several model ids above (Cursor's `gpt-5.3-codex`/`gpt-5.6-sol`, OpenCode's
+`glm-5.2`/`qwen3.7-max`/`deepseek-v4-flash`/`mimo-v2.5`) were sourced from
+web research in 2026-08 and are **not yet verified** against a live
+`cursor-agent --list-models` / OpenCode catalog call — sanity-check with a
+`workflow_dispatch` run on a low-stakes issue before trusting the 3x/day cron
+on them.
 
 Until both secrets exist the workflow runs but disarms itself at the first
 step (no failures, no noise).

@@ -132,7 +132,10 @@ jobs:
         run: npm install -g opencode-ai@1.18.21
 
       - name: Install Cursor CLI
-        if: steps.pick.outputs.engine == 'cursor'
+        # Needed whenever the secret exists, not only when the worker routes
+        # to Cursor: the reviewer's frontier cascade (below) tries Cursor's
+        # "Other Models" pool first regardless of which engine implemented.
+        if: steps.pick.outputs.empty == 'false' && secrets.CURSOR_API_KEY != ''
         run: |
           curl -fsS https://cursor.com/install | bash
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
@@ -248,12 +251,12 @@ jobs:
       # ---- Post-PR inline review threads would deadlock the merge
       # ---- (required_conversation_resolution), so all review happens here.
       # ---- One fix round allowed; a second FIX verdict fails the run.
-      - name: Review (OpenCode reviewer)
+      - name: Review (Cursor frontier, chino-premium fallback)
         if: steps.implement.outputs.result == 'DONE'
         env:
           OPENCODE_CONFIG: ${{ github.workspace }}/.github/agent/opencode.json
           ISSUE_TITLE: ${{ steps.pick.outputs.title }}
-          CURSOR_API_KEY: ${{ steps.pick.outputs.engine == 'cursor' && secrets.CURSOR_API_KEY || '' }}
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
         run: |
           compose_review_prompt() {
             {
@@ -269,21 +272,44 @@ jobs:
               echo "</diff>"
             } > "$RUNNER_TEMP/review-prompt.txt"
           }
-          run_review() {
+          # Reviewer model cascade — judgment on security/correctness gets the
+          # strongest reasoning we can afford, cheapest-first fallback only
+          # when a step is unavailable or gives no parseable verdict:
+          #   1) gpt-5.3-codex  Cursor "Other Models" pool — frontier, coding-specialised
+          #   2) gpt-5.6-sol    Cursor "Other Models" pool — frontier alt, same pool/provider
+          #   3) opencode-go/kimi-k3  OpenCode Go — "chino premium", no extra secret needed,
+          #      the guaranteed final attempt if CURSOR_API_KEY is unset or both frontier
+          #      attempts fail (e.g. the $20/mo Other-Models allowance is exhausted).
+          # tee to stderr: each attempt's stdout must carry ONLY the verdict
+          # (it is captured with $(...)), while the log still shows the review.
+          run_review_attempt() {
+            local engine="$1" model="$2"
             compose_review_prompt
-            # Reviewer is ALWAYS OpenCode top model, regardless of the
-            # implementing engine — cross-engine review, and the picked model
-            # id may not even exist on opencode (cursor models).
-            # tee to stderr: this function's stdout must carry ONLY the verdict
-            # (it is captured with $(...)), while the log still shows the review.
-            opencode run --model "opencode-go/kimi-k3" "$(cat "$RUNNER_TEMP/review-prompt.txt")" \
+            set +e
+            bash .github/agent/run-engine.sh "$engine" "$model" "$RUNNER_TEMP/review-prompt.txt" \
               | tee "$RUNNER_TEMP/review-output.txt" >&2
+            set -e
             grep -oE 'VERDICT: (APPROVE|FIX)' "$RUNNER_TEMP/review-output.txt" | tail -1 | cut -d' ' -f2
+          }
+          run_review() {
+            local verdict=""
+            if [ -n "${CURSOR_API_KEY:-}" ]; then
+              verdict=$(run_review_attempt cursor gpt-5.3-codex)
+              if [ -z "$verdict" ]; then
+                echo "Reviewer: gpt-5.3-codex gave no verdict, trying gpt-5.6-sol." >&2
+                verdict=$(run_review_attempt cursor gpt-5.6-sol)
+              fi
+            fi
+            if [ -z "$verdict" ]; then
+              echo "Reviewer: falling back to opencode-go/kimi-k3." >&2
+              verdict=$(run_review_attempt opencode "opencode-go/kimi-k3")
+            fi
+            echo "$verdict"
           }
           verdict=$(run_review)
           if [ "$verdict" = "APPROVE" ]; then exit 0; fi
           if [ "$verdict" != "FIX" ]; then
-            echo "::error::Reviewer emitted no parseable verdict (infra)."
+            echo "::error::Reviewer emitted no parseable verdict from any model in the cascade (infra)."
             exit 1
           fi
           echo "Reviewer requested fixes; running one fix round."

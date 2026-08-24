@@ -79,6 +79,24 @@ Toda la API vive bajo `/api/v1/*`. Documentación interactiva en `/docs`; invent
 
 Flujo trunk-based: rama `feat/xxx` / `fix/xxx` / `docs/xxx` desde `main`, PR de vuelta a `main`, CI (`test`, `lint`, `typecheck`) en verde y sin squash — se preserva el histórico completo.
 
+## Desarrollo autónomo (loop engineering)
+
+El roadmap restante se completa mediante un loop de agentes autónomo
+(`agent-loop`, GitHub Actions) que recoge issues, implementa, revisa y abre
+PR sin intervención humana, tres veces al día. Cada tarea del loop tiene su
+propio agente/modelo, elegido por coste-beneficio:
+
+| Tarea | Modelo principal | Alternativas |
+|---|---|---|
+| Revisión (juicio/seguridad, pre-PR) | GPT-5.3 Codex (OpenAI, vía Cursor) | GPT-5.6 Sol (OpenAI) → Kimi K3 (Moonshot) como respaldo garantizado |
+| Implementación general | Kimi K3 (Moonshot) | GLM-5.2 (Zhipu), Qwen3.7 Max (Alibaba) |
+| Implementación — documentación | MiniMax M3 | DeepSeek V4 Flash, MiMo v2.5 (Xiaomi) |
+| Implementación — tests | MiniMax M3 | GLM-5.2 (lógica compleja) |
+| Implementación — frontend | Composer 2.5 (Cursor) | Grok 4.5 / 4.6 (Cursor) |
+
+Detalle de las cadenas de fallback y la política de coste en
+[`.github/agent/README.md`](.github/agent/README.md).
+
 ## Créditos
 
 Este proyecto existe gracias a [legalize-es](https://github.com/legalize-dev/legalize-es), que recopila y versiona legislación española en Markdown.
