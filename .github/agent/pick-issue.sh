@@ -8,8 +8,15 @@
 # is granted to anyone with a merged PR).
 #
 # Outputs (to $GITHUB_OUTPUT): empty=true|false, number, title, branch_prefix,
-# engine, model. The issue body is written to $RUNNER_TEMP/issue-body.md — it
-# is data for the worker prompt, never evaluated by the shell.
+# engine, model, cursor_available=true|false. The issue body is written to
+# $RUNNER_TEMP/issue-body.md — it is data for the worker prompt, never
+# evaluated by the shell.
+#
+# cursor_available exists so later steps can gate an `if:` on whether the
+# secret is configured WITHOUT referencing `secrets` directly in a step
+# `if:` — GitHub rejects that at workflow-dispatch validation time with
+# "Unrecognized named-value: 'secrets'" (hit for real in agent-loop.yml,
+# 2026-08-24, PR #101).
 #
 # Engine routing: frontend issues go to Cursor (Codex-class models on the
 # Cursor subscription); everything else goes to OpenCode Go. If CURSOR_API_KEY
@@ -142,6 +149,7 @@ main() {
     echo "branch_prefix=$(derive_branch_prefix "$labels")"
     echo "engine=$engine"
     echo "model=$(derive_model "$engine" "$labels")"
+    echo "cursor_available=${CURSOR_AVAILABLE:-false}"
   } >> "$GITHUB_OUTPUT"
   echo "Picked #$number ($title)"
 }
