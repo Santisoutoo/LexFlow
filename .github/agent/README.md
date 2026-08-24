@@ -13,7 +13,8 @@ supervises: daily report, stuck-PR detector, watchdog (prompts under
 |---|---|
 | `worker-prompt.md` | System prompt for the implementer agent |
 | `reviewer-prompt.md` | System prompt for the pre-PR reviewer agent |
-| `pick-issue.sh` | Issue picker: author allowlist, label filters, model routing |
+| `pick-issue.sh` | Issue picker: author allowlist, label filters, engine+model routing |
+| `run-engine.sh` | Engine dispatcher: runs the worker via OpenCode or Cursor CLI |
 | `opencode.json` | OpenCode config for CI (no MCPs, headless permissions) |
 | `orca/` | Prompts for the local Orca supervision automations |
 
@@ -36,6 +37,11 @@ supervises: daily report, stuck-PR detector, watchdog (prompts under
    (PowerShell: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("$env:USERPROFILE\.local\share\opencode\auth.json"))`)
 3. Run `scripts/setup-github.sh` (or `gh label create`) so the labels
    `agent-pr`, `agent:wip`, `agent:failed`, `agent:blocked` exist.
+4. **`CURSOR_API_KEY`** (Actions secret, OPTIONAL): API key from the Cursor
+   dashboard. With it, `area: frontend` issues are implemented by the Cursor
+   CLI (`gpt-5.3-codex`) instead of OpenCode; without it every issue falls
+   back to OpenCode automatically. The reviewer always runs on OpenCode
+   (cross-engine review by design).
 
 Until both secrets exist the workflow runs but disarms itself at the first
 step (no failures, no noise).
@@ -46,6 +52,7 @@ step (no failures, no noise).
 |---|---|---|---|
 | `AGENT_GH_PAT` | PAT expiry date (max 1 year) | every run fails at the guard/claim step | regenerate PAT, update secret |
 | `OPENCODE_AUTH_JSON` | Go subscription lapse / key rotation | `Error: Invalid API key.` in the implement step | re-login locally, regenerate base64, update secret |
+| `CURSOR_API_KEY` | Cursor key revoked / sub lapse | auth error in cursor-engine implement steps | regenerate in the Cursor dashboard, update secret (loop still works via OpenCode fallback) |
 
 ## State machine (labels)
 

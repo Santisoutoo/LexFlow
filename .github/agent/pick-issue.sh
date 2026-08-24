@@ -8,14 +8,20 @@
 # is granted to anyone with a merged PR).
 #
 # Outputs (to $GITHUB_OUTPUT): empty=true|false, number, title, branch_prefix,
-# model. The issue body is written to $RUNNER_TEMP/issue-body.md — it is data
-# for the worker prompt, never evaluated by the shell.
+# engine, model. The issue body is written to $RUNNER_TEMP/issue-body.md — it
+# is data for the worker prompt, never evaluated by the shell.
+#
+# Engine routing: frontend issues go to Cursor (Codex-class models on the
+# Cursor subscription); everything else goes to OpenCode Go. If CURSOR_API_KEY
+# is not configured the workflow falls back to OpenCode, so the cursor route
+# is best-effort. The reviewer always runs on OpenCode (cross-engine review).
 set -euo pipefail
 
 ALLOWED_AUTHORS='["VforVitorio", "Santisoutoo"]'
 EXCLUDED_LABELS='["epic", "agent:wip", "agent:blocked", "area: ci-cd", "question", "wontfix", "duplicate", "invalid"]'
 MODEL_TOP="opencode-go/kimi-k3"
 MODEL_CHEAP="opencode-go/minimax-m3"
+MODEL_CURSOR="gpt-5.3-codex"
 
 fetch_candidates() {
   gh issue list --state open --limit 200 \
@@ -47,9 +53,21 @@ derive_branch_prefix() {
   fi
 }
 
-derive_model() {
+derive_engine() {
   local labels="$1"
-  if echo "$labels" | jq -e 'index("area: docs") or index("area: tests")' >/dev/null; then
+  if [ "${CURSOR_AVAILABLE:-false}" = "true" ] \
+     && echo "$labels" | jq -e 'index("area: frontend")' >/dev/null; then
+    echo "cursor"
+  else
+    echo "opencode"
+  fi
+}
+
+derive_model() {
+  local engine="$1" labels="$2"
+  if [ "$engine" = "cursor" ]; then
+    echo "$MODEL_CURSOR"
+  elif echo "$labels" | jq -e 'index("area: docs") or index("area: tests")' >/dev/null; then
     echo "$MODEL_CHEAP"
   else
     echo "$MODEL_TOP"
@@ -83,12 +101,15 @@ main() {
   labels=$(echo "$issue" | jq -c '[.labels[].name]')
   echo "$issue" | jq -r '.body' > "$RUNNER_TEMP/issue-body.md"
 
+  local engine
+  engine=$(derive_engine "$labels")
   {
     echo "empty=false"
     echo "number=$number"
     echo "title=${title//$'\n'/ }"
     echo "branch_prefix=$(derive_branch_prefix "$labels")"
-    echo "model=$(derive_model "$labels")"
+    echo "engine=$engine"
+    echo "model=$(derive_model "$engine" "$labels")"
   } >> "$GITHUB_OUTPUT"
   echo "Picked #$number ($title)"
 }
