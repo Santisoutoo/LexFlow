@@ -86,9 +86,17 @@ step (no failures, no noise).
 
 - `agent:wip` — claimed by a running job. Orphaned `wip` (no run in progress,
   no open PR) means a cancelled run; the Orca watchdog clears it.
-- `agent:failed` — one failed attempt; the picker will retry it.
-- `agent:blocked` — two failed attempts; the picker skips it until a human
-  removes the label or closes the issue.
+- `agent:failed` — one failed *real* attempt (BLOCKED verdict, verify red,
+  review cascade exhausted, push/PR failure); the picker will retry it.
+- `agent:blocked` — two failed real attempts; the picker skips it until a
+  human removes the label or closes the issue.
+- `agent:infra-stuck` — three consecutive infra failures (engine crash,
+  idle/hard-ceiling timeout, no `AGENT_RESULT` marker, DONE-but-empty-diff).
+  Infra failures never count toward `agent:failed`/`agent:blocked` — they
+  are logged as `<!-- agent-infra -->` issue comments and escalate on their
+  own counter, so an issue that reliably times out doesn't retry forever,
+  3x/day, with no human ever finding out. The picker skips it until a human
+  removes the label (usually after splitting the issue into a narrower one).
 - `agent-pr` — on every loop PR. Only one may be open at a time (branch
   protection runs `strict:false`); a red agent PR therefore PAUSES the loop
   until it is closed or fixed — that is intentional fail-safe behaviour.

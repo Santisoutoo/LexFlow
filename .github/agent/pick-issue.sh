@@ -27,7 +27,7 @@
 set -euo pipefail
 
 ALLOWED_AUTHORS='["VforVitorio", "Santisoutoo"]'
-EXCLUDED_LABELS='["epic", "agent:wip", "agent:blocked", "area: ci-cd", "question", "wontfix", "duplicate", "invalid"]'
+EXCLUDED_LABELS='["epic", "agent:wip", "agent:blocked", "agent:infra-stuck", "area: ci-cd", "question", "wontfix", "duplicate", "invalid"]'
 
 # Implementation (worker), general issues — Chinese OSS models via OpenCode
 # Go, cheapest-first among flagship-class options. Fallback chain if kimi-k3's
