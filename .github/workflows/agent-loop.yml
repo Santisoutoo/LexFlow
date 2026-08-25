@@ -189,6 +189,11 @@ jobs:
           # Model credential for the cursor engine (same exposure class as
           # opencode's auth.json on disk); GitHub-write creds stay excluded.
           CURSOR_API_KEY: ${{ steps.pick.outputs.engine == 'cursor' && secrets.CURSOR_API_KEY || '' }}
+          # Wide-scope issues genuinely need exploration room (2026-08-25,
+          # issue #52: killed mid-exploration by a flat 15min cap) — give
+          # Implement a generous idle window and hard ceiling.
+          ENGINE_IDLE_TIMEOUT_SECONDS: "360"
+          ENGINE_HARD_CEILING_SECONDS: "2400"
         run: |
           {
             cat .github/agent/worker-prompt.md
@@ -212,26 +217,47 @@ jobs:
           result=$(grep -oE 'AGENT_RESULT: (ALREADY_DONE|DONE|BLOCKED)' "$RUNNER_TEMP/worker-output.txt" | tail -1 | cut -d' ' -f2 || true)
           commits=$(git rev-list --count origin/main..HEAD)
           echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
-          echo "result=${result:-NONE}" >> "$GITHUB_OUTPUT"
           echo "commits=$commits" >> "$GITHUB_OUTPUT"
+          # `result` is written ONLY once we know its final, true value — it
+          # used to be written before the DONE-but-empty-diff guard below
+          # could still invalidate it, so Cleanup's infra-vs-attempt split
+          # (which keys off `result != DONE`) misclassified that guard
+          # failure as a real attempt instead of the infra failure it is.
           if [ "$rc" != "0" ]; then
+            case "$rc" in
+              124) reason="implement-hard-ceiling" ;;
+              125) reason="implement-idle-timeout" ;;
+              *) reason="implement-infra-other" ;;
+            esac
+            echo "result=NONE" >> "$GITHUB_OUTPUT"
+            echo "$reason" > "$RUNNER_TEMP/failure-reason.txt"
             echo "::error::opencode exited $rc (infra failure — not an attempt)"
             exit 1
           fi
           case "$result" in
             DONE)
               # Empty-diff guard: headless opencode is known to exit silently
-              # with no work (anomalyco/opencode#28605).
+              # with no real work (anomalyco/opencode#28605) — this is the
+              # SAME infra-class failure the guard above catches, so it must
+              # never count as one of the 2 real attempts before agent:blocked.
               if [ "$commits" = "0" ] || [ -n "$(git status --porcelain)" ]; then
-                echo "::error::Worker said DONE but the tree is not a clean set of new commits."
+                echo "result=EMPTY_DIFF" >> "$GITHUB_OUTPUT"
+                echo "implement-infra-empty-diff" > "$RUNNER_TEMP/failure-reason.txt"
+                echo "::error::Worker said DONE but the tree is not a clean set of new commits (opencode#28605) — infra failure."
                 exit 1
-              fi ;;
+              fi
+              echo "result=DONE" >> "$GITHUB_OUTPUT" ;;
             ALREADY_DONE)
+              echo "result=ALREADY_DONE" >> "$GITHUB_OUTPUT"
               echo "Issue already implemented on main; will close it." ;;
             BLOCKED)
+              echo "result=BLOCKED" >> "$GITHUB_OUTPUT"
+              echo "implement-blocked" > "$RUNNER_TEMP/failure-reason.txt"
               echo "::error::Worker reported BLOCKED."
               exit 1 ;;
             *)
+              echo "result=NONE" >> "$GITHUB_OUTPUT"
+              echo "implement-infra-no-marker" > "$RUNNER_TEMP/failure-reason.txt"
               echo "::error::No AGENT_RESULT marker in worker output (infra failure — not an attempt)."
               exit 1 ;;
           esac
@@ -261,6 +287,11 @@ jobs:
           OPENCODE_CONFIG: ${{ github.workspace }}/.github/agent/opencode.json
           ISSUE_TITLE: ${{ steps.pick.outputs.title }}
           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          # Tighter than Implement's: this is where the real 84min hang
+          # happened (run 32749623046, issue #85) — a review call reads a
+          # diff and judges it, it doesn't need Implement's exploration room.
+          ENGINE_IDLE_TIMEOUT_SECONDS: "180"
+          ENGINE_HARD_CEILING_SECONDS: "900"
         run: |
           compose_review_prompt() {
             {
@@ -313,6 +344,7 @@ jobs:
           verdict=$(run_review)
           if [ "$verdict" = "APPROVE" ]; then exit 0; fi
           if [ "$verdict" != "FIX" ]; then
+            echo "review-no-verdict" > "$RUNNER_TEMP/failure-reason.txt"
             echo "::error::Reviewer emitted no parseable verdict from any model in the cascade (infra)."
             exit 1
           fi
@@ -325,9 +357,16 @@ jobs:
             echo
             sed -n '/VERDICT: FIX/,$p' "$RUNNER_TEMP/review-output.txt"
           } > "$RUNNER_TEMP/fix-prompt.txt"
-          bash .github/agent/run-engine.sh "${{ steps.pick.outputs.engine }}" "${{ steps.pick.outputs.model }}" "$RUNNER_TEMP/fix-prompt.txt"
+          # Real code work scoped to a numbered fix list, not open
+          # exploration — a bit more room than a plain review verdict, but
+          # not Implement's full 40min budget. Inline override: this call
+          # sits inside a step whose `env:` otherwise sets the tighter
+          # review-cascade values above.
+          ENGINE_IDLE_TIMEOUT_SECONDS=300 ENGINE_HARD_CEILING_SECONDS=1200 \
+            bash .github/agent/run-engine.sh "${{ steps.pick.outputs.engine }}" "${{ steps.pick.outputs.model }}" "$RUNNER_TEMP/fix-prompt.txt"
           verdict=$(run_review)
           if [ "$verdict" != "APPROVE" ]; then
+            echo "review-fix-exhausted" > "$RUNNER_TEMP/failure-reason.txt"
             echo "::error::Reviewer still not satisfied after one fix round."
             exit 1
           fi
@@ -336,14 +375,27 @@ jobs:
       - name: Verify — backend
         if: steps.implement.outputs.result == 'DONE'
         run: |
+          trap 'echo verify-backend > "$RUNNER_TEMP/failure-reason.txt"' ERR
           uv run pytest -q -n auto --dist=loadfile
           uvx ruff check .
           uvx ruff format --check .
           uv run mypy src/lexflow/
 
+      # pip-audit isn't a required branch-protection context, but the loop
+      # itself arms auto-merge — without this, an agent PR that introduces
+      # a CVE-flagged dependency could sail through Verify and land on main
+      # unblocked. Always-on like ci.yml's own pip-audit job (a docs-only
+      # PR must still catch a fresh upstream advisory).
+      - name: Verify — pip-audit (CVE gate)
+        if: steps.implement.outputs.result == 'DONE'
+        run: |
+          trap 'echo verify-pip-audit > "$RUNNER_TEMP/failure-reason.txt"' ERR
+          uv run --with pip-audit pip-audit --skip-editable
+
       - name: Verify — frontend (only if touched)
         if: steps.implement.outputs.result == 'DONE'
         run: |
+          trap 'echo verify-frontend > "$RUNNER_TEMP/failure-reason.txt"' ERR
           if git diff --name-only origin/main..HEAD | grep -q '^frontend/'; then
             cd frontend && npm run lint && npm run test && npm run build
           else
@@ -353,8 +405,11 @@ jobs:
       - name: Verify — landing (only if touched)
         if: steps.implement.outputs.result == 'DONE'
         run: |
+          trap 'echo verify-landing > "$RUNNER_TEMP/failure-reason.txt"' ERR
           if git diff --name-only origin/main..HEAD | grep -q '^landing/'; then
-            cd landing && npm install --no-audit --no-fund && npm run typecheck && npm run build
+            cd landing && npm install --no-audit --no-fund
+            npx playwright install --with-deps chromium
+            npm run typecheck && npm run build
           else
             echo "Diff does not touch landing/; skipping."
           fi
@@ -367,6 +422,7 @@ jobs:
           GH_TOKEN: ${{ secrets.AGENT_GH_PAT }}
           ISSUE_TITLE: ${{ steps.pick.outputs.title }}
         run: |
+          trap 'echo push-pr > "$RUNNER_TEMP/failure-reason.txt"' ERR
           branch=$(git branch --show-current)
           git push "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" "HEAD:refs/heads/$branch"
           {
@@ -380,6 +436,7 @@ jobs:
             echo "- [x] \`uv run pytest\` verde en el runner del loop"
             echo "- [x] \`uvx ruff check .\` y \`uvx ruff format --check .\` repo-wide"
             echo "- [x] \`uv run mypy src/lexflow/\`"
+            echo "- [x] \`pip-audit\` (CVE gate)"
             echo "- [x] Frontend lint+test+build si el diff toca \`frontend/\`"
             echo
             echo "_Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}_"
@@ -410,22 +467,44 @@ jobs:
           result="${{ steps.implement.outputs.result }}"
           implement_outcome="${{ steps.implement.outcome }}"
 
+          reason_file="$RUNNER_TEMP/failure-reason.txt"
+          if [ -f "$reason_file" ]; then
+            reason=$(cat "$reason_file")
+          elif [ "${{ job.status }}" = "cancelled" ]; then
+            # timeout-minutes cancels the job before a later step can write
+            # the file — Cleanup itself still runs (if: always()).
+            reason="job-timeout"
+          else
+            reason="unknown"
+          fi
+
           # Success paths: PR armed, or issue closed as already done.
           if [ "$result" = "ALREADY_DONE" ]; then exit 0; fi
           if [ "$result" = "DONE" ] && [ "${{ job.status }}" = "success" ]; then exit 0; fi
 
-          # Infra failures don't count as attempts: opencode crashed, no
-          # marker, quota/gateway errors.
+          # Infra failures don't count as real attempts: opencode crashed, no
+          # marker, quota/gateway errors, DONE-but-empty-diff. They DO get
+          # their own counter, though — an issue that reliably infra-fails
+          # (e.g. genuinely too large for a single call) would otherwise
+          # retry forever, 3x/day, with no escalation path (found
+          # 2026-08-25 investigating issue #52's timeout).
           if [ "$implement_outcome" = "failure" ] && [ "$result" != "BLOCKED" ] && [ "$result" != "DONE" ]; then
-            gh issue comment "$n" --body "<!-- agent-infra --> Agent loop infra failure (not an attempt): $RUN_URL"
+            infra_attempts=$(gh issue view "$n" --json comments \
+              --jq '[.comments[].body | select(contains("<!-- agent-infra -->"))] | length')
+            infra_attempts=$((infra_attempts + 1))
+            gh issue comment "$n" --body "<!-- agent-infra --> Agent loop infra failure $infra_attempts ($reason, not a real attempt): $RUN_URL"
+            if [ "$infra_attempts" -ge 3 ]; then
+              gh issue edit "$n" --add-label "agent:infra-stuck" || true
+            fi
             exit 0
           fi
 
-          # Attempt failure: BLOCKED, verify red, publish red, or timeout.
+          # Attempt failure: BLOCKED, verify red, publish red, or review
+          # cascade exhausted.
           attempts=$(gh issue view "$n" --json comments \
             --jq '[.comments[].body | select(contains("<!-- agent-attempt -->"))] | length')
           attempts=$((attempts + 1))
-          gh issue comment "$n" --body "<!-- agent-attempt --> Agent loop attempt $attempts failed: $RUN_URL"
+          gh issue comment "$n" --body "<!-- agent-attempt --> Agent loop attempt $attempts failed ($reason): $RUN_URL"
           if [ "$attempts" -ge 2 ]; then
             gh issue edit "$n" --add-label "agent:blocked" --remove-label "agent:failed" || true
           else
