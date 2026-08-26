@@ -15,7 +15,12 @@ se atasca. Desde 2026-08-26 la supervisión mecánica corre sola: el workflow
 atascadas y el estado de salud del loop sin que nadie tenga que abrir nada
 a mano. Los tres prompts de **Orca** (`.github/agent/orca/`) siguen
 existiendo para investigación puntual que sí requiere juicio humano/LLM,
-pero ya no son la única vía de supervisión — ver "Cambios recientes".
+pero ya no son la única vía de supervisión — ver "Cambios recientes". Desde
+la misma fecha, `external-pr-review.yml` cubre la otra puerta de entrada de
+un repo público — una PR abierta directamente desde un fork, sin pasar por
+ninguna issue — con una revisión de solo lectura, nunca autoritativa: nunca
+mergea, nunca ejecuta código de la PR, solo deja un comentario recomendando
+o desaconsejando el merge para que un humano decida.
 
 ## Motores de implementación (engines)
 
@@ -171,6 +176,44 @@ tres huecos de diseño que ya se han cerrado:
   debe hacerse desde un worktree dedicado (`../LexFlow-orca`), nunca en el
   checkout principal del mantenedor — mismo principio que la lección de
   `CLAUDE.md` (2026-06-06) sobre worktrees y trabajo no comiteado.
+- **`external-pr-review.yml`**: el allowlist de `pick-issue.sh` solo protege
+  el lado de las issues — alguien de fuera puede abrir una PR directamente
+  desde un fork sin pasar por ninguna issue. Este workflow nuevo la revisa
+  (ver sección propia abajo) sin poder nunca mergearla ni ejecutar su código.
+
+## Revisión de PRs externas
+
+`external-pr-review.yml` (trigger `pull_request_target`, tipos
+`opened`/`synchronize`/`reopened`) es la contraparte de seguridad del
+allowlist de issues, pero para PRs. Se salta silenciosamente si el autor
+está en el allowlist, es un bot, la PR ya lleva label `agent-pr` (es del
+propio loop), es un draft, o el diff supera 1500 líneas/50 ficheros (en ese
+caso comenta que es demasiado grande, sin gastar una llamada al modelo).
+
+Para lo demás: obtiene el diff como **texto** vía la API (`gh pr diff`,
+nunca hace `checkout` del HEAD de la PR ni ejecuta nada de su código — el
+paso de checkout se queda siempre en `main`), se lo pasa a un modelo
+(`opencode-go/kimi-k3`, sin cascada) con un config dedicado que **deniega
+edit/bash/webfetch por completo** — aunque el diff contenga una inyección
+de prompt, el modelo no tiene ninguna herramienta que ejecutar. El paso que
+llama al LLM nunca lleva un token con permiso de escritura en su entorno;
+solo el paso posterior que publica el comentario lo tiene, ya con el output
+del LLM capturado a fichero.
+
+El veredicto (`RECOMMEND_MERGE` / `NEEDS_CHANGES` / `DO_NOT_MERGE`) se
+publica siempre como **comentario normal**, nunca como review formal de
+GitHub (`APPROVE`/`REQUEST_CHANGES`) — la protección de rama de `main` hoy
+no exige ninguna review aprobatoria, así que un `APPROVE` de bot no
+desbloquea nada que un humano no pudiera ya hacer, pero sí daría una falsa
+sensación de autoridad, y se volvería un riesgo real si esa política cambia
+algún día. El comentario se edita en cada `synchronize` en vez de duplicarse
+en cada push. **La decisión de mergear sigue siendo siempre humana.**
+
+Como `pull_request_target` solo ejecuta la versión del workflow que ya está
+en la rama por defecto, no se puede probar de extremo a extremo desde la
+propia PR que lo introduce — se verifica después con
+`gh workflow run external-pr-review -f pr_number=<N>` contra una PR externa
+real ya abierta.
 
 ## Diagrama
 
@@ -231,10 +274,24 @@ flowchart TD
     SUPERVISOR -.->|quita label huérfana| CLAIM
     SUPERVISOR -.->|reporta, no auto-arregla| ORCA
 
+    EXTPR["🍴 PR abierta desde un fork<br/>(no pasa por ninguna issue)"] --> EGUARD
+
+    subgraph EXTREVIEW["GitHub Actions — external-pr-review.yml (pull_request_target)"]
+        EGUARD{"¿Autor allowlisted,<br/>bot, agent-pr o draft?"}
+        EGUARD -->|sí| ESKIP["Se salta, sin comentario"]
+        EGUARD -->|no, pero diff enorme| ETOOBIG["Comenta: demasiado grande<br/>para revisión automática"]
+        EGUARD -->|no| EDIFF["gh pr diff → texto<br/>(nunca checkout del HEAD de la PR)"]
+        EDIFF --> EREVIEW["kimi-k3<br/>config sin edit/bash/webfetch<br/>(sin token de escritura en este paso)"]
+        EREVIEW --> ECOMMENT["Comenta veredicto<br/>RECOMMEND_MERGE / NEEDS_CHANGES / DO_NOT_MERGE<br/>(edita en cada push, nunca APPROVE formal)"]
+    end
+
+    ECOMMENT -.->|"decisión de mergear<br/>SIEMPRE humana"| HUMAN["🧑 Mantenedor"]
+    ETOOBIG -.-> HUMAN
+
     classDef engine fill:#e8f0fe,stroke:#4285f4
     classDef risk fill:#fce8e6,stroke:#d93025
     classDef ok fill:#e6f4ea,stroke:#34a853
-    class CURSOR,OPENCODE engine
-    class FAILED,DISARM risk
+    class CURSOR,OPENCODE,EREVIEW engine
+    class FAILED,DISARM,ETOOBIG risk
     class MERGE,PR ok
 ```

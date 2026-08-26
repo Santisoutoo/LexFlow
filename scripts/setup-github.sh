@@ -78,6 +78,7 @@ LABELS=(
   "agent:failed|d4c5f9|Last agent-loop attempt failed; retry allowed"
   "agent:blocked|6f42c1|Two agent-loop attempts failed; needs a human"
   "agent:infra-stuck|e99695|3+ infra failures in a row; probably too large for a single call"
+  "external-contribution|006b75|PR from outside the agent-loop allowlist; auto-reviewed, needs human merge decision"
 )
 
 echo "==> Ensuring labels exist on ${REPO}"

@@ -8,7 +8,10 @@ mechanizes the deterministic parts of supervision: clears orphaned
 `agent:wip`, reports (never auto-fixes) stuck/red `agent-pr`s, and checks
 credential health. Orca (desktop, on the maintainer's machine, prompts under
 `.github/agent/orca/`) remains for ad hoc investigation that needs judgment —
-see "Supervision" below.
+see "Supervision" below. `external-pr-review.yml` covers the other entry
+point a public repo has — a PR opened directly from a fork, not through an
+issue — with a read-only, tool-less advisory review; see "External PR
+review" below.
 
 ## Files
 
@@ -20,6 +23,8 @@ see "Supervision" below.
 | `run-engine.sh` | Engine dispatcher: runs the worker via OpenCode or Cursor CLI |
 | `opencode.json` | OpenCode config for CI (no MCPs, headless permissions) |
 | `orca/` | Prompts for the local Orca supervision automations |
+| `external-reviewer-prompt.md` | System prompt for the external-PR review bot (`external-pr-review.yml`) |
+| `opencode-external-review.json` | OpenCode config for that bot — denies edit/bash/webfetch entirely |
 
 ## One-time setup (repo admin only)
 
@@ -40,7 +45,7 @@ see "Supervision" below.
    (PowerShell: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("$env:USERPROFILE\.local\share\opencode\auth.json"))`)
 3. Run `scripts/setup-github.sh` (or `gh label create`) so the labels
    `agent-pr`, `agent:wip`, `agent:failed`, `agent:blocked`,
-   `agent:infra-stuck` exist.
+   `agent:infra-stuck`, `external-contribution` exist.
 4. **`CURSOR_API_KEY`** (Actions secret, OPTIONAL): API key from the Cursor
    dashboard. With it: (a) `area: frontend` issues are implemented by the
    Cursor CLI (`composer-2.5`, Cursor's agent-native model — cheapest in the
@@ -154,6 +159,31 @@ stuck-pr-prompt's call), or a deeper credential/health diagnosis than the
 mechanical heuristic gives. Always run it from a dedicated worktree, never
 the primary checkout — see "Manual rescue" below for the exact commands.
 
+## External PR review
+
+The allowlist in `pick-issue.sh` only protects the issue side — someone
+outside it can still open a PR directly from a fork. `external-pr-review.yml`
+(triggered on `pull_request_target: opened/synchronize/reopened`) reviews
+those: it reads the diff with a locked-down, tool-less OpenCode config
+(`opencode-external-review.json`: `edit`/`bash`/`webfetch` all `deny`) and
+posts an advisory comment (edited in place on new pushes, never duplicated)
+with a `RECOMMEND_MERGE` / `NEEDS_CHANGES` / `DO_NOT_MERGE` verdict.
+
+It **never** approves as a formal GitHub review and **never** auto-merges —
+a human always decides. It also never checks out or executes the PR's own
+code (the checkout step stays on the base branch; the diff is fetched as
+text via the API), and the LLM-calling step never has a write-capable token
+in its env — only the separate comment-posting step does, after the LLM's
+output is already captured to a file. Skips silently for: the two
+allowlisted authors, bot authors (Dependabot etc.), the loop's own
+`agent-pr`s, drafts, and diffs bigger than 1500 lines / 50 files (comments
+"too large for automated review" instead of spending a call on it).
+
+Since `pull_request_target` workflows only run the version already on the
+base branch, this one can't be tested from the PR that introduces it — use
+`gh workflow run external-pr-review -f pr_number=<N>` against an already-open
+external PR to dry-run it manually.
+
 ## Pause / resume
 
 - Pause: `gh workflow disable agent-loop` (or delete the secrets).
@@ -186,3 +216,8 @@ in `CLAUDE.md` (2026-06-06) warns about.
 - The PAT has no Workflows scope, so a push touching `.github/workflows/` is
   rejected by GitHub itself; `area: ci-cd` issues are excluded by the picker
   for the same reason.
+- Direct PRs from a fork (not routed through an issue) are covered
+  separately by `external-pr-review.yml` — see "External PR review" above.
+  It never checks out or executes the PR's own code, never has a
+  write-capable token in the same step as the LLM call, and its reviewer
+  config denies every tool the model could otherwise call.
