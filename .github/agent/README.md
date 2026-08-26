@@ -3,9 +3,12 @@
 The `agent-loop` workflow (`.github/workflows/agent-loop.yml`) picks one open
 issue three times a day, implements it with an OpenCode worker (OpenCode Go
 models), has a second agent review the diff, verifies the full CI surface,
-opens a PR and arms auto-merge. Orca (desktop, on the maintainer's machine)
-supervises: daily report, stuck-PR detector, watchdog (prompts under
-`.github/agent/orca/`).
+opens a PR and arms auto-merge. `orca-supervisor.yml` (scheduled, once/day)
+mechanizes the deterministic parts of supervision: clears orphaned
+`agent:wip`, reports (never auto-fixes) stuck/red `agent-pr`s, and checks
+credential health. Orca (desktop, on the maintainer's machine, prompts under
+`.github/agent/orca/`) remains for ad hoc investigation that needs judgment —
+see "Supervision" below.
 
 ## Files
 
@@ -36,7 +39,8 @@ supervises: daily report, stuck-PR detector, watchdog (prompts under
 
    (PowerShell: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("$env:USERPROFILE\.local\share\opencode\auth.json"))`)
 3. Run `scripts/setup-github.sh` (or `gh label create`) so the labels
-   `agent-pr`, `agent:wip`, `agent:failed`, `agent:blocked` exist.
+   `agent-pr`, `agent:wip`, `agent:failed`, `agent:blocked`,
+   `agent:infra-stuck` exist.
 4. **`CURSOR_API_KEY`** (Actions secret, OPTIONAL): API key from the Cursor
    dashboard. With it: (a) `area: frontend` issues are implemented by the
    Cursor CLI (`composer-2.5`, Cursor's agent-native model — cheapest in the
@@ -53,13 +57,21 @@ judgment quality matters more than cost) are documented as comments next to
 the constants in `pick-issue.sh` and in the Review step of
 `agent-loop.yml`. Summary:
 
-| Task | Primary | Fallback(s) | Rationale |
+| Task | Primary (tier 0) | Fallback(s) (tier 1 / 2) | Rationale |
 |---|---|---|---|
 | Review (judgment/security) | `gpt-5.3-codex` (Cursor) | `gpt-5.6-sol` (Cursor) → `kimi-k3` (OpenCode) | Frontier reasoning first, "chino premium" as the guaranteed final attempt |
 | Implementation (general) | `kimi-k3` (OpenCode) | `glm-5.2` → `qwen3.7-max` | Chinese OSS models, flagship-class |
 | Implementation (`area: docs`) | `minimax-m3` (OpenCode) | `deepseek-v4-flash` → `mimo-v2.5` | Cheapest tier, prose-heavy work |
 | Implementation (`area: tests`) | `minimax-m3` (OpenCode) | `glm-5.2` → `deepseek-v4-flash` | Cheap but escalates for logic-heavy tests |
-| Implementation (`area: frontend`) | `composer-2.5` (Cursor) | `grok-4.5`/`grok-4.6` | Included pool, no draw on the paid allowance |
+| Implementation (`area: frontend`) | `composer-2.5` (Cursor) | `grok-4.5` → `grok-4.6` | Included pool, no draw on the paid allowance |
+
+**Implementation fallback auto-escalates** (since 2026-08-26): `derive_model()`
+in `pick-issue.sh` counts how many `<!-- agent-infra -->` comments the picked
+issue already has (0/1/2) and indexes straight into the tier for that count —
+no manual swap needed. A 3rd infra failure gets the issue `agent:infra-stuck`
+and excluded from the picker before a 4th attempt would ever happen, so tier 2
+is the ceiling. The Review cascade already auto-escalates on its own (tries
+each model in sequence, gated on whether a `VERDICT:` line parsed).
 
 The Review cascade and the frontend fallback both draw from Cursor's same
 $20/mo "Other Models" allowance when they escalate past the included pool —
@@ -69,10 +81,34 @@ Several model ids above (Cursor's `gpt-5.3-codex`/`gpt-5.6-sol`, OpenCode's
 web research in 2026-08 and are **not yet verified** against a live
 `cursor-agent --list-models` / OpenCode catalog call — sanity-check with a
 `workflow_dispatch` run on a low-stakes issue before trusting the 3x/day cron
-on them.
+on them, and especially before relying on the tier-1/2 auto-escalation above.
 
 Until both secrets exist the workflow runs but disarms itself at the first
 step (no failures, no noise).
+
+## Circuit breaker
+
+All `opencode-go/*` models share **one pooled budget** ($12/5h — see the
+`timeout-minutes: 90` comment in `agent-loop.yml`), so rotating tiers within
+that namespace doesn't protect against the pool itself running dry — only
+crossing to Cursor (a genuinely separate budget) does. The "Circuit breaker"
+step in `agent-loop.yml`, run before Pick issue, checks whether the last 3
+completed runs all concluded `failure` (via `gh run list`, a proxy signal —
+it can't see which engine a run used, only its overall conclusion). If so:
+
+- Cursor configured → force `engine=cursor` for this run, regardless of the
+  issue's area label.
+- Cursor not configured → skip the run entirely rather than burn a 4th
+  attempt against a possibly-exhausted opencode pool. The skipped run itself
+  concludes success/skip, which correctly resets the streak next cycle.
+
+Separately, the Implement step best-effort greps the worker's captured
+output for `429`/`rate limit`/`quota`/`insufficient credit` text and tags the
+failure `implement-quota-exhausted` instead of a generic infra reason when
+matched — a heuristic (a model could print those words in unrelated prose),
+but a faster, more specific signal than waiting for 3 generic infra fails.
+The `<!-- agent-infra -->` comment also now records `engine=`/`model=`, since
+`gh run list` can't reconstruct per-engine failure history on its own.
 
 ## Credential rotation
 
@@ -85,7 +121,9 @@ step (no failures, no noise).
 ## State machine (labels)
 
 - `agent:wip` — claimed by a running job. Orphaned `wip` (no run in progress,
-  no open PR) means a cancelled run; the Orca watchdog clears it.
+  no open PR) means a cancelled run; `orca-supervisor.yml` clears it daily
+  (it double-checks no agent-loop run is genuinely `in_progress` first, so it
+  never rips a label off a live claim).
 - `agent:failed` — one failed *real* attempt (BLOCKED verdict, verify red,
   review cascade exhausted, push/PR failure); the picker will retry it.
 - `agent:blocked` — two failed real attempts; the picker skips it until a
@@ -101,6 +139,21 @@ step (no failures, no noise).
   protection runs `strict:false`); a red agent PR therefore PAUSES the loop
   until it is closed or fixed — that is intentional fail-safe behaviour.
 
+## Supervision
+
+`orca-supervisor.yml` (`.github/workflows/orca-supervisor.yml`, cron 1x/day,
+30 min after the loop's last daily slot) mechanizes what doesn't need
+judgment: clears orphaned `agent:wip` (see State machine above), a
+credential-health heuristic against the last failing run's log, and a
+deduped comment on stuck/red `agent-pr`s — it reports, never auto-reruns or
+auto-closes. It writes a job summary every run.
+
+Local Orca (`.github/agent/orca/*.md`) is still worth reaching for when a
+situation needs actual judgment: is a red check flaky or real (the
+stuck-pr-prompt's call), or a deeper credential/health diagnosis than the
+mechanical heuristic gives. Always run it from a dedicated worktree, never
+the primary checkout — see "Manual rescue" below for the exact commands.
+
 ## Pause / resume
 
 - Pause: `gh workflow disable agent-loop` (or delete the secrets).
@@ -110,7 +163,14 @@ step (no failures, no noise).
 
 ## Manual rescue of `agent:blocked`
 
-1. Open the repo in Orca (or a terminal), create a branch `fix/...`.
+Always in a **dedicated worktree**, never in the maintainer's primary
+checkout — a local Orca/rescue session and a human editing the same repo at
+the same time is exactly the uncommitted-work collision the worktree lesson
+in `CLAUDE.md` (2026-06-06) warns about.
+
+1. `git worktree add ../LexFlow-orca -b fix/... main` (or `cd ../LexFlow-orca`
+   if it already exists), then `npm install --prefix frontend --no-fund
+   --no-audit` (worktrees don't share `node_modules`, same lesson).
 2. Run `opencode` interactively with `.github/agent/worker-prompt.md` as the
    opening prompt plus the issue text, or just fix it by hand.
 3. Open a normal PR; remove `agent:blocked` (or let `closes #N` end it).

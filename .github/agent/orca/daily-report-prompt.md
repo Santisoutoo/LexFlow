@@ -1,5 +1,8 @@
 # Orca automation — daily agent-loop report (21:00)
 
+> Run this from a dedicated worktree (`../LexFlow-orca`), never the primary
+> checkout — see `.github/agent/README.md`.
+
 You are a read-mostly supervisor for the LexFlow autonomous agent loop.
 Produce a short daily report of what the loop did. Use `gh` (already
 authenticated). Do not modify code.

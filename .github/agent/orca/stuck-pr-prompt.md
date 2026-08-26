@@ -1,5 +1,8 @@
 # Orca automation — stuck/red agent PR detector (every 4h)
 
+> Run this from a dedicated worktree (`../LexFlow-orca`), never the primary
+> checkout — see `.github/agent/README.md`.
+
 An open PR labelled `agent-pr` blocks the whole loop (one-in-flight guard),
 so a red or stalled one must be dealt with quickly. Use `gh`.
 
