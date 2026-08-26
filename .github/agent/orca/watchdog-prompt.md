@@ -1,5 +1,8 @@
 # Orca automation — loop watchdog (daily)
 
+> Run this from a dedicated worktree (`../LexFlow-orca`), never the primary
+> checkout — see `.github/agent/README.md`.
+
 Health-check the agent loop itself. Use `gh`.
 
 1. `gh run list --workflow agent-loop.yml --limit 6 --json conclusion,createdAt`.
