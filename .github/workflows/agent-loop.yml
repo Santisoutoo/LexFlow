@@ -31,7 +31,9 @@ concurrency:
   group: agent-loop
   cancel-in-progress: false
 
-permissions: {} # nothing via GITHUB_TOKEN; writes go through the PAT
+permissions:
+  actions: read # lets the circuit-breaker step call `gh run list` via the
+  # default GITHUB_TOKEN; every write still goes through AGENT_GH_PAT
 
 jobs:
   run-one-issue:
@@ -63,12 +65,45 @@ jobs:
             echo "proceed=true" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Circuit breaker — opencode failure streak
+        id: breaker
+        if: steps.guard.outputs.proceed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }} # read-only Actions API, never a write credential
+          CURSOR_AVAILABLE: ${{ secrets.CURSOR_API_KEY != '' }}
+        run: |
+          # Proxy signal, not ground truth: gh run list exposes conclusion
+          # but not which engine a run used or infra-vs-attempt failure, so
+          # "last 3 runs all failed" is the best available approximation of
+          # "opencode-go's pooled $12/5h budget may be exhausted." A run that
+          # the Guard step itself skips concludes success, which correctly
+          # resets the streak — a paused loop isn't evidence of exhaustion.
+          # Explicitly exclude the CURRENT run: gh run list can already list
+          # it (conclusion=null, in progress), which would otherwise always
+          # keep the breaker closed.
+          last3=$(gh run list --workflow agent-loop.yml --json databaseId,conclusion --limit 5 \
+            --jq '[.[] | select(.databaseId != ${{ github.run_id }}) | .conclusion] | .[0:3]')
+          all_failed=$(echo "$last3" | jq -r 'length == 3 and all(. == "failure")')
+          if [ "$all_failed" != "true" ]; then
+            echo "force_engine=" >> "$GITHUB_OUTPUT"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          elif [ "$CURSOR_AVAILABLE" = "true" ]; then
+            echo "Last 3 runs all failed — forcing engine=cursor (opencode-go pool may be exhausted)."
+            echo "force_engine=cursor" >> "$GITHUB_OUTPUT"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Last 3 runs all failed and Cursor is not configured — skipping this run rather than burning a 4th attempt against a possibly-exhausted opencode pool."
+            echo "force_engine=" >> "$GITHUB_OUTPUT"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Pick issue
         id: pick
-        if: steps.guard.outputs.proceed == 'true'
+        if: steps.guard.outputs.proceed == 'true' && steps.breaker.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ secrets.AGENT_GH_PAT }}
           FORCED_ISSUE: ${{ inputs.issue }}
+          FORCE_ENGINE: ${{ steps.breaker.outputs.force_engine }}
           # Cursor routing is best-effort: without the secret every issue
           # falls back to the OpenCode engine.
           CURSOR_AVAILABLE: ${{ secrets.CURSOR_API_KEY != '' }}
@@ -171,12 +206,35 @@ jobs:
           # Issue titles are third-party text; they reach the shell only
           # through env vars, never through ${{ }} inline interpolation.
           ISSUE_TITLE: ${{ steps.pick.outputs.title }}
+          ENGINE: ${{ steps.pick.outputs.engine }}
+          MODEL: ${{ steps.pick.outputs.model }}
         run: |
           git config user.name "lexflow-agent"
           git config user.email "agent-loop@users.noreply.github.com"
           slug=$(printf '%s' "$ISSUE_TITLE" \
             | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]\+/-/g; s/^-//; s/-$//' | cut -c1-40)
           git checkout -b "${{ steps.pick.outputs.branch_prefix }}/agent-issue-${{ steps.pick.outputs.number }}-$slug"
+
+          # Attribute every commit made from here on (Implement + the Review
+          # fix-round) to the engine/model that actually produced it. A hook,
+          # not a worker-prompt instruction: don't rely on the LLM to format
+          # a trailer correctly — this fires on every `git commit`.
+          if [ "$ENGINE" = "cursor" ]; then engine_label="Cursor"; else engine_label="OpenCode"; fi
+          model_slug=$(printf '%s' "$MODEL" | tr '[:upper:]/.' '[:lower:]--')
+          trailer="Co-authored-by: ${engine_label} (${MODEL}) <${model_slug}@users.noreply.github.com>"
+          mkdir -p .git/hooks
+          cat > .git/hooks/prepare-commit-msg <<HOOK
+          #!/usr/bin/env bash
+          # Installed by agent-loop.yml — appends engine attribution to every
+          # commit made during this run. Skip merge/squash commits.
+          case "\$2" in
+            merge|squash) exit 0 ;;
+          esac
+          if ! grep -qF "${trailer}" "\$1"; then
+            git interpret-trailers --if-exists doNothing --trailer "${trailer}" --in-place "\$1"
+          fi
+          HOOK
+          chmod +x .git/hooks/prepare-commit-msg
 
       # ---- Implement. No credentials in this step's env: the issue body is
       # ---- third-party data and the worker executes arbitrary code.
@@ -224,11 +282,19 @@ jobs:
           # (which keys off `result != DONE`) misclassified that guard
           # failure as a real attempt instead of the infra failure it is.
           if [ "$rc" != "0" ]; then
-            case "$rc" in
-              124) reason="implement-hard-ceiling" ;;
-              125) reason="implement-idle-timeout" ;;
-              *) reason="implement-infra-other" ;;
-            esac
+            # Best-effort text match on the worker's own output: a model
+            # could print these words in unrelated prose, so this is a
+            # heuristic, not proof — but it's a faster, more specific signal
+            # than waiting for 3 generic infra fails to escalate to a human.
+            if grep -qiE '429|rate.?limit|quota|insufficient.?(credit|balance)' "$RUNNER_TEMP/worker-output.txt"; then
+              reason="implement-quota-exhausted"
+            else
+              case "$rc" in
+                124) reason="implement-hard-ceiling" ;;
+                125) reason="implement-idle-timeout" ;;
+                *) reason="implement-infra-other" ;;
+              esac
+            fi
             echo "result=NONE" >> "$GITHUB_OUTPUT"
             echo "$reason" > "$RUNNER_TEMP/failure-reason.txt"
             echo "::error::opencode exited $rc (infra failure — not an attempt)"
@@ -492,7 +558,7 @@ jobs:
             infra_attempts=$(gh issue view "$n" --json comments \
               --jq '[.comments[].body | select(contains("<!-- agent-infra -->"))] | length')
             infra_attempts=$((infra_attempts + 1))
-            gh issue comment "$n" --body "<!-- agent-infra --> Agent loop infra failure $infra_attempts ($reason, not a real attempt): $RUN_URL"
+            gh issue comment "$n" --body "<!-- agent-infra --> Agent loop infra failure $infra_attempts ($reason, engine=${{ steps.pick.outputs.engine }}, model=${{ steps.pick.outputs.model }}, not a real attempt): $RUN_URL"
             if [ "$infra_attempts" -ge 3 ]; then
               gh issue edit "$n" --add-label "agent:infra-stuck" || true
             fi
