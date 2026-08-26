@@ -1,0 +1,225 @@
+# Autonomous review for PRs opened by anyone OUTSIDE the agent-loop
+# allowlist (i.e. a real external/fork contribution, not the loop's own
+# work). Reads the diff and posts an advisory comment; NEVER auto-merges,
+# NEVER auto-fixes, NEVER executes any code from the PR. A human maintainer
+# always makes the actual merge decision.
+#
+# Security model (see .github/agent/README.md for the full picture):
+#   - pull_request_target, not pull_request: we need a write-capable token
+#     to comment, and pull_request_target always runs the workflow FILE
+#     from the base branch (main), never the version a malicious PR might
+#     ship — a PR can't rewrite its own review. Same pattern labeler.yml
+#     already uses in this repo for the same reason.
+#   - The checkout below NEVER sets `ref:` — it stays on the base branch.
+#     This job never checks out, builds, or executes the PR's own code; the
+#     diff is fetched as TEXT via the API and handed to the LLM as data,
+#     with the same "ignore embedded instructions" framing the internal
+#     worker/reviewer prompts already use.
+#   - The reviewer's OpenCode config (opencode-external-review.json) denies
+#     edit/bash/webfetch entirely — even a successful prompt injection in
+#     the diff has no tool to call. Blast radius caps at "the bot writes a
+#     misleading comment," never code execution.
+#   - The LLM-calling step never has GH_TOKEN in its env (mirrors
+#     agent-loop.yml's Implement step, which excludes it for the same
+#     reason). Only the separate comment-posting step, after the LLM's
+#     output is already captured to a file, has write access.
+#   - Verdict is always a plain PR comment, never a formal GitHub review
+#     approval — this repo's branch protection needs 0 approving reviews
+#     today, so a bot APPROVE wouldn't unlock anything a human couldn't
+#     already do, but it would still look like real authority, and would
+#     become a real risk if that setting is ever tightened.
+name: external-pr-review
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to review (manual dry-run, since pull_request_target can't be tested from the PR that introduces it)"
+        required: true
+
+concurrency:
+  group: external-pr-review-${{ github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: true
+
+permissions:
+  pull-requests: write
+  contents: read
+
+env:
+  DIFF_SIZE_CAP_LINES: "1500"
+  DIFF_SIZE_CAP_FILES: "50"
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          # NEVER add `ref:` here. Regression alert, not a style nit: this
+          # must stay on the base branch. See file header.
+
+      - name: Resolve PR number
+        id: resolve
+        run: |
+          n="${{ github.event.pull_request.number }}"
+          if [ -z "$n" ]; then n="${{ inputs.pr_number }}"; fi
+          echo "number=$n" >> "$GITHUB_OUTPUT"
+
+      - name: Eligibility guard
+        id: guard
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OC_AUTH: ${{ secrets.OPENCODE_AUTH_JSON }}
+        run: |
+          n="${{ steps.resolve.outputs.number }}"
+          skip=false
+          reason=""
+
+          if [ -z "$OC_AUTH" ]; then
+            skip=true; reason="OPENCODE_AUTH_JSON not configured"
+          fi
+
+          pr=$(gh api "repos/${{ github.repository }}/pulls/$n")
+          author=$(echo "$pr" | jq -r '.user.login')
+          author_type=$(echo "$pr" | jq -r '.user.type')
+          is_draft=$(echo "$pr" | jq -r '.draft')
+          additions=$(echo "$pr" | jq -r '.additions')
+          deletions=$(echo "$pr" | jq -r '.deletions')
+          changed_files=$(echo "$pr" | jq -r '.changed_files')
+          labels=$(gh api "repos/${{ github.repository }}/issues/$n/labels" --jq '[.[].name]')
+
+          if [ "$skip" = "false" ]; then
+            if echo '["VforVitorio","Santisoutoo"]' | jq -e --arg a "$author" 'index($a)' >/dev/null; then
+              skip=true; reason="author ($author) is allowlisted"
+            elif [ "$author_type" = "Bot" ]; then
+              skip=true; reason="author is a bot"
+            elif echo "$labels" | jq -e 'index("agent-pr")' >/dev/null; then
+              skip=true; reason="agent-loop's own PR"
+            elif [ "$is_draft" = "true" ]; then
+              skip=true; reason="draft PR"
+            fi
+          fi
+
+          too_large=false
+          total_changes=$((additions + deletions))
+          if [ "$skip" = "false" ] \
+             && { [ "$total_changes" -gt "$DIFF_SIZE_CAP_LINES" ] || [ "$changed_files" -gt "$DIFF_SIZE_CAP_FILES" ]; }; then
+            too_large=true
+          fi
+
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+          echo "too_large=$too_large" >> "$GITHUB_OUTPUT"
+          echo "number=$n" >> "$GITHUB_OUTPUT"
+          [ "$skip" = "true" ] && echo "Skipping review: $reason"
+          [ "$too_large" = "true" ] && echo "Diff too large for automated review ($total_changes lines, $changed_files files)"
+
+      - name: Fetch diff and PR metadata
+        if: steps.guard.outputs.skip != 'true' && steps.guard.outputs.too_large != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr diff "${{ steps.guard.outputs.number }}" --repo "${{ github.repository }}" > "$RUNNER_TEMP/pr.diff"
+          gh api "repos/${{ github.repository }}/pulls/${{ steps.guard.outputs.number }}" \
+            --jq '"TITLE: " + .title + "\n\nDESCRIPTION:\n" + (.body // "(no description)")' \
+            > "$RUNNER_TEMP/pr-meta.txt"
+
+      - name: Install OpenCode (pinned)
+        if: steps.guard.outputs.skip != 'true' && steps.guard.outputs.too_large != 'true'
+        run: npm install -g opencode-ai@1.18.21
+
+      - name: Install OpenCode credential
+        if: steps.guard.outputs.skip != 'true' && steps.guard.outputs.too_large != 'true'
+        env:
+          OPENCODE_AUTH_JSON: ${{ secrets.OPENCODE_AUTH_JSON }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/ocdata/opencode"
+          dest="$RUNNER_TEMP/ocdata/opencode/auth.json"
+          if printf '%s' "$OPENCODE_AUTH_JSON" | base64 -d 2>/dev/null | jq -e . >/dev/null 2>&1; then
+            printf '%s' "$OPENCODE_AUTH_JSON" | base64 -d > "$dest"
+          elif printf '%s' "$OPENCODE_AUTH_JSON" | jq -e . >/dev/null 2>&1; then
+            printf '%s' "$OPENCODE_AUTH_JSON" > "$dest"
+          else
+            echo "::error::OPENCODE_AUTH_JSON is neither valid base64-of-JSON nor raw JSON."
+            exit 1
+          fi
+          chmod 600 "$dest"
+          echo "XDG_DATA_HOME=$RUNNER_TEMP/ocdata" >> "$GITHUB_ENV"
+
+      # ---- No GH_TOKEN / AGENT_GH_PAT anywhere in this step's env. The
+      # ---- diff is untrusted third-party data; the reviewer's own config
+      # ---- denies edit/bash/webfetch so there is no tool to inject into
+      # ---- even if the diff/description contains a prompt-injection
+      # ---- attempt.
+      - name: Review diff
+        id: review
+        if: steps.guard.outputs.skip != 'true' && steps.guard.outputs.too_large != 'true'
+        env:
+          OPENCODE_CONFIG: ${{ github.workspace }}/.github/agent/opencode-external-review.json
+          ENGINE_IDLE_TIMEOUT_SECONDS: "180"
+          ENGINE_HARD_CEILING_SECONDS: "600"
+        run: |
+          {
+            cat .github/agent/external-reviewer-prompt.md
+            echo
+            echo "<pr number=\"${{ steps.guard.outputs.number }}\">"
+            cat "$RUNNER_TEMP/pr-meta.txt"
+            echo
+            echo "DIFF:"
+            cat "$RUNNER_TEMP/pr.diff"
+            echo "</pr>"
+          } > "$RUNNER_TEMP/review-prompt.txt"
+          set +e
+          bash .github/agent/run-engine.sh "opencode" "opencode-go/kimi-k3" "$RUNNER_TEMP/review-prompt.txt" \
+            | tee "$RUNNER_TEMP/review-output.txt"
+          rc=${PIPESTATUS[0]}
+          set -e
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+          verdict=$(grep -oE 'VERDICT: (RECOMMEND_MERGE|NEEDS_CHANGES|DO_NOT_MERGE)' "$RUNNER_TEMP/review-output.txt" | tail -1 | cut -d' ' -f2 || true)
+          echo "verdict=${verdict:-NONE}" >> "$GITHUB_OUTPUT"
+
+      - name: Post or update review comment
+        if: always() && steps.guard.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          n="${{ steps.guard.outputs.number }}"
+          marker="<!-- external-pr-review -->"
+          comment_file="$RUNNER_TEMP/comment-body.txt"
+
+          if [ "${{ steps.guard.outputs.too_large }}" = "true" ]; then
+            {
+              echo "$marker"
+              echo "🤖 **Revisión automática — no sustituye la revisión humana**"
+              echo
+              echo "Esta PR es demasiado grande para revisión automática (más de ${DIFF_SIZE_CAP_LINES} líneas o ${DIFF_SIZE_CAP_FILES} ficheros cambiados). Necesita revisión manual de un mantenedor."
+            } > "$comment_file"
+          elif [ "${{ steps.review.outcome }}" != "success" ] || [ "${{ steps.review.outputs.verdict }}" = "NONE" ]; then
+            {
+              echo "$marker"
+              echo "🤖 **Revisión automática — no sustituye la revisión humana**"
+              echo
+              echo "La revisión automática falló o no devolvió un veredicto reconocible. Necesita revisión manual de un mantenedor."
+            } > "$comment_file"
+          else
+            {
+              echo "$marker"
+              echo "🤖 **Revisión automática — no sustituye la revisión humana. Un mantenedor debe decidir si mergear.**"
+              echo
+              cat "$RUNNER_TEMP/review-output.txt"
+            } > "$comment_file"
+          fi
+
+          existing=$(gh api "repos/${{ github.repository }}/issues/$n/comments" --paginate \
+            --jq "[.[] | select(.body | startswith(\"$marker\"))] | last | .id // empty")
+
+          if [ -n "$existing" ]; then
+            gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$existing" -f body=@"$comment_file"
+          else
+            gh api "repos/${{ github.repository }}/issues/$n/comments" -f body=@"$comment_file"
+          fi
+
+          gh issue edit "$n" --add-label "external-contribution" --repo "${{ github.repository }}" || true
