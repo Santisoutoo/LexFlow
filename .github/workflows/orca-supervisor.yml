@@ -1,0 +1,125 @@
+# Deterministic replacement for the parts of Orca (the manual, desktop-only
+# supervision routine) that don't need human/LLM judgment: clearing orphaned
+# `agent:wip`, a credential-health heuristic, and reporting stuck/red
+# `agent-pr`s. Runs on a schedule so nobody has to remember to open Orca.
+#
+# Deliberately does NOT auto-rerun or auto-close PRs — that needs the
+# flaky-vs-real-failure judgment call `.github/agent/orca/stuck-pr-prompt.md`
+# describes, which a script can't make safely. This workflow reports; a human
+# (or a future LLM-backed step) decides. See `.github/agent/README.md`.
+name: orca-supervisor
+
+on:
+  schedule:
+    - cron: "30 20 * * *" # 30 min after the agent-loop's last daily slot (20:00 UTC)
+  workflow_dispatch: {}
+
+permissions:
+  actions: read # gh run list/view via the default GITHUB_TOKEN
+
+jobs:
+  supervise:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Guard — secret configured
+        id: guard
+        env:
+          GH_TOKEN: ${{ secrets.AGENT_GH_PAT }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "AGENT_GH_PAT not configured; nothing to supervise."
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Clear orphaned agent:wip
+        id: wip
+        if: steps.guard.outputs.proceed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.AGENT_GH_PAT }}
+        run: |
+          # If a loop run is genuinely in progress right now (this workflow's
+          # 20:30 UTC slot can overlap the loop's 20:00 UTC slot within its
+          # 90min cap), its wip claim is legitimate — don't touch any wip
+          # label this cycle rather than risk ripping off a live claim.
+          running=$(gh run list --workflow agent-loop.yml --status in_progress --json databaseId --jq 'length')
+          if [ "$running" != "0" ]; then
+            echo "agent-loop is currently running; skipping wip cleanup this cycle."
+            echo "cleared=(skipped: loop running)" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          cleared=""
+          for n in $(gh issue list --state open --label "agent:wip" --json number --jq '.[].number'); do
+            open_pr=$(gh pr list --state open --search "closes #$n in:body" --json number --jq 'length')
+            if [ "$open_pr" = "0" ]; then
+              gh issue edit "$n" --remove-label "agent:wip" || true
+              cleared="$cleared #$n"
+            fi
+          done
+          echo "cleared=${cleared:-none}" >> "$GITHUB_OUTPUT"
+
+      - name: Credential health check
+        id: creds
+        if: steps.guard.outputs.proceed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          last6=$(gh run list --workflow agent-loop.yml --json databaseId,conclusion --limit 6)
+          all_failed=$(echo "$last6" | jq -r '[.[].conclusion] | length >= 3 and (.[0:3] | all(. == "failure"))')
+          status="OK"
+          if [ "$all_failed" = "true" ]; then
+            failed_id=$(echo "$last6" | jq -r '[.[] | select(.conclusion == "failure")][0].databaseId')
+            log=$(gh run view "$failed_id" --log-failed 2>/dev/null || true)
+            if echo "$log" | grep -qi "Invalid API key"; then
+              status="DOWN: OPENCODE_AUTH_JSON looks dead (Invalid API key in run $failed_id) — rotate it, see README.md Credential rotation"
+            elif echo "$log" | grep -qiE "bad credentials|401 |403 "; then
+              status="DOWN: a GitHub credential looks dead (401/403 in run $failed_id) — check AGENT_GH_PAT expiry"
+            else
+              status="DEGRADED: last 3+ runs failed (run $failed_id), no known credential signature — needs a human look"
+            fi
+          fi
+          no_run_24h=$(gh run list --workflow agent-loop.yml --json createdAt --limit 1 \
+            --jq 'if length == 0 then true else (now - (.[0].createdAt | fromdateiso8601)) > 86400 end')
+          if [ "$no_run_24h" = "true" ]; then
+            status="DOWN: no agent-loop run in the last 24h — check gh workflow list (may be disabled)"
+          fi
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+
+      - name: Stuck/red agent-pr report
+        id: stuck
+        if: steps.guard.outputs.proceed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.AGENT_GH_PAT }}
+        run: |
+          reported=""
+          for n in $(gh pr list --state open --label "agent-pr" --json number --jq '.[].number'); do
+            checks=$(gh pr checks "$n" --json state --jq '[.[] | select(.state == "FAILURE")] | length' 2>/dev/null || echo 0)
+            if [ "$checks" != "0" ]; then
+              last_comment=$(gh pr view "$n" --json comments --jq '.comments[-1].body // ""')
+              if ! echo "$last_comment" | grep -qF "<!-- orca-supervisor -->"; then
+                gh pr comment "$n" --body "<!-- orca-supervisor --> Red required check(s) on this agent PR — it is blocking the whole loop (one-in-flight guard). Needs a human look: rerun if flaky, or close + relabel the linked issue \`agent:failed\` if it's a real failure."
+              fi
+              reported="$reported #$n(red)"
+            fi
+          done
+          echo "reported=${reported:-none}" >> "$GITHUB_OUTPUT"
+
+      - name: Write job summary
+        if: always() && steps.guard.outputs.proceed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.AGENT_GH_PAT }}
+        run: |
+          backlog=$(gh issue list --state open --json number --jq 'length')
+          blocked=$(gh issue list --state open --label "agent:blocked" --json number --jq 'length')
+          failed=$(gh issue list --state open --label "agent:failed" --json number --jq 'length')
+          infra_stuck=$(gh issue list --state open --label "agent:infra-stuck" --json number --jq 'length')
+          {
+            echo "## Orca supervisor"
+            echo ""
+            echo "- **Loop health**: ${{ steps.creds.outputs.status }}"
+            echo "- **Orphaned agent:wip cleared**: ${{ steps.wip.outputs.cleared }}"
+            echo "- **Stuck/red agent-pr**: ${{ steps.stuck.outputs.reported }}"
+            echo "- **Backlog**: $backlog open ($blocked blocked, $failed failed, $infra_stuck infra-stuck)"
+          } >> "$GITHUB_STEP_SUMMARY"
