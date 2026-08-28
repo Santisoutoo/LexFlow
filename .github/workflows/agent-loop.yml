@@ -1,6 +1,7 @@
-# Autonomous agent loop: picks one eligible open issue, implements it with an
-# OpenCode worker (OpenCode Go models), verifies the full CI surface locally,
-# opens a PR and arms auto-merge. Fully unattended; Orca (local) supervises.
+# Autonomous agent loop: an agent picks one eligible open issue with business
+# judgment, a second agent plans the implementation, a Cursor CLI worker
+# implements the plan, verifies the full CI surface locally, opens a PR and
+# arms auto-merge. Fully unattended; Orca (local) supervises.
 #
 # Design notes (see .github/agent/README.md for the runbook):
 #   - Everything that writes to GitHub uses AGENT_GH_PAT (fine-grained PAT,
@@ -20,7 +21,7 @@ name: agent-loop
 
 on:
   schedule:
-    - cron: "0 6,13,20 * * *" # 3 runs/day — pacing for the Go budget
+    - cron: "0 6,13,20 * * *" # 3 runs/day — pacing for the Cursor budget
   workflow_dispatch:
     inputs:
       issue:
@@ -38,7 +39,7 @@ permissions:
 jobs:
   run-one-issue:
     runs-on: ubuntu-latest
-    timeout-minutes: 90 # hard cap so a stuck issue can't burn the $12/5h window
+    timeout-minutes: 90 # hard cap so a stuck issue can't burn the Cursor budget
     steps:
       - uses: actions/checkout@v7
         with:
@@ -50,10 +51,10 @@ jobs:
         id: guard
         env:
           GH_TOKEN: ${{ secrets.AGENT_GH_PAT }}
-          OC_AUTH: ${{ secrets.OPENCODE_AUTH_JSON }}
+          CURSOR_KEY: ${{ secrets.CURSOR_API_KEY }}
         run: |
-          if [ -z "$GH_TOKEN" ] || [ -z "$OC_AUTH" ]; then
-            echo "AGENT_GH_PAT / OPENCODE_AUTH_JSON not configured; loop disarmed."
+          if [ -z "$GH_TOKEN" ] || [ -z "$CURSOR_KEY" ]; then
+            echo "AGENT_GH_PAT / CURSOR_API_KEY not configured; loop disarmed."
             echo "proceed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -65,36 +66,43 @@ jobs:
             echo "proceed=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Circuit breaker — opencode failure streak
+      # Installed early, before Pick issue: the picker (inside pick-issue.sh)
+      # and the Plan implementation step both invoke cursor-agent themselves,
+      # ahead of the heavier setup (submodule/uv/node) further down that only
+      # Implement actually needs.
+      - name: Install Cursor CLI
+        if: steps.guard.outputs.proceed == 'true'
+        run: |
+          curl -fsS https://cursor.com/install | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Circuit breaker — fallos seguidos
         id: breaker
         if: steps.guard.outputs.proceed == 'true'
         env:
           GH_TOKEN: ${{ github.token }} # read-only Actions API, never a write credential
-          CURSOR_AVAILABLE: ${{ secrets.CURSOR_API_KEY != '' }}
         run: |
           # Proxy signal, not ground truth: gh run list exposes conclusion
-          # but not which engine a run used or infra-vs-attempt failure, so
-          # "last 3 runs all failed" is the best available approximation of
-          # "opencode-go's pooled $12/5h budget may be exhausted." A run that
-          # the Guard step itself skips concludes success, which correctly
-          # resets the streak — a paused loop isn't evidence of exhaustion.
-          # Explicitly exclude the CURRENT run: gh run list can already list
-          # it (conclusion=null, in progress), which would otherwise always
-          # keep the breaker closed.
+          # but not infra-vs-attempt failure, so "last 3 runs all failed" is
+          # the best available approximation of "Cursor's budget/quota may be
+          # exhausted." A run that the Guard step itself skips concludes
+          # success, which correctly resets the streak — a paused loop isn't
+          # evidence of exhaustion. Explicitly exclude the CURRENT run: gh run
+          # list can already list it (conclusion=null, in progress), which
+          # would otherwise always keep the breaker closed.
+          #
+          # With a single engine there is nowhere left to escalate to — this
+          # just skips the run rather than burning a 4th attempt against a
+          # possibly-exhausted Cursor quota. The skipped run itself concludes
+          # success/skip, which resets the streak next cycle.
           last3=$(gh run list --workflow agent-loop.yml --json databaseId,conclusion --limit 5 \
             --jq '[.[] | select(.databaseId != ${{ github.run_id }}) | .conclusion] | .[0:3]')
           all_failed=$(echo "$last3" | jq -r 'length == 3 and all(. == "failure")')
-          if [ "$all_failed" != "true" ]; then
-            echo "force_engine=" >> "$GITHUB_OUTPUT"
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          elif [ "$CURSOR_AVAILABLE" = "true" ]; then
-            echo "Last 3 runs all failed — forcing engine=cursor (opencode-go pool may be exhausted)."
-            echo "force_engine=cursor" >> "$GITHUB_OUTPUT"
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "Last 3 runs all failed and Cursor is not configured — skipping this run rather than burning a 4th attempt against a possibly-exhausted opencode pool."
-            echo "force_engine=" >> "$GITHUB_OUTPUT"
+          if [ "$all_failed" = "true" ]; then
+            echo "Last 3 runs all failed — skipping this run rather than burning a 4th attempt against a possibly-exhausted Cursor quota."
             echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Pick issue
@@ -102,11 +110,8 @@ jobs:
         if: steps.guard.outputs.proceed == 'true' && steps.breaker.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ secrets.AGENT_GH_PAT }}
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
           FORCED_ISSUE: ${{ inputs.issue }}
-          FORCE_ENGINE: ${{ steps.breaker.outputs.force_engine }}
-          # Cursor routing is best-effort: without the secret every issue
-          # falls back to the OpenCode engine.
-          CURSOR_AVAILABLE: ${{ secrets.CURSOR_API_KEY != '' }}
         run: bash .github/agent/pick-issue.sh
 
       - name: Claim issue
@@ -162,51 +167,12 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Install OpenCode (pinned)
-        if: steps.pick.outputs.empty == 'false'
-        run: npm install -g opencode-ai@1.18.21
-
-      - name: Install Cursor CLI
-        # Needed whenever the secret exists, not only when the worker routes
-        # to Cursor: the reviewer's frontier cascade (below) tries Cursor's
-        # "Other Models" pool first regardless of which engine implemented.
-        # Gated on steps.pick.outputs.cursor_available, NOT `secrets.` directly:
-        # GitHub rejects a step `if:` that references the secrets context with
-        # "Unrecognized named-value: 'secrets'" at workflow-dispatch validation
-        # time (broke this exact line in PR #101, discovered 2026-08-24).
-        if: steps.pick.outputs.empty == 'false' && steps.pick.outputs.cursor_available == 'true'
-        run: |
-          curl -fsS https://cursor.com/install | bash
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Install OpenCode credential
-        if: steps.pick.outputs.empty == 'false'
-        env:
-          OPENCODE_AUTH_JSON: ${{ secrets.OPENCODE_AUTH_JSON }}
-        run: |
-          mkdir -p "$RUNNER_TEMP/ocdata/opencode"
-          dest="$RUNNER_TEMP/ocdata/opencode/auth.json"
-          # Accept the secret as base64 OR as raw JSON — whichever decodes to
-          # valid JSON wins, so a mis-pasted secret fails loudly here instead
-          # of as a cryptic auth error in the implement step.
-          if printf '%s' "$OPENCODE_AUTH_JSON" | base64 -d 2>/dev/null | jq -e . >/dev/null 2>&1; then
-            printf '%s' "$OPENCODE_AUTH_JSON" | base64 -d > "$dest"
-          elif printf '%s' "$OPENCODE_AUTH_JSON" | jq -e . >/dev/null 2>&1; then
-            printf '%s' "$OPENCODE_AUTH_JSON" > "$dest"
-          else
-            echo "::error::OPENCODE_AUTH_JSON is neither valid base64-of-JSON nor raw JSON."
-            exit 1
-          fi
-          chmod 600 "$dest"
-          echo "XDG_DATA_HOME=$RUNNER_TEMP/ocdata" >> "$GITHUB_ENV"
-
       - name: Git identity + work branch
         if: steps.pick.outputs.empty == 'false'
         env:
           # Issue titles are third-party text; they reach the shell only
           # through env vars, never through ${{ }} inline interpolation.
           ISSUE_TITLE: ${{ steps.pick.outputs.title }}
-          ENGINE: ${{ steps.pick.outputs.engine }}
           MODEL: ${{ steps.pick.outputs.model }}
         run: |
           git config user.name "lexflow-agent"
@@ -216,12 +182,11 @@ jobs:
           git checkout -b "${{ steps.pick.outputs.branch_prefix }}/agent-issue-${{ steps.pick.outputs.number }}-$slug"
 
           # Attribute every commit made from here on (Implement + the Review
-          # fix-round) to the engine/model that actually produced it. A hook,
-          # not a worker-prompt instruction: don't rely on the LLM to format
-          # a trailer correctly — this fires on every `git commit`.
-          if [ "$ENGINE" = "cursor" ]; then engine_label="Cursor"; else engine_label="OpenCode"; fi
+          # fix-round) to the model that actually produced it. A hook, not a
+          # worker-prompt instruction: don't rely on the LLM to format a
+          # trailer correctly — this fires on every `git commit`.
           model_slug=$(printf '%s' "$MODEL" | tr '[:upper:]/.' '[:lower:]--')
-          trailer="Co-authored-by: ${engine_label} (${MODEL}) <${model_slug}@users.noreply.github.com>"
+          trailer="Co-authored-by: Cursor (${MODEL}) <${model_slug}@users.noreply.github.com>"
           mkdir -p .git/hooks
           cat > .git/hooks/prepare-commit-msg <<HOOK
           #!/usr/bin/env bash
@@ -236,17 +201,51 @@ jobs:
           HOOK
           chmod +x .git/hooks/prepare-commit-msg
 
-      # ---- Implement. No credentials in this step's env: the issue body is
-      # ---- third-party data and the worker executes arbitrary code.
-      - name: Implement (OpenCode worker)
+      # ---- Plan implementation: a strong, read-only pass over the issue and
+      # ---- the real repo before any code gets written. Lets Implement below
+      # ---- use a cheaper model to EXECUTE the plan instead of reasoning the
+      # ---- approach from scratch. Single call, no cascade (see model table
+      # ---- in README.md); a failed or empty plan is a soft failure — worth
+      # ---- logging, never worth blocking the run over, since Implement can
+      # ---- still proceed by reasoning from the issue directly.
+      - name: Plan implementation
+        id: plan
+        if: steps.pick.outputs.empty == 'false'
+        env:
+          ISSUE_TITLE: ${{ steps.pick.outputs.title }}
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+        run: |
+          {
+            cat .github/agent/planner-prompt.md
+            echo
+            echo "<issue number=\"${{ steps.pick.outputs.number }}\">"
+            printf 'TITLE: %s\n' "$ISSUE_TITLE"
+            echo
+            echo "BODY:"
+            cat "$RUNNER_TEMP/issue-body.md"
+            echo "</issue>"
+          } > "$RUNNER_TEMP/plan-prompt.txt"
+          set +e
+          ENGINE_MODE=ask bash .github/agent/run-engine.sh "cursor" "gpt-5.3-codex" "$RUNNER_TEMP/plan-prompt.txt" \
+            > "$RUNNER_TEMP/plan.md"
+          rc=$?
+          set -e
+          if [ "$rc" != "0" ] || [ ! -s "$RUNNER_TEMP/plan.md" ]; then
+            echo "Planner produced no usable plan (exit $rc) — Implement will proceed without one."
+            rm -f "$RUNNER_TEMP/plan.md"
+          fi
+
+      # ---- Implement. No GitHub-write credentials in this step's env: the
+      # ---- issue body is third-party data and the worker executes arbitrary
+      # ---- code.
+      - name: Implement (Cursor worker)
         id: implement
         if: steps.pick.outputs.empty == 'false'
         env:
-          OPENCODE_CONFIG: ${{ github.workspace }}/.github/agent/opencode.json
           ISSUE_TITLE: ${{ steps.pick.outputs.title }}
-          # Model credential for the cursor engine (same exposure class as
-          # opencode's auth.json on disk); GitHub-write creds stay excluded.
-          CURSOR_API_KEY: ${{ steps.pick.outputs.engine == 'cursor' && secrets.CURSOR_API_KEY || '' }}
+          # GitHub-write creds stay excluded from this step; only the model
+          # credential is present.
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
           # Wide-scope issues genuinely need exploration room (2026-08-25,
           # issue #52: killed mid-exploration by a flat 15min cap) — give
           # Implement a generous idle window and hard ceiling.
@@ -255,6 +254,12 @@ jobs:
         run: |
           {
             cat .github/agent/worker-prompt.md
+            if [ -s "$RUNNER_TEMP/plan.md" ]; then
+              echo
+              echo "## Plan de implementación a seguir"
+              echo
+              cat "$RUNNER_TEMP/plan.md"
+            fi
             echo
             echo "<issue number=\"${{ steps.pick.outputs.number }}\">"
             printf 'TITLE: %s\n' "$ISSUE_TITLE"
@@ -297,19 +302,19 @@ jobs:
             fi
             echo "result=NONE" >> "$GITHUB_OUTPUT"
             echo "$reason" > "$RUNNER_TEMP/failure-reason.txt"
-            echo "::error::opencode exited $rc (infra failure — not an attempt)"
+            echo "::error::cursor-agent exited $rc (infra failure — not an attempt)"
             exit 1
           fi
           case "$result" in
             DONE)
-              # Empty-diff guard: headless opencode is known to exit silently
-              # with no real work (anomalyco/opencode#28605) — this is the
-              # SAME infra-class failure the guard above catches, so it must
-              # never count as one of the 2 real attempts before agent:blocked.
+              # Empty-diff guard: a headless CLI worker can exit "successfully"
+              # with no real work done — this is an infra-class failure, so it
+              # must never count as one of the 2 real attempts before
+              # agent:blocked.
               if [ "$commits" = "0" ] || [ -n "$(git status --porcelain)" ]; then
                 echo "result=EMPTY_DIFF" >> "$GITHUB_OUTPUT"
                 echo "implement-infra-empty-diff" > "$RUNNER_TEMP/failure-reason.txt"
-                echo "::error::Worker said DONE but the tree is not a clean set of new commits (opencode#28605) — infra failure."
+                echo "::error::Worker said DONE but the tree is not a clean set of new commits — infra failure."
                 exit 1
               fi
               echo "result=DONE" >> "$GITHUB_OUTPUT" ;;
@@ -347,10 +352,9 @@ jobs:
       # ---- Post-PR inline review threads would deadlock the merge
       # ---- (required_conversation_resolution), so all review happens here.
       # ---- One fix round allowed; a second FIX verdict fails the run.
-      - name: Review (Cursor frontier, chino-premium fallback)
+      - name: Review (Cursor frontier cascade)
         if: steps.implement.outputs.result == 'DONE'
         env:
-          OPENCODE_CONFIG: ${{ github.workspace }}/.github/agent/opencode.json
           ISSUE_TITLE: ${{ steps.pick.outputs.title }}
           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
           # Tighter than Implement's: this is where the real 84min hang
@@ -375,12 +379,12 @@ jobs:
           }
           # Reviewer model cascade — judgment on security/correctness gets the
           # strongest reasoning we can afford, cheapest-first fallback only
-          # when a step is unavailable or gives no parseable verdict:
-          #   1) gpt-5.3-codex  Cursor "Other Models" pool — frontier, coding-specialised
-          #   2) gpt-5.6-sol    Cursor "Other Models" pool — frontier alt, same pool/provider
-          #   3) opencode-go/kimi-k3  OpenCode Go — "chino premium", no extra secret needed,
-          #      the guaranteed final attempt if CURSOR_API_KEY is unset or both frontier
-          #      attempts fail (e.g. the $20/mo Other-Models allowance is exhausted).
+          # when a step gives no parseable verdict. All three now live on
+          # Cursor, on purpose diversified across upstream vendors so one
+          # provider's outage doesn't take out the whole cascade:
+          #   1) gpt-5.3-codex   OpenAI   — frontier, coding-specialised
+          #   2) gpt-5.6-sol     OpenAI   — frontier alt, same vendor
+          #   3) kimi-k3-max     Moonshot — different vendor, guaranteed final attempt
           # tee to stderr: each attempt's stdout must carry ONLY the verdict
           # (it is captured with $(...)), while the log still shows the review.
           run_review_attempt() {
@@ -394,16 +398,14 @@ jobs:
           }
           run_review() {
             local verdict=""
-            if [ -n "${CURSOR_API_KEY:-}" ]; then
-              verdict=$(run_review_attempt cursor gpt-5.3-codex)
-              if [ -z "$verdict" ]; then
-                echo "Reviewer: gpt-5.3-codex gave no verdict, trying gpt-5.6-sol." >&2
-                verdict=$(run_review_attempt cursor gpt-5.6-sol)
-              fi
+            verdict=$(run_review_attempt cursor gpt-5.3-codex)
+            if [ -z "$verdict" ]; then
+              echo "Reviewer: gpt-5.3-codex gave no verdict, trying gpt-5.6-sol." >&2
+              verdict=$(run_review_attempt cursor gpt-5.6-sol)
             fi
             if [ -z "$verdict" ]; then
-              echo "Reviewer: falling back to opencode-go/kimi-k3." >&2
-              verdict=$(run_review_attempt opencode "opencode-go/kimi-k3")
+              echo "Reviewer: gpt-5.6-sol gave no verdict, trying kimi-k3-max." >&2
+              verdict=$(run_review_attempt cursor kimi-k3-max)
             fi
             echo "$verdict"
           }
@@ -548,8 +550,8 @@ jobs:
           if [ "$result" = "ALREADY_DONE" ]; then exit 0; fi
           if [ "$result" = "DONE" ] && [ "${{ job.status }}" = "success" ]; then exit 0; fi
 
-          # Infra failures don't count as real attempts: opencode crashed, no
-          # marker, quota/gateway errors, DONE-but-empty-diff. They DO get
+          # Infra failures don't count as real attempts: cursor-agent crashed,
+          # no marker, quota/gateway errors, DONE-but-empty-diff. They DO get
           # their own counter, though — an issue that reliably infra-fails
           # (e.g. genuinely too large for a single call) would otherwise
           # retry forever, 3x/day, with no escalation path (found

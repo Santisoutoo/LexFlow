@@ -1,13 +1,29 @@
 #!/usr/bin/env bash
-# Runs one implementation pass with the selected engine.
+# Runs one cursor-agent pass in the selected mode.
 #
 # Usage: run-engine.sh <engine> <model> <prompt-file>
-#   engine: "opencode" | "cursor"
+#   engine: "cursor" (only supported value — kept as a positional arg for
+#           compatibility with callers that still pass it explicitly)
 #
-# Both engines receive the same worker prompt and honour the same finish
-# protocol (AGENT_RESULT markers), so the surrounding workflow parses their
-# output identically. Auth: opencode reads auth.json from XDG_DATA_HOME;
+# Mode, via ENGINE_MODE (default "full"):
+#   full — Implement / Review, trusted first-party code: `--force` (skips
+#          both the workspace-trust prompt and per-command approval).
+#   ask  — picker, planner, external-PR reviewer: pure read/analyze, never
+#          write. `--mode ask --trust --sandbox enabled`, NEVER `--force`/
+#          `--yolo`. `--trust` is required even here: verified locally
+#          (2026-08-28) that `--mode ask` alone still blocks on the
+#          "Workspace Trust Required" prompt in a non-interactive shell —
+#          only `--trust` (or `--force`, which implies it) skips that gate.
+#          `--sandbox enabled` is Linux-only (fine, the runner is
+#          ubuntu-latest) and hasn't been exercised on a live CI run yet —
+#          same "verify before trusting the cron" caveat as the model ids in
+#          README.md.
+#
 # cursor-agent reads CURSOR_API_KEY from the environment.
+#
+# opencode was removed 2026-08-28: it kept failing without a diagnosable
+# error, and Cursor already covered every code path opencode did. See
+# CLAUDE.md §11 for the full lesson.
 #
 # Every invocation is bounded by an IDLE timeout, not a flat wall-clock one.
 # On 2026-08-24 a cursor-agent review call (run 32749623046, issue #85) hung
@@ -28,14 +44,28 @@ PROMPT_FILE="$3"
 IDLE_TIMEOUT_SECONDS="${ENGINE_IDLE_TIMEOUT_SECONDS:-300}"
 HARD_CEILING_SECONDS="${ENGINE_HARD_CEILING_SECONDS:-900}"
 
+ENGINE_MODE="${ENGINE_MODE:-full}"
+
 case "$ENGINE" in
-  opencode)
-    cmd=(opencode run --model "$MODEL" "$(cat "$PROMPT_FILE")")
-    ;;
   cursor)
-    # -p: non-interactive print mode; --force: skip the workspace-trust and
-    # command-approval prompts (required headless).
-    cmd=(cursor-agent -p --force --model "$MODEL" "$(cat "$PROMPT_FILE")")
+    case "$ENGINE_MODE" in
+      full)
+        # -p: non-interactive print mode; --force: skip the workspace-trust
+        # and command-approval prompts (required headless).
+        cmd=(cursor-agent -p --force --model "$MODEL" "$(cat "$PROMPT_FILE")")
+        ;;
+      ask)
+        # Read-only: no --force/--yolo, ever. --trust only skips the
+        # workspace-trust prompt (still required headless, see header); it
+        # does not grant command-approval like --force does, and --mode ask
+        # has no edit/bash tool to approve in the first place.
+        cmd=(cursor-agent -p --mode ask --trust --sandbox enabled --model "$MODEL" "$(cat "$PROMPT_FILE")")
+        ;;
+      *)
+        echo "::error::Unknown ENGINE_MODE '$ENGINE_MODE'" >&2
+        exit 1
+        ;;
+    esac
     ;;
   *)
     echo "::error::Unknown engine '$ENGINE'" >&2

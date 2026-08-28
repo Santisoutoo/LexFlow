@@ -1,30 +1,35 @@
 # Autonomous agent loop — runbook
 
 The `agent-loop` workflow (`.github/workflows/agent-loop.yml`) picks one open
-issue three times a day, implements it with an OpenCode worker (OpenCode Go
-models), has a second agent review the diff, verifies the full CI surface,
-opens a PR and arms auto-merge. `orca-supervisor.yml` (scheduled, once/day)
-mechanizes the deterministic parts of supervision: clears orphaned
-`agent:wip`, reports (never auto-fixes) stuck/red `agent-pr`s, and checks
-credential health. Orca (desktop, on the maintainer's machine, prompts under
-`.github/agent/orca/`) remains for ad hoc investigation that needs judgment —
-see "Supervision" below. `external-pr-review.yml` covers the other entry
-point a public repo has — a PR opened directly from a fork, not through an
-issue — with a read-only, tool-less advisory review; see "External PR
-review" below.
+issue three times a day — using an agent with business judgment, not a blind
+sort — plans the implementation with a second read-only agent, implements the
+plan with a Cursor CLI worker, has a fourth agent review the diff, verifies
+the full CI surface, opens a PR and arms auto-merge. `orca-supervisor.yml`
+(scheduled, once/day) mechanizes the deterministic parts of supervision:
+clears orphaned `agent:wip`, reports (never auto-fixes) stuck/red `agent-pr`s,
+and checks credential health. Orca (desktop, on the maintainer's machine,
+prompts under `.github/agent/orca/`) remains for ad hoc investigation that
+needs judgment — see "Supervision" below. `external-pr-review.yml` covers the
+other entry point a public repo has — a PR opened directly from a fork, not
+through an issue — with a read-only, tool-less advisory review; see "External
+PR review" below.
+
+Everything runs on the Cursor CLI (`cursor-agent`) — opencode was removed
+2026-08-28 after it kept failing without a diagnosable error; see CLAUDE.md
+§11 for the full lesson.
 
 ## Files
 
 | File | Role |
 |---|---|
+| `picker-prompt.md` | System prompt for the issue-selection agent |
+| `planner-prompt.md` | System prompt for the read-only implementation planner |
 | `worker-prompt.md` | System prompt for the implementer agent |
 | `reviewer-prompt.md` | System prompt for the pre-PR reviewer agent |
-| `pick-issue.sh` | Issue picker: author allowlist, label filters, engine+model routing |
-| `run-engine.sh` | Engine dispatcher: runs the worker via OpenCode or Cursor CLI |
-| `opencode.json` | OpenCode config for CI (no MCPs, headless permissions) |
+| `pick-issue.sh` | Issue picker: author allowlist, label filters, picker-agent call, model routing |
+| `run-engine.sh` | Runs one `cursor-agent` pass, in `full` (trusted write) or `ask` (read-only) mode |
 | `orca/` | Prompts for the local Orca supervision automations |
 | `external-reviewer-prompt.md` | System prompt for the external-PR review bot (`external-pr-review.yml`) |
-| `opencode-external-review.json` | OpenCode config for that bot — denies edit/bash/webfetch entirely |
 
 ## One-time setup (repo admin only)
 
@@ -34,41 +39,60 @@ review" below.
    even under prompt injection). Note the expiry date below. The default
    `GITHUB_TOKEN` cannot be used: PRs it creates never trigger the required
    `pull_request` checks, so auto-merge would never fire.
-2. **`OPENCODE_AUTH_JSON`** (Actions secret): base64 of an `auth.json`
-   holding a valid OpenCode Go API key. Generate from a machine where
-   `opencode` is logged in:
-
-   ```bash
-   base64 -w0 ~/.local/share/opencode/auth.json
-   ```
-
-   (PowerShell: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("$env:USERPROFILE\.local\share\opencode\auth.json"))`)
+2. **`CURSOR_API_KEY`** (Actions secret, REQUIRED — the loop has no fallback
+   engine): API key from the Cursor dashboard. Without it the Guard step
+   disarms the whole loop at the first step (no failures, no noise), same as
+   a missing `AGENT_GH_PAT`.
 3. Run `scripts/setup-github.sh` (or `gh label create`) so the labels
    `agent-pr`, `agent:wip`, `agent:failed`, `agent:blocked`,
    `agent:infra-stuck`, `external-contribution` exist.
-4. **`CURSOR_API_KEY`** (Actions secret, OPTIONAL): API key from the Cursor
-   dashboard. With it: (a) `area: frontend` issues are implemented by the
-   Cursor CLI (`composer-2.5`, Cursor's agent-native model — cheapest in the
-   Pro plan's included "Cursor Models" pool) instead of OpenCode, and (b) the
-   reviewer tries frontier judgment first (`gpt-5.3-codex`, then `gpt-5.6-sol`,
-   both from Cursor's paid "Other Models" pool) before falling back to
-   OpenCode's `kimi-k3`. Without the secret, every issue implements on
-   OpenCode and the reviewer goes straight to `kimi-k3`.
+
+## Issue selection
+
+`pick-issue.sh` filters candidates deterministically (allowlisted author, no
+excluded label — `agent:blocked`/`agent:infra-stuck` issues never even reach
+the picker) and then hands the survivors to a picker agent
+(`picker-prompt.md`, `gpt-5.3-codex`, read-only `--mode ask`) instead of a
+blind priority/bug/number sort. The picker weighs declared dependencies
+between issues, retry history, priority/bug labels, and stated urgency — see
+`picker-prompt.md` for the full rubric. If it doesn't return a usable choice
+(no parseable `PICKER_RESULT:` line, or a `chosen` number outside the
+filtered candidates), `pick-issue.sh` falls back to the old deterministic
+sort — the picker is never a new single point of failure for the whole loop.
+Either way, the choice is written as a `<!-- agent-picker -->` comment on the
+picked issue: reasoning, the runner-up candidates it considered next, and
+which already-blocked issues were skipped and why.
+
+## Implementation planning
+
+Before the worker writes any code, a separate read-only agent
+(`planner-prompt.md`, `gpt-5.3-codex`, `--mode ask`) reads the issue and the
+already-checked-out repo and writes an implementation plan — files to touch,
+existing patterns to reuse, edge cases to cover. That plan is injected into
+the worker's prompt as "Plan de implementación a seguir". This is why
+Implementation below can run on a mid-tier model instead of a frontier one:
+the expensive reasoning about *approach* already happened; the worker mostly
+has to *execute* it. A failed or empty plan is a soft failure — Implement
+proceeds without one, reasoning from the issue directly, same as before this
+existed.
 
 ## Model routing
 
 Full fallback chains (2-3 models per task, cheapest-viable-first except where
 judgment quality matters more than cost) are documented as comments next to
 the constants in `pick-issue.sh` and in the Review step of
-`agent-loop.yml`. Summary:
+`agent-loop.yml`. Summary — every task now runs on Cursor, each tier
+deliberately diversified across upstream vendors so one provider's outage
+doesn't take out a whole fallback chain:
 
 | Task | Primary (tier 0) | Fallback(s) (tier 1 / 2) | Rationale |
 |---|---|---|---|
-| Review (judgment/security) | `gpt-5.3-codex` (Cursor) | `gpt-5.6-sol` (Cursor) → `kimi-k3` (OpenCode) | Frontier reasoning first, "chino premium" as the guaranteed final attempt |
-| Implementation (general) | `kimi-k3` (OpenCode) | `glm-5.2` → `qwen3.7-max` | Chinese OSS models, flagship-class |
-| Implementation (`area: docs`) | `minimax-m3` (OpenCode) | `deepseek-v4-flash` → `mimo-v2.5` | Cheapest tier, prose-heavy work |
-| Implementation (`area: tests`) | `minimax-m3` (OpenCode) | `glm-5.2` → `deepseek-v4-flash` | Cheap but escalates for logic-heavy tests |
-| Implementation (`area: frontend`) | `composer-2.5` (Cursor) | `grok-4.5` → `grok-4.6` | Included pool, no draw on the paid allowance |
+| Issue picking | `gpt-5.3-codex` | — (falls back to deterministic sort, not another model) | Single call per cycle, judgment over cost |
+| Implementation planning | `gpt-5.3-codex` | — (Implement proceeds without a plan) | Single call per cycle, judgment over cost |
+| Review (judgment/security) | `gpt-5.3-codex` | `gpt-5.6-sol` → `kimi-k3-max` | Frontier reasoning first (OpenAI), Moonshot as the guaranteed final attempt |
+| Implementation (general) | `claude-sonnet-5-thinking-medium` | `cursor-grok-4.6-high` → `kimi-k3-max` | Mid-tier is enough — it EXECUTES a plan someone else already reasoned through |
+| Implementation (`area: docs`) | `gpt-5.4-mini` | `gemini-3.7-flash-high` → `kimi-k2.7-code` | Cheapest tier, prose-heavy work |
+| Implementation (`area: tests`) | `kimi-k2.7-code` | `gpt-5.4-mini` → `gemini-3.7-flash-high` | Code-specialised cheap model first |
 
 **Implementation fallback auto-escalates** (since 2026-08-26): `derive_model()`
 in `pick-issue.sh` counts how many `<!-- agent-infra -->` comments the picked
@@ -78,50 +102,39 @@ and excluded from the picker before a 4th attempt would ever happen, so tier 2
 is the ceiling. The Review cascade already auto-escalates on its own (tries
 each model in sequence, gated on whether a `VERDICT:` line parsed).
 
-The Review cascade and the frontend fallback both draw from Cursor's same
-$20/mo "Other Models" allowance when they escalate past the included pool —
-if both escalate heavily in the same billing window they compete for it.
-Several model ids above (Cursor's `gpt-5.3-codex`/`gpt-5.6-sol`, OpenCode's
-`glm-5.2`/`qwen3.7-max`/`deepseek-v4-flash`/`mimo-v2.5`) were sourced from
-web research in 2026-08 and are **not yet verified** against a live
-`cursor-agent --list-models` / OpenCode catalog call — sanity-check with a
-`workflow_dispatch` run on a low-stakes issue before trusting the 3x/day cron
-on them, and especially before relying on the tier-1/2 auto-escalation above.
+Model ids above were confirmed against a live `cursor-agent --list-models`
+call in this session (2026-08-28) — the earlier caveat about unverified
+OpenCode-sourced ids no longer applies, since opencode is gone. Still worth a
+`workflow_dispatch` sanity run on a low-stakes issue after any model-table
+change, same practice as before.
 
 Until both secrets exist the workflow runs but disarms itself at the first
 step (no failures, no noise).
 
 ## Circuit breaker
 
-All `opencode-go/*` models share **one pooled budget** ($12/5h — see the
-`timeout-minutes: 90` comment in `agent-loop.yml`), so rotating tiers within
-that namespace doesn't protect against the pool itself running dry — only
-crossing to Cursor (a genuinely separate budget) does. The "Circuit breaker"
-step in `agent-loop.yml`, run before Pick issue, checks whether the last 3
-completed runs all concluded `failure` (via `gh run list`, a proxy signal —
-it can't see which engine a run used, only its overall conclusion). If so:
-
-- Cursor configured → force `engine=cursor` for this run, regardless of the
-  issue's area label.
-- Cursor not configured → skip the run entirely rather than burn a 4th
-  attempt against a possibly-exhausted opencode pool. The skipped run itself
-  concludes success/skip, which correctly resets the streak next cycle.
+With a single engine there is nowhere left to escalate to on a failure
+streak — the "Circuit breaker" step in `agent-loop.yml`, run before Pick
+issue, checks whether the last 3 completed runs all concluded `failure` (via
+`gh run list`, a proxy signal — it can't see infra-vs-attempt failure, only
+overall conclusion). If so, it skips this run rather than burning a 4th
+attempt against a possibly-exhausted Cursor quota; the skipped run itself
+concludes success/skip, which correctly resets the streak next cycle.
 
 Separately, the Implement step best-effort greps the worker's captured
 output for `429`/`rate limit`/`quota`/`insufficient credit` text and tags the
 failure `implement-quota-exhausted` instead of a generic infra reason when
 matched — a heuristic (a model could print those words in unrelated prose),
 but a faster, more specific signal than waiting for 3 generic infra fails.
-The `<!-- agent-infra -->` comment also now records `engine=`/`model=`, since
-`gh run list` can't reconstruct per-engine failure history on its own.
+The `<!-- agent-infra -->` comment also records `engine=`/`model=` for
+traceability.
 
 ## Credential rotation
 
 | Credential | Expires | Symptom when dead | Fix |
 |---|---|---|---|
 | `AGENT_GH_PAT` | PAT expiry date (max 1 year) | every run fails at the guard/claim step | regenerate PAT, update secret |
-| `OPENCODE_AUTH_JSON` | Go subscription lapse / key rotation | `Error: Invalid API key.` in the implement step | re-login locally, regenerate base64, update secret |
-| `CURSOR_API_KEY` | Cursor key revoked / sub lapse | auth error in cursor-engine implement steps | regenerate in the Cursor dashboard, update secret (loop still works via OpenCode fallback) |
+| `CURSOR_API_KEY` | Cursor key revoked / sub lapse | "Warning: The provided API key is invalid." in any cursor-agent step (verified string, 2026-08-28) | regenerate in the Cursor dashboard, update secret — the loop has no fallback engine, so this disarms it entirely |
 
 ## State machine (labels)
 
@@ -164,10 +177,12 @@ the primary checkout — see "Manual rescue" below for the exact commands.
 The allowlist in `pick-issue.sh` only protects the issue side — someone
 outside it can still open a PR directly from a fork. `external-pr-review.yml`
 (triggered on `pull_request_target: opened/synchronize/reopened`) reviews
-those: it reads the diff with a locked-down, tool-less OpenCode config
-(`opencode-external-review.json`: `edit`/`bash`/`webfetch` all `deny`) and
-posts an advisory comment (edited in place on new pushes, never duplicated)
-with a `RECOMMEND_MERGE` / `NEEDS_CHANGES` / `DO_NOT_MERGE` verdict.
+those: it reads the diff with `cursor-agent` run in locked-down read-only
+mode (`ENGINE_MODE=ask` in `run-engine.sh` — `--mode ask --trust --sandbox
+enabled`, never `--force`/`--yolo`, so there is no edit/bash tool to call
+even under a successful prompt injection) and posts an advisory comment
+(edited in place on new pushes, never duplicated) with a `RECOMMEND_MERGE` /
+`NEEDS_CHANGES` / `DO_NOT_MERGE` verdict.
 
 It **never** approves as a formal GitHub review and **never** auto-merges —
 a human always decides. It also never checks out or executes the PR's own
@@ -201,8 +216,8 @@ in `CLAUDE.md` (2026-06-06) warns about.
 1. `git worktree add ../LexFlow-orca -b fix/... main` (or `cd ../LexFlow-orca`
    if it already exists), then `npm install --prefix frontend --no-fund
    --no-audit` (worktrees don't share `node_modules`, same lesson).
-2. Run `opencode` interactively with `.github/agent/worker-prompt.md` as the
-   opening prompt plus the issue text, or just fix it by hand.
+2. Run `cursor-agent` interactively with `.github/agent/worker-prompt.md` as
+   the opening prompt plus the issue text, or just fix it by hand.
 3. Open a normal PR; remove `agent:blocked` (or let `closes #N` end it).
 
 ## Security model
@@ -219,5 +234,6 @@ in `CLAUDE.md` (2026-06-06) warns about.
 - Direct PRs from a fork (not routed through an issue) are covered
   separately by `external-pr-review.yml` — see "External PR review" above.
   It never checks out or executes the PR's own code, never has a
-  write-capable token in the same step as the LLM call, and its reviewer
-  config denies every tool the model could otherwise call.
+  write-capable token in the same step as the LLM call, and it runs
+  `cursor-agent` in read-only `--mode ask` (never `--force`/`--yolo`) so
+  there is no tool the model could call even under a successful injection.

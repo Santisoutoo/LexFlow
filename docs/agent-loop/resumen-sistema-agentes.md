@@ -7,63 +7,111 @@ capa de scripts en `.github/agent/` y la supervisión local Orca. Fuente:
 ## Qué es
 
 Un workflow de GitHub Actions que corre **3 veces al día** (cron
-`0 6,13,20 * * *`), recoge un issue abierto elegible, lo implementa con un
-agente ("worker"), lo revisa con un segundo agente, verifica CI completo,
-abre PR y arma auto-merge. Todo sin intervención humana salvo cuando algo
-se atasca. Desde 2026-08-26 la supervisión mecánica corre sola: el workflow
-`orca-supervisor.yml` (1x/día) limpia labels huérfanas, reporta PRs
-atascadas y el estado de salud del loop sin que nadie tenga que abrir nada
-a mano. Los tres prompts de **Orca** (`.github/agent/orca/`) siguen
-existiendo para investigación puntual que sí requiere juicio humano/LLM,
-pero ya no son la única vía de supervisión — ver "Cambios recientes". Desde
-la misma fecha, `external-pr-review.yml` cubre la otra puerta de entrada de
-un repo público — una PR abierta directamente desde un fork, sin pasar por
-ninguna issue — con una revisión de solo lectura, nunca autoritativa: nunca
-mergea, nunca ejecuta código de la PR, solo deja un comentario recomendando
-o desaconsejando el merge para que un humano decida.
+`0 6,13,20 * * *`): un agente elige un issue abierto elegible con criterio de
+negocio (no un sort ciego), un segundo agente de solo lectura planifica la
+implementación, un worker Cursor CLI ejecuta ese plan, un cuarto agente
+revisa el diff, verifica CI completo, abre PR y arma auto-merge. Todo sin
+intervención humana salvo cuando algo se atasca. Desde 2026-08-26 la
+supervisión mecánica corre sola: el workflow `orca-supervisor.yml` (1x/día)
+limpia labels huérfanas, reporta PRs atascadas y el estado de salud del loop
+sin que nadie tenga que abrir nada a mano. Los tres prompts de **Orca**
+(`.github/agent/orca/`) siguen existiendo para investigación puntual que sí
+requiere juicio humano/LLM, pero ya no son la única vía de supervisión — ver
+"Cambios recientes". Desde la misma fecha, `external-pr-review.yml` cubre la
+otra puerta de entrada de un repo público — una PR abierta directamente desde
+un fork, sin pasar por ninguna issue — con una revisión de solo lectura,
+nunca autoritativa: nunca mergea, nunca ejecuta código de la PR, solo deja un
+comentario recomendando o desaconsejando el merge para que un humano decida.
 
-## Motores de implementación (engines)
+Desde 2026-08-28 todo el sistema corre sobre un único motor, **Cursor CLI**
+(`cursor-agent`) — opencode se retiró por completo tras fallar
+repetidamente sin dar a entender el error real que tenía. Ver "Cambios
+recientes" para el detalle.
 
-| Engine | Cuándo se usa | Modelo |
+## Motor de implementación
+
+Todo pasa por `run-engine.sh`, que ejecuta `cursor-agent` en uno de dos
+modos según la variable `ENGINE_MODE`:
+
+| Modo | Uso | Flags |
 |---|---|---|
-| **OpenCode** | Motor por defecto para todo issue | `kimi-k3` → `glm-5.2` → `qwen3.7-max` (general); `minimax-m3` → `deepseek-v4-flash`/`glm-5.2` (docs/tests, más barato) |
-| **Cursor CLI** | Solo `area: frontend`, y solo si existe `CURSOR_API_KEY` | `composer-2.5` (pool incluido del plan Pro) |
+| `full` (por defecto) | Implement, Review — código propio y confiado | `-p --force` |
+| `ask` | Picker, planificador, revisor de PRs externas — solo lectura, nunca escritura | `-p --mode ask --trust --sandbox enabled` (nunca `--force`) |
 
-Sin `CURSOR_API_KEY`, todo se implementa vía OpenCode. `run-engine.sh` es
-el dispatcher que decide y ejecuta uno u otro, con un timeout por llamada
-(fix de PR #102, 2026-08-24).
+`CURSOR_API_KEY` es ahora un secret **obligatorio** (ya no hay motor de
+fallback) — sin él, el Guard desarma el loop entero en el primer paso, igual
+que si faltara `AGENT_GH_PAT`.
 
-## Cascada de revisión
+## Selección de issue
 
-El agente revisor no usa el mismo modelo barato que el implementador —
-prioriza juicio sobre coste:
+`pick-issue.sh` filtra candidatos de forma determinista (autor en
+allowlist, sin labels excluidas — `agent:blocked`/`agent:infra-stuck` ya
+quedan fuera del pool) y entrega los supervivientes a un agente picker
+(`gpt-5.3-codex`, modo `ask`) en vez de ordenarlos ciegamente por
+prioridad/bug/número. El picker valora dependencias declaradas entre
+issues, historial de reintentos, labels de prioridad/bug y urgencia descrita
+en el cuerpo. Si no devuelve una elección utilizable, `pick-issue.sh` cae al
+mismo sort determinista de siempre — el picker nunca es un nuevo punto único
+de fallo. La elección queda por escrito como comentario
+`<!-- agent-picker -->` en el issue elegido: razonamiento, candidatos
+siguientes considerados, y qué issues ya bloqueados se descartaron y por qué.
 
-1. `gpt-5.3-codex` (Cursor, frontier) — si hay `CURSOR_API_KEY`
-2. `gpt-5.6-sol` (Cursor, fallback)
-3. `kimi-k3` (OpenCode) — "chino premium", intento final garantizado
+## Planificación de la implementación
+
+Antes de que el worker escriba código, un agente de solo lectura
+(`gpt-5.3-codex`, modo `ask`) lee el issue y el repo real ya clonado y
+escribe un plan de implementación — ficheros a tocar, patrones existentes a
+reutilizar, casos límite. Ese plan se inyecta en el prompt del worker como
+sección "Plan de implementación a seguir". Por eso el modelo de
+Implementación (tabla abajo) puede ser de nivel medio en vez de frontier: el
+razonamiento caro sobre el enfoque ya está hecho, el worker solo tiene que
+ejecutarlo. Un plan fallido o vacío es un fallo blando — el worker sigue
+adelante razonando desde el issue directamente, como antes de que esto
+existiera.
+
+## Modelos por tarea
+
+| Tarea | Modelo | Nota |
+|---|---|---|
+| Selección de issue | `gpt-5.3-codex` | Llamada única por ciclo, sin cascada |
+| Planificación | `gpt-5.3-codex` | Llamada única por ciclo, sin cascada |
+| Implementación (general) | `claude-sonnet-5-thinking-medium` → `cursor-grok-4.6-high` → `kimi-k3-max` | Nivel medio — EJECUTA un plan, no lo diseña |
+| Implementación (`area: docs`) | `gpt-5.4-mini` → `gemini-3.7-flash-high` → `kimi-k2.7-code` | Tier más barato |
+| Implementación (`area: tests`) | `kimi-k2.7-code` → `gpt-5.4-mini` → `gemini-3.7-flash-high` | Modelo code-capable primero |
+| Revisión | `gpt-5.3-codex` → `gpt-5.6-sol` → `kimi-k3-max` | Frontier primero, Moonshot como intento final garantizado |
+| Revisor de PRs externas | `kimi-k3-max` (sin cascada) | Modo `ask`, solo lectura |
+
+Cada cascada mezcla proveedor upstream distinto (Anthropic/xAI/Moonshot en
+implementación general; OpenAI/Google/Moonshot en docs/tests) para que un
+fallo de un solo proveedor no tumbe las 3 opciones — mismo principio que ya
+usaba la lista original de OpenCode.
 
 ## Pipeline del workflow (`run-one-issue`, 1 job, cap 90 min)
 
-1. **Guard** — comprueba que los secrets necesarios existen y que no hay ya
-   una PR de agente en vuelo (solo una a la vez). Si faltan secrets, el
-   workflow se desarma sin fallo ni ruido.
-2. **Pick issue** (`pick-issue.sh`) — filtra por allowlist de autor, labels
-   (excluye `agent:blocked`, `area: ci-cd`), decide engine + modelo.
-3. **Claim issue** — pone label `agent:wip`.
-4. **Setup** — submódulo `legalize-es` (cache/shallow clone), `uv`,
-   dependencias backend/frontend, instala OpenCode y Cursor CLI, credenciales.
-5. **Git identity + work branch**.
-6. **Implement** — el worker (OpenCode o Cursor) escribe el código.
-7. **Close already-done issue** — si el worker detecta que el issue ya
-   estaba resuelto, cierra sin abrir PR.
-8. **Review** — cascada frontier→chino-premium descrita arriba; puede
-   rechazar el diff.
-9. **Verify** — backend siempre; frontend y landing solo si hubo cambios
-   ahí.
-10. **Push, open PR, arm auto-merge** — usa `AGENT_GH_PAT` (no el
+1. **Guard** — comprueba que los secrets necesarios existen (`AGENT_GH_PAT`,
+   `CURSOR_API_KEY`) y que no hay ya una PR de agente en vuelo (solo una a la
+   vez). Si faltan secrets, el workflow se desarma sin fallo ni ruido.
+2. **Install Cursor CLI** — pronto, antes de Pick issue: el picker y el
+   planificador ya necesitan `cursor-agent`.
+3. **Circuit breaker** — si las últimas 3 runs fallaron seguidas, salta esta
+   run en vez de quemar un 4º intento contra una cuota posiblemente agotada.
+4. **Pick issue** (`pick-issue.sh`) — filtra por allowlist/labels, delega la
+   elección en el picker (ver arriba), deriva modelo.
+5. **Claim issue** — pone label `agent:wip`.
+6. **Setup** — submódulo `legalize-es` (cache/shallow clone), `uv`, node,
+   dependencias backend/frontend.
+7. **Git identity + work branch**.
+8. **Plan implementation** — el planificador de solo lectura (ver arriba).
+9. **Implement** — el worker Cursor ejecuta el plan.
+10. **Close already-done issue** — si el worker detecta que el issue ya
+    estaba resuelto, cierra sin abrir PR.
+11. **Review** — cascada de revisión descrita arriba; puede rechazar el diff.
+12. **Verify** — backend siempre; frontend y landing solo si hubo cambios
+    ahí.
+13. **Push, open PR, arm auto-merge** — usa `AGENT_GH_PAT` (no el
     `GITHUB_TOKEN` por defecto, porque sus PRs no disparan los checks
     `pull_request` requeridos y el auto-merge nunca dispararía).
-11. **Cleanup and attempt accounting** — gestiona las labels de estado.
+14. **Cleanup and attempt accounting** — gestiona las labels de estado.
 
 ## Máquina de estados (labels)
 
@@ -81,6 +129,11 @@ prioriza juicio sobre coste:
 - `agent-pr` — en toda PR del loop. Solo una abierta a la vez; una PR en
   rojo **pausa el loop** hasta que se arregle o cierre (fail-safe
   intencional).
+
+Además de las labels, cada pick queda documentado como comentario
+`<!-- agent-picker -->` en el issue elegido (ver "Selección de issue"
+arriba) — no es un estado nuevo, es el registro escrito de por qué se eligió
+ese issue y no otro.
 
 ## Seguridad
 
@@ -125,7 +178,7 @@ manual".
 - Run manual: `gh workflow run agent-loop -f issue=<N>`.
 - Rescate de `agent:blocked`: en un worktree dedicado (`git worktree add
   ../LexFlow-orca -b fix/... main`, nunca en el checkout principal —
-  evita pisar trabajo no comiteado del mantenedor), correr `opencode` a
+  evita pisar trabajo no comiteado del mantenedor), correr `cursor-agent` a
   mano con `worker-prompt.md` + el texto del issue, o arreglarlo
   directamente; abrir PR normal y quitar la label.
 
@@ -181,6 +234,41 @@ tres huecos de diseño que ya se han cerrado:
   desde un fork sin pasar por ninguna issue. Este workflow nuevo la revisa
   (ver sección propia abajo) sin poder nunca mergearla ni ejecutar su código.
 
+## Cambios recientes (2026-08-28)
+
+`opencode` llevaba fallando de forma repetida en el loop sin dar información
+clara del error real (motivo del cambio, comunicado directamente por el
+mantenedor). Se retiró por completo y todo el sistema pasó a correr sobre un
+único motor, Cursor CLI:
+
+- **Motor único**: `run-engine.sh` perdió la rama `opencode)`; ahora solo
+  soporta `cursor`, en dos modos (`full`/`ask`, ver "Motor de
+  implementación" arriba). `CURSOR_API_KEY` pasó de secret opcional a
+  obligatorio — sin él el Guard desarma el loop entero, igual que sin
+  `AGENT_GH_PAT`.
+- **Picker basado en agente**: `pick-issue.sh` dejó de elegir issue con un
+  `jq sort_by` ciego — ahora un agente (`gpt-5.3-codex`, modo `ask`) elige
+  con criterio de negocio entre los candidatos ya filtrados, con fallback
+  determinista si no devuelve una elección utilizable (ver "Selección de
+  issue" arriba). El mecanismo de "issue muy reintentado → pasa a revisión
+  humana" no cambió — ya existía vía `agent:blocked`/`agent:infra-stuck`; lo
+  nuevo es que la elección entre los candidatos elegibles ahora tiene
+  criterio, y queda documentada por escrito en un comentario del issue.
+- **Planificador de implementación**: nuevo paso de solo lectura antes de
+  Implement (ver "Planificación de la implementación" arriba) — permite que
+  el modelo de implementación baje de familias frontier a nivel medio
+  (`claude-sonnet-5-thinking-medium` en vez de `kimi-k3`), porque ya no
+  tiene que razonar el enfoque desde cero.
+- **Verificado en local antes de escribir código**: se probó `cursor-agent`
+  autenticado en esta máquina antes de diseñar el picker/planificador —
+  `--mode plan` no sirve para uso no interactivo (no devuelve el plan por
+  stdout en `-p`), así que ambos usan `--mode ask --trust`; y se confirmó
+  que `--mode ask` por sí solo se bloquea en el prompt de confianza del
+  workspace sin `--trust`, algo que no estaba documentado antes de probarlo.
+- **`external-pr-review.yml`**: pasó del config `opencode-external-review.json`
+  (`permission: deny` en edit/bash/webfetch) al equivalente en Cursor —
+  `--mode ask --trust --sandbox enabled`, nunca `--force`/`--yolo`.
+
 ## Revisión de PRs externas
 
 `external-pr-review.yml` (trigger `pull_request_target`, tipos
@@ -192,13 +280,13 @@ caso comenta que es demasiado grande, sin gastar una llamada al modelo).
 
 Para lo demás: obtiene el diff como **texto** vía la API (`gh pr diff`,
 nunca hace `checkout` del HEAD de la PR ni ejecuta nada de su código — el
-paso de checkout se queda siempre en `main`), se lo pasa a un modelo
-(`opencode-go/kimi-k3`, sin cascada) con un config dedicado que **deniega
-edit/bash/webfetch por completo** — aunque el diff contenga una inyección
-de prompt, el modelo no tiene ninguna herramienta que ejecutar. El paso que
-llama al LLM nunca lleva un token con permiso de escritura en su entorno;
-solo el paso posterior que publica el comentario lo tiene, ya con el output
-del LLM capturado a fichero.
+paso de checkout se queda siempre en `main`), se lo pasa a `cursor-agent`
+(`kimi-k3-max`, sin cascada) ejecutado en `ENGINE_MODE=ask` — `--mode ask
+--trust --sandbox enabled`, **nunca** `--force`/`--yolo` — aunque el diff
+contenga una inyección de prompt, el modelo no tiene ninguna herramienta que
+ejecutar. El paso que llama al LLM nunca lleva un token con permiso de
+escritura en su entorno; solo el paso posterior que publica el comentario lo
+tiene, ya con el output del LLM capturado a fichero.
 
 El veredicto (`RECOMMEND_MERGE` / `NEEDS_CHANGES` / `DO_NOT_MERGE`) se
 publica siempre como **comentario normal**, nunca como review formal de
@@ -222,29 +310,36 @@ flowchart TD
     CRON["⏰ Cron 3x/día<br/>06:00 · 13:00 · 20:00"] --> GUARD
     DISPATCH["🖱️ workflow_dispatch<br/>-f issue=N"] --> GUARD
 
-    subgraph WF["GitHub Actions — agent-loop.yml (cap 90 min)"]
-        GUARD["Guard<br/>secrets OK? ¿PR de agente ya abierta?"]
+    subgraph WF["GitHub Actions — agent-loop.yml (cap 90 min, motor único: Cursor CLI)"]
+        GUARD["Guard<br/>AGENT_GH_PAT + CURSOR_API_KEY OK? ¿PR de agente ya abierta?"]
         GUARD -->|falta secret| DISARM["Se desarma sin fallo"]
-        GUARD -->|OK| PICK["Pick issue<br/>pick-issue.sh: allowlist + labels + engine/modelo"]
-        PICK --> CLAIM["Claim issue<br/>label agent:wip"]
-        CLAIM --> SETUP["Setup<br/>submódulo, uv, deps, OpenCode, Cursor CLI, credenciales"]
-        SETUP --> IMPLEMENT
+        GUARD -->|OK| INSTALLCLI["Install Cursor CLI<br/>(temprano: picker y planificador ya lo necesitan)"]
+        INSTALLCLI --> BREAKER["Circuit breaker<br/>¿últimas 3 runs fallaron?"]
+        BREAKER -->|sí| SKIP["Salta esta run<br/>(evita quemar un 4º intento)"]
+        BREAKER -->|no| PICK
 
-        subgraph IMPLEMENT["Implement (run-engine.sh)"]
+        subgraph PICK["Pick issue (pick-issue.sh)"]
             direction LR
-            ENGDEC{"area: frontend<br/>y CURSOR_API_KEY?"}
-            ENGDEC -->|sí| CURSOR["Cursor CLI<br/>composer-2.5"]
-            ENGDEC -->|no| OPENCODE["OpenCode worker<br/>kimi-k3 → glm-5.2 → qwen3.7-max<br/>(docs/tests: minimax-m3 → …)"]
+            FILTER["Filtro determinista<br/>allowlist autor + labels excluidas"]
+            FILTER --> PICKER["Picker agent<br/>gpt-5.3-codex, modo ask<br/>criterio de negocio"]
+            PICKER -->|sin veredicto usable| SORTFB["Fallback: sort determinista<br/>prioridad → bug → número"]
         end
+
+        PICK --> COMMENT["Comenta &lt;!-- agent-picker --&gt;<br/>razonamiento + candidatos siguientes"]
+        COMMENT --> CLAIM["Claim issue<br/>label agent:wip"]
+        CLAIM --> SETUP["Setup<br/>submódulo, uv, node, deps backend/frontend"]
+        SETUP --> GITID["Git identity + work branch"]
+        GITID --> PLAN["Plan implementation<br/>gpt-5.3-codex, modo ask (solo lectura)<br/>lee issue + repo real"]
+        PLAN --> IMPLEMENT["Implement<br/>ejecuta el plan con un modelo de nivel medio<br/>claude-sonnet-5-thinking-medium → cursor-grok-4.6-high → kimi-k3-max"]
 
         IMPLEMENT --> DONE{"¿Issue ya<br/>estaba resuelto?"}
         DONE -->|sí| CLOSE["Close issue<br/>sin PR"]
         DONE -->|no| REVIEW
 
-        subgraph REVIEW["Review — cascada frontier → chino-premium"]
+        subgraph REVIEW["Review — cascada Cursor, 3 proveedores"]
             direction LR
-            R1["gpt-5.3-codex (Cursor)"] -->|falla/no disponible| R2["gpt-5.6-sol (Cursor)"]
-            R2 -->|falla/no disponible| R3["kimi-k3 (OpenCode)"]
+            R1["gpt-5.3-codex (OpenAI)"] -->|falla/no disponible| R2["gpt-5.6-sol (OpenAI)"]
+            R2 -->|falla/no disponible| R3["kimi-k3-max (Moonshot)"]
         end
 
         REVIEW -->|rechaza diff| FAILED["label agent:failed<br/>(2º fallo → agent:blocked)"]
@@ -260,7 +355,7 @@ flowchart TD
     SUPCRON["⏰ Cron 1x/día<br/>20:30 (30min tras el loop)"] --> SUPERVISOR
 
     subgraph SUP["GitHub Actions — orca-supervisor.yml (programado)"]
-        SUPERVISOR["Clear wip huérfano<br/>+ salud de credenciales<br/>+ reporte PR atascada<br/>+ job summary"]
+        SUPERVISOR["Clear wip huérfano<br/>+ salud de credenciales (CURSOR_API_KEY)<br/>+ reporte PR atascada<br/>+ job summary"]
     end
 
     subgraph ORCA["🖥️ Orca — supervisión local (juicio puntual, fuera del workflow)"]
@@ -281,7 +376,7 @@ flowchart TD
         EGUARD -->|sí| ESKIP["Se salta, sin comentario"]
         EGUARD -->|no, pero diff enorme| ETOOBIG["Comenta: demasiado grande<br/>para revisión automática"]
         EGUARD -->|no| EDIFF["gh pr diff → texto<br/>(nunca checkout del HEAD de la PR)"]
-        EDIFF --> EREVIEW["kimi-k3<br/>config sin edit/bash/webfetch<br/>(sin token de escritura en este paso)"]
+        EDIFF --> EREVIEW["kimi-k3-max, modo ask<br/>--mode ask --trust --sandbox enabled, nunca --force<br/>(sin token de escritura en este paso)"]
         EREVIEW --> ECOMMENT["Comenta veredicto<br/>RECOMMEND_MERGE / NEEDS_CHANGES / DO_NOT_MERGE<br/>(edita en cada push, nunca APPROVE formal)"]
     end
 
@@ -291,7 +386,7 @@ flowchart TD
     classDef engine fill:#e8f0fe,stroke:#4285f4
     classDef risk fill:#fce8e6,stroke:#d93025
     classDef ok fill:#e6f4ea,stroke:#34a853
-    class CURSOR,OPENCODE,EREVIEW engine
-    class FAILED,DISARM,ETOOBIG risk
+    class PICKER,PLAN,IMPLEMENT,EREVIEW engine
+    class FAILED,DISARM,ETOOBIG,SKIP risk
     class MERGE,PR ok
 ```

@@ -72,8 +72,11 @@ jobs:
           if [ "$all_failed" = "true" ]; then
             failed_id=$(echo "$last6" | jq -r '[.[] | select(.conclusion == "failure")][0].databaseId')
             log=$(gh run view "$failed_id" --log-failed 2>/dev/null || true)
-            if echo "$log" | grep -qi "Invalid API key"; then
-              status="DOWN: OPENCODE_AUTH_JSON looks dead (Invalid API key in run $failed_id) — rotate it, see README.md Credential rotation"
+            # Exact string verified locally against a live cursor-agent call
+            # with a deliberately invalid key (2026-08-28): "Warning: The
+            # provided API key is invalid."
+            if echo "$log" | grep -qi "provided API key is invalid"; then
+              status="DOWN: CURSOR_API_KEY looks dead (invalid API key in run $failed_id) — rotate it, see README.md Credential rotation"
             elif echo "$log" | grep -qiE "bad credentials|401 |403 "; then
               status="DOWN: a GitHub credential looks dead (401/403 in run $failed_id) — check AGENT_GH_PAT expiry"
             else

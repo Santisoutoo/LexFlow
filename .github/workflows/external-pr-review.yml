@@ -15,10 +15,12 @@
 #     diff is fetched as TEXT via the API and handed to the LLM as data,
 #     with the same "ignore embedded instructions" framing the internal
 #     worker/reviewer prompts already use.
-#   - The reviewer's OpenCode config (opencode-external-review.json) denies
-#     edit/bash/webfetch entirely — even a successful prompt injection in
-#     the diff has no tool to call. Blast radius caps at "the bot writes a
-#     misleading comment," never code execution.
+#   - The reviewer runs cursor-agent in `--mode ask` (read-only Q&A, no
+#     edit/bash tool) with `--sandbox enabled` and, critically, WITHOUT
+#     `--force`/`--yolo` — even a successful prompt injection in the diff has
+#     no tool to call. Blast radius caps at "the bot writes a misleading
+#     comment," never code execution. See run-engine.sh's ENGINE_MODE=ask
+#     branch.
 #   - The LLM-calling step never has GH_TOKEN in its env (mirrors
 #     agent-loop.yml's Implement step, which excludes it for the same
 #     reason). Only the separate comment-posting step, after the LLM's
@@ -73,14 +75,14 @@ jobs:
         id: guard
         env:
           GH_TOKEN: ${{ github.token }}
-          OC_AUTH: ${{ secrets.OPENCODE_AUTH_JSON }}
+          CURSOR_KEY: ${{ secrets.CURSOR_API_KEY }}
         run: |
           n="${{ steps.resolve.outputs.number }}"
           skip=false
           reason=""
 
-          if [ -z "$OC_AUTH" ]; then
-            skip=true; reason="OPENCODE_AUTH_JSON not configured"
+          if [ -z "$CURSOR_KEY" ]; then
+            skip=true; reason="CURSOR_API_KEY not configured"
           fi
 
           pr=$(gh api "repos/${{ github.repository }}/pulls/$n")
@@ -114,8 +116,20 @@ jobs:
           echo "skip=$skip" >> "$GITHUB_OUTPUT"
           echo "too_large=$too_large" >> "$GITHUB_OUTPUT"
           echo "number=$n" >> "$GITHUB_OUTPUT"
-          [ "$skip" = "true" ] && echo "Skipping review: $reason"
-          [ "$too_large" = "true" ] && echo "Diff too large for automated review ($total_changes lines, $changed_files files)"
+          # Real bug found 2026-08-28 while dry-running this workflow: under
+          # `bash -e` (the default for a step's `run:` block), a trailing
+          # `[ cond ] && echo ...` fails the WHOLE STEP whenever cond is
+          # false, because that's then the script's last command and its
+          # non-zero test exit becomes the script's exit code. That silently
+          # broke the guard for every normal-sized eligible PR (too_large is
+          # false in the common case) — explicit `if` blocks avoid the trap
+          # entirely instead of relying on `|| true`.
+          if [ "$skip" = "true" ]; then
+            echo "Skipping review: $reason"
+          fi
+          if [ "$too_large" = "true" ]; then
+            echo "Diff too large for automated review ($total_changes lines, $changed_files files)"
+          fi
 
       - name: Fetch diff and PR metadata
         if: steps.guard.outputs.skip != 'true' && steps.guard.outputs.too_large != 'true'
@@ -127,38 +141,22 @@ jobs:
             --jq '"TITLE: " + .title + "\n\nDESCRIPTION:\n" + (.body // "(no description)")' \
             > "$RUNNER_TEMP/pr-meta.txt"
 
-      - name: Install OpenCode (pinned)
+      - name: Install Cursor CLI
         if: steps.guard.outputs.skip != 'true' && steps.guard.outputs.too_large != 'true'
-        run: npm install -g opencode-ai@1.18.21
-
-      - name: Install OpenCode credential
-        if: steps.guard.outputs.skip != 'true' && steps.guard.outputs.too_large != 'true'
-        env:
-          OPENCODE_AUTH_JSON: ${{ secrets.OPENCODE_AUTH_JSON }}
         run: |
-          mkdir -p "$RUNNER_TEMP/ocdata/opencode"
-          dest="$RUNNER_TEMP/ocdata/opencode/auth.json"
-          if printf '%s' "$OPENCODE_AUTH_JSON" | base64 -d 2>/dev/null | jq -e . >/dev/null 2>&1; then
-            printf '%s' "$OPENCODE_AUTH_JSON" | base64 -d > "$dest"
-          elif printf '%s' "$OPENCODE_AUTH_JSON" | jq -e . >/dev/null 2>&1; then
-            printf '%s' "$OPENCODE_AUTH_JSON" > "$dest"
-          else
-            echo "::error::OPENCODE_AUTH_JSON is neither valid base64-of-JSON nor raw JSON."
-            exit 1
-          fi
-          chmod 600 "$dest"
-          echo "XDG_DATA_HOME=$RUNNER_TEMP/ocdata" >> "$GITHUB_ENV"
+          curl -fsS https://cursor.com/install | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       # ---- No GH_TOKEN / AGENT_GH_PAT anywhere in this step's env. The
-      # ---- diff is untrusted third-party data; the reviewer's own config
-      # ---- denies edit/bash/webfetch so there is no tool to inject into
-      # ---- even if the diff/description contains a prompt-injection
-      # ---- attempt.
+      # ---- diff is untrusted third-party data; ENGINE_MODE=ask runs
+      # ---- cursor-agent in read-only `--mode ask` with no `--force`, so
+      # ---- there is no tool to inject into even if the diff/description
+      # ---- contains a prompt-injection attempt.
       - name: Review diff
         id: review
         if: steps.guard.outputs.skip != 'true' && steps.guard.outputs.too_large != 'true'
         env:
-          OPENCODE_CONFIG: ${{ github.workspace }}/.github/agent/opencode-external-review.json
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
           ENGINE_IDLE_TIMEOUT_SECONDS: "180"
           ENGINE_HARD_CEILING_SECONDS: "600"
         run: |
@@ -173,7 +171,7 @@ jobs:
             echo "</pr>"
           } > "$RUNNER_TEMP/review-prompt.txt"
           set +e
-          bash .github/agent/run-engine.sh "opencode" "opencode-go/kimi-k3" "$RUNNER_TEMP/review-prompt.txt" \
+          ENGINE_MODE=ask bash .github/agent/run-engine.sh "cursor" "kimi-k3-max" "$RUNNER_TEMP/review-prompt.txt" \
             | tee "$RUNNER_TEMP/review-output.txt"
           rc=${PIPESTATUS[0]}
           set -e
