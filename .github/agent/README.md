@@ -111,6 +111,23 @@ change, same practice as before.
 Until both secrets exist the workflow runs but disarms itself at the first
 step (no failures, no noise).
 
+## Timeouts
+
+Every `cursor-agent` call in `run-engine.sh` is bounded by `IDLE_TIMEOUT_SECONDS`
+and `HARD_CEILING_SECONDS` — but as of 2026-08-28 `IDLE` is set just below
+`CEILING` everywhere, not a real "no new output" window. Verified against a
+live run (issue #112): `cursor-agent -p` in the default text output format
+prints **nothing until the entire response is ready** — a real Implement
+call sat silent for 666s before printing one correct line. That's the
+opposite of opencode's behaviour, which the original idle-detection design
+(PR #102) was built around. A short idle window now just kills real work
+before it can finish, so every caller sizes `IDLE` close to `CEILING`
+instead, making the external `timeout` wrapper the sole practical safety
+net. Genuine incremental-hang detection would need `--output-format
+stream-json --stream-partial-output`, which requires reworking every
+`AGENT_RESULT`/`VERDICT`/`PICKER_RESULT` parser downstream — a known,
+not-yet-done follow-up (see `run-engine.sh`'s header for the full story).
+
 ## Circuit breaker
 
 With a single engine there is nowhere left to escalate to on a failure
@@ -178,9 +195,9 @@ The allowlist in `pick-issue.sh` only protects the issue side — someone
 outside it can still open a PR directly from a fork. `external-pr-review.yml`
 (triggered on `pull_request_target: opened/synchronize/reopened`) reviews
 those: it reads the diff with `cursor-agent` run in locked-down read-only
-mode (`ENGINE_MODE=ask` in `run-engine.sh` — `--mode ask --trust --sandbox
-enabled`, never `--force`/`--yolo`, so there is no edit/bash tool to call
-even under a successful prompt injection) and posts an advisory comment
+mode (`ENGINE_MODE=ask` in `run-engine.sh` — `--mode ask --trust`, never
+`--force`/`--yolo`, so there is no edit/bash tool to call even under a
+successful prompt injection) and posts an advisory comment
 (edited in place on new pushes, never duplicated) with a `RECOMMEND_MERGE` /
 `NEEDS_CHANGES` / `DO_NOT_MERGE` verdict.
 
