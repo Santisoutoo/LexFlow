@@ -214,6 +214,13 @@ jobs:
         env:
           ISSUE_TITLE: ${{ steps.pick.outputs.title }}
           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          # Read-only reasoning over one issue + the repo, no tool-heavy
+          # exploration loop — shorter ceiling than Implement. IDLE just
+          # below CEILING, same reason as every other cursor-agent call
+          # (see run-engine.sh header: no streaming, so idle can't trail
+          # ceiling without killing real work).
+          ENGINE_IDLE_TIMEOUT_SECONDS: "570"
+          ENGINE_HARD_CEILING_SECONDS: "600"
         run: |
           {
             cat .github/agent/planner-prompt.md
@@ -249,7 +256,15 @@ jobs:
           # Wide-scope issues genuinely need exploration room (2026-08-25,
           # issue #52: killed mid-exploration by a flat 15min cap) — give
           # Implement a generous idle window and hard ceiling.
-          ENGINE_IDLE_TIMEOUT_SECONDS: "360"
+          #
+          # IDLE is set just below CEILING (not a real "no new output for
+          # 360s" window): verified 2026-08-28 that cursor-agent's default
+          # text output prints NOTHING until the whole response is ready —
+          # a real Implement call took 666s of total silence before its
+          # first byte. A short idle window kills real work before it can
+          # finish; see run-engine.sh's header for the full explanation and
+          # the streaming-based real fix this is standing in for.
+          ENGINE_IDLE_TIMEOUT_SECONDS: "2340"
           ENGINE_HARD_CEILING_SECONDS: "2400"
         run: |
           {
@@ -360,7 +375,9 @@ jobs:
           # Tighter than Implement's: this is where the real 84min hang
           # happened (run 32749623046, issue #85) — a review call reads a
           # diff and judges it, it doesn't need Implement's exploration room.
-          ENGINE_IDLE_TIMEOUT_SECONDS: "180"
+          # IDLE set just below CEILING — see run-engine.sh header: cursor-agent
+          # doesn't stream, so a short idle window kills real (if slow) work.
+          ENGINE_IDLE_TIMEOUT_SECONDS: "840"
           ENGINE_HARD_CEILING_SECONDS: "900"
         run: |
           compose_review_prompt() {
@@ -429,8 +446,9 @@ jobs:
           # exploration — a bit more room than a plain review verdict, but
           # not Implement's full 40min budget. Inline override: this call
           # sits inside a step whose `env:` otherwise sets the tighter
-          # review-cascade values above.
-          ENGINE_IDLE_TIMEOUT_SECONDS=300 ENGINE_HARD_CEILING_SECONDS=1200 \
+          # review-cascade values above. IDLE set just below CEILING — see
+          # run-engine.sh header (no streaming, so idle can't trail ceiling).
+          ENGINE_IDLE_TIMEOUT_SECONDS=1140 ENGINE_HARD_CEILING_SECONDS=1200 \
             bash .github/agent/run-engine.sh "${{ steps.pick.outputs.engine }}" "${{ steps.pick.outputs.model }}" "$RUNNER_TEMP/fix-prompt.txt"
           verdict=$(run_review)
           if [ "$verdict" != "APPROVE" ]; then

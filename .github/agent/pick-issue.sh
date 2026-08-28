@@ -129,8 +129,13 @@ run_picker() {
     echo "</candidates>"
   } > "$RUNNER_TEMP/picker-prompt.txt"
 
+  # Pure reasoning over already-fetched candidate text, no repo access —
+  # short ceiling. IDLE just below CEILING: cursor-agent's default text
+  # output doesn't stream, see run-engine.sh's header for why idle can't
+  # trail ceiling without risking killing real (if slow) work.
   set +e
-  ENGINE_MODE=ask bash .github/agent/run-engine.sh "cursor" "$PICKER_MODEL" "$RUNNER_TEMP/picker-prompt.txt" \
+  ENGINE_MODE=ask ENGINE_IDLE_TIMEOUT_SECONDS=280 ENGINE_HARD_CEILING_SECONDS=300 \
+    bash .github/agent/run-engine.sh "cursor" "$PICKER_MODEL" "$RUNNER_TEMP/picker-prompt.txt" \
     > "$RUNNER_TEMP/picker-output.txt" 2>&1
   set -e
 

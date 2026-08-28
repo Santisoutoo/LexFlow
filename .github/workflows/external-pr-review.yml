@@ -157,7 +157,12 @@ jobs:
         if: steps.guard.outputs.skip != 'true' && steps.guard.outputs.too_large != 'true'
         env:
           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
-          ENGINE_IDLE_TIMEOUT_SECONDS: "180"
+          # IDLE just below CEILING: cursor-agent's default text output
+          # doesn't stream (verified 2026-08-28 against a real Implement
+          # call — 666s of total silence before its first byte), so a short
+          # idle window kills real review work before it can finish. See
+          # run-engine.sh's header for the full explanation.
+          ENGINE_IDLE_TIMEOUT_SECONDS: "560"
           ENGINE_HARD_CEILING_SECONDS: "600"
         run: |
           {
