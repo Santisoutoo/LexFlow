@@ -1,10 +1,13 @@
 # Autonomous agent loop — runbook
 
 The `agent-loop` workflow (`.github/workflows/agent-loop.yml`) picks one open
-issue three times a day — using an agent with business judgment, not a blind
-sort — plans the implementation with a second read-only agent, implements the
-plan with a Cursor CLI worker, has a fourth agent review the diff, verifies
-the full CI surface, opens a PR and arms auto-merge. `orca-supervisor.yml`
+issue three times a day on the healthy path — using an agent with business
+judgment, not a blind sort — plans the implementation with a second read-only
+agent, implements the plan with a Cursor CLI worker, has a fourth agent
+review the diff, verifies the full CI surface, opens a PR and arms
+auto-merge. A frequent low-cost poll cron on top of that retries sooner after
+a transient failure instead of waiting for the next official slot — see
+"Circuit breaker & retry gate" below. `orca-supervisor.yml`
 (scheduled, once/day) mechanizes the deterministic parts of supervision:
 clears orphaned `agent:wip`, reports (never auto-fixes) stuck/red `agent-pr`s,
 and checks credential health. Orca (desktop, on the maintainer's machine,
@@ -128,11 +131,11 @@ stream-json --stream-partial-output`, which requires reworking every
 `AGENT_RESULT`/`VERDICT`/`PICKER_RESULT` parser downstream — a known,
 not-yet-done follow-up (see `run-engine.sh`'s header for the full story).
 
-## Circuit breaker
+## Circuit breaker & retry gate
 
 With a single engine there is nowhere left to escalate to on a failure
 streak — the "Circuit breaker" step in `agent-loop.yml`, run before Pick
-issue, checks whether the last 3 completed runs all concluded `failure` (via
+issue, checks whether the last 3 real attempts all concluded `failure` (via
 `gh run list`, a proxy signal — it can't see infra-vs-attempt failure, only
 overall conclusion). If so, it skips this run rather than burning a 4th
 attempt against a possibly-exhausted Cursor quota; the skipped run itself
@@ -145,6 +148,37 @@ matched — a heuristic (a model could print those words in unrelated prose),
 but a faster, more specific signal than waiting for 3 generic infra fails.
 The `<!-- agent-infra -->` comment also records `engine=`/`model=` for
 traceability.
+
+On top of the 3 official slots (06:00, 13:00, 20:00 UTC), a second cron entry
+(`15,45 * * * *`, every 30min, offset from the official `:00` minute so the
+two never collide) fires a lightweight "poll tick." A new "Retry gate" step
+(run right after Guard, before Install Cursor CLI and the Circuit breaker)
+lets a poll tick fall through to a real attempt ONLY if the most recent
+*substantive* run (excluding this one and excluding prior no-op poll ticks)
+concluded `failure` and at least 1h has passed since it finished; otherwise
+it self-cancels (`gh run cancel`) so the run concludes `cancelled`, not
+`success` — that distinct conclusion is what lets both the retry gate's own
+lookup and the Circuit breaker's "last 3 runs" query correctly skip past
+no-op ticks instead of being diluted by them (`--limit 50`, not 5, since up
+to ~46 poll ticks can sit between two real attempts). Official 06/13/20 UTC
+slots and `workflow_dispatch` runs are never gated by this — they always
+proceed exactly as before. Net effect: a transient/infra failure (timeout,
+crash, one-off flake) now waits roughly 60-90 minutes for a retry instead of
+up to ~10 hours for the next official slot, at near-zero cost in the healthy
+case (a no-op poll tick self-cancels in well under a minute).
+
+Backoff is uniform (1h) regardless of failure reason for now — a
+`implement-quota-exhausted` failure could reasonably warrant a longer
+backoff than a one-off timeout, since retrying immediately against an
+exhausted quota is unlikely to succeed, but that reason is currently only
+recorded per-issue (in the `<!-- agent-infra -->` comment), not per-run,
+so the retry gate has no cheap way to read it before picking an issue. A
+documented follow-up: have Cleanup also persist the reason as a repo
+variable (e.g. `gh variable set LAST_FAILURE_REASON`), so the retry gate can
+read it back cheaply and apply a longer backoff specifically for quota
+exhaustion. Not yet implemented — v1 ships with the uniform backoff, and a
+genuinely exhausted quota still gets caught by the same Circuit breaker,
+just faster (failures now accumulate in ~1h cycles instead of ~7-10h ones).
 
 ## Credential rotation
 
@@ -218,7 +252,10 @@ external PR to dry-run it manually.
 
 ## Pause / resume
 
-- Pause: `gh workflow disable agent-loop` (or delete the secrets).
+- Pause: `gh workflow disable agent-loop` (or delete the secrets). This
+  disables BOTH `schedule` entries at once — the official 3x/day slots and
+  the 30min poll tick — there is no way to pause only one without editing
+  `on.schedule` in the YAML.
 - Resume: `gh workflow enable agent-loop`.
 - One-shot manual run: `gh workflow run agent-loop -f issue=<N>` (the forced
   issue still passes the author/label safety filters).
