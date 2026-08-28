@@ -21,7 +21,8 @@ name: agent-loop
 
 on:
   schedule:
-    - cron: "0 6,13,20 * * *" # 3 runs/day — pacing for the Cursor budget
+    - cron: "0 6,13,20 * * *" # 3 runs/day — pacing for the Cursor budget (official slots; ALWAYS run in full)
+    - cron: "15,45 * * * *"   # poll tick, every 30min at :15/:45 (never :00 — disjoint from the official slots). Near-zero-cost no-op unless the last substantive run failed and the backoff window elapsed — see "Circuit breaker & retry gate" in .github/agent/README.md
   workflow_dispatch:
     inputs:
       issue:
@@ -33,8 +34,11 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  actions: read # lets the circuit-breaker step call `gh run list` via the
-  # default GITHUB_TOKEN; every write still goes through AGENT_GH_PAT
+  actions: write # `gh run list` (read) for the circuit breaker AND retry gate, plus
+  # `gh run cancel` (write) so a no-op poll tick self-cancels instead of
+  # completing as a plain "success" — that distinction is what lets both
+  # this token's own run-history queries skip past no-op ticks. Every
+  # content/PR/issue write still goes through AGENT_GH_PAT, unaffected.
 
 jobs:
   run-one-issue:
@@ -66,21 +70,71 @@ jobs:
             echo "proceed=true" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Retry gate — sondeo solo tras fallo real + backoff
+        id: retry_gate
+        if: steps.guard.outputs.proceed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }} # gh run list (read) + gh run cancel (write) on the no-op path — never a content-write credential
+          EVENT_SCHEDULE: ${{ github.event.schedule }}
+          POLL_CRON: "15,45 * * * *" # must match the second on.schedule entry above verbatim
+          BACKOFF_SECONDS: "3600" # 1h backoff — see .github/agent/README.md "Circuit breaker & retry gate"
+        run: |
+          # Fail OPEN toward the official cadence: only throttle when the
+          # schedule string matches the poll cron EXACTLY. Anything else —
+          # official cron, workflow_dispatch (EVENT_SCHEDULE is empty there),
+          # or a cron string that drifted out of sync with `on.schedule` —
+          # proceeds unthrottled. This direction fails safe if the constant
+          # ever drifts from the real cron line.
+          if [ "$EVENT_SCHEDULE" != "$POLL_CRON" ]; then
+            echo "Official/manual trigger (schedule='$EVENT_SCHEDULE') — proceeding as always."
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Poll tick. Look at the most recent SUBSTANTIVE run (success or
+          # failure), excluding the current run AND prior no-op poll ticks
+          # (which self-cancel below, conclusion=cancelled). --limit 50: up
+          # to ~46 poll ticks can sit between two official slots.
+          proceed=false
+          last=$(gh run list --workflow agent-loop.yml --json databaseId,conclusion,updatedAt --limit 50 \
+            --jq '[.[] | select(.databaseId != ${{ github.run_id }})
+                        | select(.conclusion == "success" or .conclusion == "failure")][0]')
+          conclusion=$(echo "$last" | jq -r '.conclusion // empty')
+          if [ "$conclusion" = "failure" ]; then
+            finished_at=$(echo "$last" | jq -r '.updatedAt')
+            elapsed=$(( $(date -u +%s) - $(date -u -d "$finished_at" +%s) ))
+            if [ "$elapsed" -ge "$BACKOFF_SECONDS" ]; then
+              echo "Last substantive run failed ${elapsed}s ago (>= ${BACKOFF_SECONDS}s) — retrying now."
+              proceed=true
+            else
+              echo "Last substantive run failed only ${elapsed}s ago — waiting for a later poll tick."
+            fi
+          else
+            echo "Last substantive run did not fail (conclusion=${conclusion:-none}) — nothing to retry."
+          fi
+          echo "proceed=$proceed" >> "$GITHUB_OUTPUT"
+
+          if [ "$proceed" != "true" ]; then
+            echo "No-op poll tick — self-cancelling (conclusion=cancelled) so run-history queries skip it."
+            gh run cancel ${{ github.run_id }} || true
+            sleep 60
+          fi
+
       # Installed early, before Pick issue: the picker (inside pick-issue.sh)
       # and the Plan implementation step both invoke cursor-agent themselves,
       # ahead of the heavier setup (submodule/uv/node) further down that only
       # Implement actually needs.
       - name: Install Cursor CLI
-        if: steps.guard.outputs.proceed == 'true'
+        if: steps.guard.outputs.proceed == 'true' && steps.retry_gate.outputs.proceed == 'true'
         run: |
           curl -fsS https://cursor.com/install | bash
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Circuit breaker — fallos seguidos
         id: breaker
-        if: steps.guard.outputs.proceed == 'true'
+        if: steps.guard.outputs.proceed == 'true' && steps.retry_gate.outputs.proceed == 'true'
         env:
-          GH_TOKEN: ${{ github.token }} # read-only Actions API, never a write credential
+          GH_TOKEN: ${{ github.token }} # only calls gh run list (read) here; never a content-write credential
         run: |
           # Proxy signal, not ground truth: gh run list exposes conclusion
           # but not infra-vs-attempt failure, so "last 3 runs all failed" is
@@ -95,8 +149,19 @@ jobs:
           # just skips the run rather than burning a 4th attempt against a
           # possibly-exhausted Cursor quota. The skipped run itself concludes
           # success/skip, which resets the streak next cycle.
-          last3=$(gh run list --workflow agent-loop.yml --json databaseId,conclusion --limit 5 \
-            --jq '[.[] | select(.databaseId != ${{ github.run_id }}) | .conclusion] | .[0:3]')
+          #
+          # Since the poll cron was added, no-op poll ticks self-cancel
+          # (conclusion=cancelled) instead of completing as a plain success —
+          # they are filtered out here for the same reason a Guard-disarmed
+          # run's success was already excluded: neither is a real attempt.
+          # --limit 50 (not 5): up to ~46 poll ticks can sit between two real
+          # attempts. Known residual gap: a genuinely job-timed-out real
+          # attempt, or a human-cancelled run, also reads as cancelled and is
+          # equally invisible here — acceptable, no fix needed for now.
+          last3=$(gh run list --workflow agent-loop.yml --json databaseId,conclusion --limit 50 \
+            --jq '[.[] | select(.databaseId != ${{ github.run_id }})
+                       | select(.conclusion == "success" or .conclusion == "failure")
+                       | .conclusion] | .[0:3]')
           all_failed=$(echo "$last3" | jq -r 'length == 3 and all(. == "failure")')
           if [ "$all_failed" = "true" ]; then
             echo "Last 3 runs all failed — skipping this run rather than burning a 4th attempt against a possibly-exhausted Cursor quota."
@@ -107,7 +172,7 @@ jobs:
 
       - name: Pick issue
         id: pick
-        if: steps.guard.outputs.proceed == 'true' && steps.breaker.outputs.skip != 'true'
+        if: steps.guard.outputs.proceed == 'true' && steps.retry_gate.outputs.proceed == 'true' && steps.breaker.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ secrets.AGENT_GH_PAT }}
           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
