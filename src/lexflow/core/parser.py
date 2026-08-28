@@ -289,8 +289,20 @@ def _build_section_list(
 # The pattern allows ``#{1,6}`` (NOT ``#{1,5}``): the real corpus uses six
 # hashes, so capping at five silently extracted ZERO articles from every law
 # (the test fixture used five hashes, which masked it). See #561.
+#
+# The heading tail splits into number + optional title (#112): the corpus
+# format is ``Artículo 1. Objeto de la Ley.`` — capturing the whole tail as
+# the number made ``find_article(law, "1")`` miss every titled article and
+# 404'd ``/articles/1``. All separators are horizontal whitespace (``[ \t]``)
+# so the optional title group can never leak onto the following line.
+# Group 3 is a fallback for tails that don't fit ``number[. title]`` (rare
+# exotic numberings): keep the old whole-tail behaviour rather than dropping
+# the article entirely.
+_ARTICLE_NUMBER_PATTERN = r"\d+(?:[ \t]+(?:bis|ter|quater|quinquies|sexies|septies|octies|nonies|decies))*"
 _ARTICLE_RE = re.compile(
-    r"^(?:#{1,6}\s+)?Art[ií]culo\s+(.+?)\.?\s*$",
+    r"^(?:#{1,6}[ \t]+)?Art[ií]culo[ \t]+"
+    r"(?:(" + _ARTICLE_NUMBER_PATTERN + r")(?:\.[ \t]+(.+?))?\.?[ \t]*$"
+    r"|(.+?)\.?\s*$)",
     re.MULTILINE | re.IGNORECASE,
 )
 
@@ -298,8 +310,10 @@ _ARTICLE_RE = re.compile(
 def extract_articles(body: str) -> list[Article]:
     """Extract all articles from a Markdown body.
 
-    Finds ``Articulo N.`` patterns and captures text until the next
-    article heading or section heading.
+    Finds ``Articulo N.`` patterns, splitting each heading into the article
+    number and its optional title (``Artículo 1. Objeto de la Ley.`` →
+    number ``"1"``, title ``"Objeto de la Ley"`` — #112), and captures text
+    until the next article heading or section heading.
     """
     matches = list(_ARTICLE_RE.finditer(body))
     if not matches:
@@ -307,12 +321,14 @@ def extract_articles(body: str) -> list[Article]:
 
     articles: list[Article] = []
     for idx, match in enumerate(matches):
-        number = match.group(1).strip()
+        number = (match.group(1) or match.group(3)).strip()
+        raw_title = match.group(2)
+        title = raw_title.strip() if raw_title else None
         text_start = match.end()
         text_end = matches[idx + 1].start() if idx + 1 < len(matches) else len(body)
         raw_text = _extract_article_text(body[text_start:text_end])
         references = extract_references(raw_text, source_article=number)
-        articles.append(_build_article(number, raw_text, references))
+        articles.append(_build_article(number, title, raw_text, references))
 
     return articles
 
@@ -340,11 +356,11 @@ def _extract_article_text(raw: str) -> str:
     return "\n".join(lines).strip()
 
 
-def _build_article(number: str, text: str, references: list[Reference]) -> Article:
+def _build_article(number: str, title: str | None, text: str, references: list[Reference]) -> Article:
     """Construct an :class:`Article` instance from parsed components."""
     return Article(
         number=number,
-        title=None,
+        title=title,
         text=text,
         references=references,
     )
