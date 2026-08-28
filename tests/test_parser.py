@@ -194,6 +194,45 @@ class TestExtractArticles:
         assert articles[0].number == "1"
         assert "Texto del primero" in articles[0].text
 
+    def test_heading_title_split_from_number(self) -> None:
+        """Regression (#112): the corpus format ``Artículo 1. Objeto de la
+        Ley.`` used to land whole in ``number`` (``"1. Objeto de la Ley"``),
+        so ``find_article(law, "1")`` missed and ``/articles/1`` 404'd on
+        every titled article. Number and title are now separate groups.
+        """
+        body = "###### Artículo 1. Objeto de la Ley.\n\nTexto del primero."
+        articles = extract_articles(body)
+        assert len(articles) == 1
+        assert articles[0].number == "1"
+        assert articles[0].title == "Objeto de la Ley"
+        assert "Texto del primero" in articles[0].text
+
+    def test_heading_title_split_with_bis_qualifier(self) -> None:
+        body = "###### Artículo 2 bis. Definiciones.\n\nTexto del bis."
+        articles = extract_articles(body)
+        assert len(articles) == 1
+        assert articles[0].number == "2 bis"
+        assert articles[0].title == "Definiciones"
+
+    def test_number_only_heading_keeps_title_none(self) -> None:
+        body = dedent("""\
+            ###### Artículo 1.
+
+            1. Primer párrafo del cuerpo.
+
+            ###### Artículo 2
+
+            Segundo sin punto.
+        """)
+        articles = extract_articles(body)
+        assert len(articles) == 2
+        assert articles[0].number == "1"
+        assert articles[0].title is None
+        # The title group must never leak onto the body's first line.
+        assert "Primer párrafo" in articles[0].text
+        assert articles[1].number == "2"
+        assert articles[1].title is None
+
     def test_section_articles_not_duplicated_across_levels(self) -> None:
         """Regression (#570): each article appears once in the section tree.
 
