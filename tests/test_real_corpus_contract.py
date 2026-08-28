@@ -89,6 +89,13 @@ class TestConstitutionContract:
         law = real_registry.get_law(CONSTITUTION_ID)
         assert law.sections, "Constitution should parse a non-empty section tree"
 
+    def test_parses_to_15_disposiciones_incl_one_derogatoria(self, real_registry: LawRegistry) -> None:
+        """#106 AC: 169 articles + 15 disposiciones incl. exactly 1 derogatoria."""
+        law = real_registry.get_law(CONSTITUTION_ID)
+        assert len(law.disposiciones) == 15
+        derogatorias = [d for d in law.disposiciones if d.kind == "derogatoria"]
+        assert len(derogatorias) == 1
+
 
 class TestKnownLawsHaveContent:
     @pytest.mark.parametrize("law_id, min_articles", KNOWN_LAWS_MIN_ARTICLES)
@@ -137,3 +144,23 @@ class TestTitledArticleContract:
         article = response.json()["article"]
         assert article["number"] == "1"
         assert article["title"] == "Objeto de la Ley"
+
+
+class TestLpacDisposicionesContract:
+    """#106 regression: Ley 39/2015's 15 derogatoria refs were mis-attributed
+    to "art. 133" because disposiciones weren't extracted separately from the
+    last article's body.
+    """
+
+    def test_disposiciones_parsed_non_empty(self, real_registry: LawRegistry) -> None:
+        law = real_registry.get_law(LPAC_ID)
+        assert len(law.disposiciones) == 22
+
+    def test_last_article_body_has_no_disposicion_derived_references(self, real_registry: LawRegistry) -> None:
+        law = real_registry.get_law(LPAC_ID)
+        article_133 = next(a for a in law.articles if a.number == "133")
+        derogatoria = next(d for d in law.disposiciones if d.kind == "derogatoria")
+        assert derogatoria.references
+        derogatoria_ref_texts = {r.target_text for r in derogatoria.references}
+        article_133_ref_texts = {r.target_text for r in article_133.references}
+        assert not derogatoria_ref_texts & article_133_ref_texts

@@ -19,6 +19,7 @@ import yaml
 
 from lexflow.core.enums import (
     ConsolidationStatus,
+    DisposicionKind,
     Jurisdiction,
     LawRank,
     LawStatus,
@@ -26,7 +27,7 @@ from lexflow.core.enums import (
     Scope,
 )
 from lexflow.core.exceptions import ParserError
-from lexflow.core.models import Article, Law, LawMetadata, Reference, Section
+from lexflow.core.models import Article, Disposicion, Law, LawMetadata, Reference, Section
 
 logger = logging.getLogger(__name__)
 
@@ -345,12 +346,17 @@ def _extract_article_text(raw: str) -> str:
     """Clean raw text between two article headings.
 
     Strips leading/trailing whitespace and stops at the next non-article
-    heading (``##``, ``###``, ``####`` without 'Articulo').
+    heading (``##``, ``###``, ``####`` without 'Articulo'), or at a
+    disposicion heading (``###### Disposición adicional ...`` etc — #106).
+    Disposiciones use the same heading level as articles (six hashes), so
+    without this second check the LAST article of a law swallowed the
+    entire disposiciones block as its own body (Ley 39/2015's 15
+    derogatoria references mis-attributed to "art. 133").
     """
     lines: list[str] = []
     for line in raw.split("\n"):
-        # Stop at the next section heading (but not an article heading)
-        if _SECTION_BREAK_RE.match(line) and not _INLINE_ARTICLE_HEADING_RE.match(line):
+        is_section_break = _SECTION_BREAK_RE.match(line) and not _INLINE_ARTICLE_HEADING_RE.match(line)
+        if is_section_break or _DISPOSICION_HEADING_RE.match(line):
             break
         lines.append(line)
     return "\n".join(lines).strip()
@@ -359,6 +365,90 @@ def _extract_article_text(raw: str) -> str:
 def _build_article(number: str, title: str | None, text: str, references: list[Reference]) -> Article:
     """Construct an :class:`Article` instance from parsed components."""
     return Article(
+        number=number,
+        title=title,
+        text=text,
+        references=references,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Disposicion extraction (#106)
+# ---------------------------------------------------------------------------
+
+# Disposicion headings in legalize-es are markdown level 6, same as
+# Articulo headings: ``###### Disposición adicional primera.``. The tail
+# after the kind word is free-form: bare (``Disposición derogatoria.``),
+# with only an ordinal (``Disposición adicional primera.``), or with both
+# an ordinal and a title sentence (``Disposición derogatoria única.
+# Derogación normativa.``). Group 1 captures the full heading text (sans
+# hashes) for the ``heading`` field, group 2 the kind, group 3 the tail —
+# split further by ``_split_disposicion_tail``.
+_DISPOSICION_KIND_PATTERN = r"adicional|transitoria|derogatoria|final"
+_DISPOSICION_RE = re.compile(
+    r"^#{1,6}[ \t]+(Disposici[oó]n[ \t]+(" + _DISPOSICION_KIND_PATTERN + r")(.*))$",
+    re.MULTILINE | re.IGNORECASE,
+)
+
+# Used by ``_extract_article_text`` to stop an article's body before a
+# trailing disposicion block, and to bound each disposicion's own text.
+_DISPOSICION_HEADING_RE = re.compile(
+    r"^#{1,6}[ \t]+Disposici[oó]n[ \t]+(?:" + _DISPOSICION_KIND_PATTERN + r")\b",
+    re.IGNORECASE,
+)
+
+
+def extract_disposiciones(body: str) -> list[Disposicion]:
+    """Extract all closing dispositions from a Markdown body.
+
+    Finds ``Disposición adicional|transitoria|derogatoria|final`` headings
+    and captures text until the next disposicion heading or the end of the
+    document.
+    """
+    matches = list(_DISPOSICION_RE.finditer(body))
+    if not matches:
+        return []
+
+    disposiciones: list[Disposicion] = []
+    for idx, match in enumerate(matches):
+        heading = match.group(1).strip()
+        kind = match.group(2).lower()
+        number, title = _split_disposicion_tail(match.group(3))
+        text_start = match.end()
+        text_end = matches[idx + 1].start() if idx + 1 < len(matches) else len(body)
+        raw_text = _extract_article_text(body[text_start:text_end])
+        references = extract_references(raw_text)
+        disposiciones.append(_build_disposicion(heading, kind, number, title, raw_text, references))
+
+    return disposiciones
+
+
+def _split_disposicion_tail(tail: str) -> tuple[str | None, str | None]:
+    """Split a disposicion heading's tail into ``(number, title)``.
+
+    *tail* is everything after the kind word, e.g. ``" primera."``,
+    ``" única. Derogación normativa."`` or ``"."`` (bare heading). The
+    ordinal sits before the first ``.``, the optional title sentence
+    after it.
+    """
+    number_part, _, title_part = tail.partition(".")
+    number = number_part.strip() or None
+    title = title_part.strip().rstrip(".").strip() or None
+    return number, title
+
+
+def _build_disposicion(
+    heading: str,
+    kind: str,
+    number: str | None,
+    title: str | None,
+    text: str,
+    references: list[Reference],
+) -> Disposicion:
+    """Construct a :class:`Disposicion` instance from parsed components."""
+    return Disposicion(
+        heading=heading,
+        kind=DisposicionKind(kind),
         number=number,
         title=title,
         text=text,
@@ -533,21 +623,25 @@ def parse_law_content(content: str, file_path: str) -> Law:
     metadata = frontmatter_to_metadata(raw_fm)
     sections = extract_heading_tree(body)
     articles = extract_articles(body)
-    all_references = _collect_all_references(articles)
+    disposiciones = extract_disposiciones(body)
+    all_references = _collect_all_references(articles, disposiciones)
 
     return Law(
         metadata=metadata,
         sections=sections,
         articles=articles,
+        disposiciones=disposiciones,
         references=all_references,
         raw_text=body,
         file_path=file_path,
     )
 
 
-def _collect_all_references(articles: list[Article]) -> list[Reference]:
-    """Flatten references from all articles into a single list."""
+def _collect_all_references(articles: list[Article], disposiciones: list[Disposicion]) -> list[Reference]:
+    """Flatten references from all articles, then all disposiciones (#106)."""
     refs: list[Reference] = []
     for article in articles:
         refs.extend(article.references)
+    for disposicion in disposiciones:
+        refs.extend(disposicion.references)
     return refs
