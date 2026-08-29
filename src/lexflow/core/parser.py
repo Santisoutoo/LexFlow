@@ -420,10 +420,26 @@ def extract_disposiciones(body: str) -> list[Disposicion]:
         text_start = match.end()
         text_end = matches[idx + 1].start() if idx + 1 < len(matches) else len(body)
         raw_text = _extract_article_text(body[text_start:text_end])
-        references = extract_references(raw_text)
+        source = _disposicion_source_label(kind, number)
+        references = extract_references(raw_text, source_article=source)
         disposiciones.append(_build_disposicion(heading, kind, number, title, raw_text, references))
 
     return disposiciones
+
+
+def _disposicion_source_label(kind: str, number: str | None) -> str:
+    """Build a reference ``source_article`` label for a disposición (#108).
+
+    References found inside a disposición's text were previously left
+    unattributed (``source_article=None``), which made ``Reference``
+    lookups fall back to whatever the last parsed article happened to
+    be. ``"disposición <kind> <number>"`` (e.g. ``"disposición
+    derogatoria única"``) mirrors how the law itself names the
+    disposición, so it stays legible without introducing a new field.
+    """
+    if number:
+        return f"disposición {kind} {number}"
+    return f"disposición {kind}"
 
 
 def _split_disposicion_tail(tail: str) -> tuple[str | None, str | None]:

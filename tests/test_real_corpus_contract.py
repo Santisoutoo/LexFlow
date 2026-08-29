@@ -184,3 +184,11 @@ class TestLpacDisposicionesContract:
         law = real_registry.get_law(LPAC_ID)
         article_133 = next(a for a in law.articles if a.number == "133")
         assert "disposición derogatoria única" not in article_133.text.lower()
+
+    def test_ley_30_1992_reference_attributed_to_derogatoria_not_article_133(self, real_registry: LawRegistry) -> None:
+        """#108 AC: the Ley 30/1992 reference's source is the disposición, not art. 133."""
+        law = real_registry.get_law(LPAC_ID)
+        derogatoria = next(d for d in law.disposiciones if d.kind == "derogatoria")
+        ley_30_1992_ref = next(r for r in derogatoria.references if "Ley 30/1992" in r.target_text)
+        assert ley_30_1992_ref.source_article == "disposición derogatoria única"
+        assert ley_30_1992_ref.source_article != "133"
