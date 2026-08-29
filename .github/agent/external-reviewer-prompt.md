@@ -54,3 +54,6 @@ put a blank line after it before any list or prose:
   explanation of the specific concern. Use this for anything in the
   suspicious-intent or security-weakening categories above, not routine bugs
   — those are `NEEDS_CHANGES`.
+
+Write the rationale/list/explanation prose above in the caveman style
+appended below this prompt — the `VERDICT:` line itself is unaffected.

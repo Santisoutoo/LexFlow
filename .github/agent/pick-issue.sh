@@ -124,6 +124,8 @@ run_picker() {
   {
     cat .github/agent/picker-prompt.md
     echo
+    cat .github/agent/caveman-style.md
+    echo
     echo "<candidates>"
     echo "$candidates"
     echo "</candidates>"
@@ -133,10 +135,13 @@ run_picker() {
   # short ceiling. IDLE just below CEILING: cursor-agent's default text
   # output doesn't stream, see run-engine.sh's header for why idle can't
   # trail ceiling without risking killing real (if slow) work.
+  # tee'd (not redirected) so the picker's reasoning reaches the Actions
+  # log — previously only the parsed `next_candidates` field survived, as
+  # an issue comment, with no raw trace of the run itself.
   set +e
   ENGINE_MODE=ask ENGINE_IDLE_TIMEOUT_SECONDS=280 ENGINE_HARD_CEILING_SECONDS=300 \
     bash .github/agent/run-engine.sh "cursor" "$PICKER_MODEL" "$RUNNER_TEMP/picker-prompt.txt" \
-    > "$RUNNER_TEMP/picker-output.txt" 2>&1
+    2>&1 | tee "$RUNNER_TEMP/picker-output.txt"
   set -e
 
   local line json chosen

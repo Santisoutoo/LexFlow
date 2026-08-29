@@ -37,3 +37,6 @@ blank line after it before any list or prose:
   concrete, actionable problems (file, what is wrong, what to change). Only
   list problems that genuinely block the merge; anything cosmetic goes in a
   final "Notes (non-blocking)" paragraph instead.
+
+Write the FIX list and the "Notes (non-blocking)" paragraph in the caveman
+style appended below this prompt — the `VERDICT:` line itself is unaffected.
