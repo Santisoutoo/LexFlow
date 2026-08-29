@@ -36,7 +36,12 @@ class Reference(BaseModel):
     )
     source_article: str | None = Field(
         None,
-        description="Article number where this reference appears.",
+        description=(
+            "Where this reference appears: an article number, or a "
+            "disposición label (e.g. 'disposición derogatoria única') "
+            "when the reference is inside a disposición rather than an "
+            "article (#108)."
+        ),
     )
     kind: ReferenceKind = Field(
         default=ReferenceKind.CITES,
