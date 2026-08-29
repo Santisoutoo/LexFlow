@@ -342,7 +342,7 @@ class TestExtractDisposiciones:
         assert len(disposiciones) == 1
         ref_texts = [r.target_text for r in disposiciones[0].references]
         assert any("Ley 30/1992" in t for t in ref_texts)
-        assert disposiciones[0].references[0].source_article is None
+        assert disposiciones[0].references[0].source_article == "disposición derogatoria única"
 
 
 class TestArticleDisposicionBoundary:
@@ -383,7 +383,7 @@ class TestArticleDisposicionBoundary:
         disposiciones = extract_disposiciones(body)
         assert articles[0].references == []
         assert len(disposiciones[0].references) == 1
-        assert disposiciones[0].references[0].source_article is None
+        assert disposiciones[0].references[0].source_article == "disposición derogatoria única"
 
     def test_article_text_stops_at_level5_non_article_heading(self) -> None:
         """Regression (#107): ``_SECTION_BREAK_RE`` used to only match
