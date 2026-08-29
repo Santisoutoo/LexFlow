@@ -135,13 +135,18 @@ run_picker() {
   # short ceiling. IDLE just below CEILING: cursor-agent's default text
   # output doesn't stream, see run-engine.sh's header for why idle can't
   # trail ceiling without risking killing real (if slow) work.
-  # tee'd (not redirected) so the picker's reasoning reaches the Actions
-  # log — previously only the parsed `next_candidates` field survived, as
-  # an issue comment, with no raw trace of the run itself.
+  # tee'd to stderr (not redirected) so the picker's reasoning reaches the
+  # Actions log — previously only the parsed `next_candidates` field
+  # survived, as an issue comment, with no raw trace of the run itself.
+  # >&2 on tee's own copy matters: this function's real return value is its
+  # stdout, captured by the caller via $(run_picker ...) — piping the raw
+  # engine output onto that same stdout would corrupt the captured value,
+  # same reason run_review_attempt() in agent-loop.yml redirects its tee to
+  # stderr too.
   set +e
   ENGINE_MODE=ask ENGINE_IDLE_TIMEOUT_SECONDS=280 ENGINE_HARD_CEILING_SECONDS=300 \
     bash .github/agent/run-engine.sh "cursor" "$PICKER_MODEL" "$RUNNER_TEMP/picker-prompt.txt" \
-    2>&1 | tee "$RUNNER_TEMP/picker-output.txt"
+    2>&1 | tee "$RUNNER_TEMP/picker-output.txt" >&2
   set -e
 
   local line json chosen
