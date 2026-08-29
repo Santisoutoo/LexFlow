@@ -21,6 +21,12 @@ jobs:
   supervise:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      # No checkout step in this workflow (it never touches repo files), so
+      # `gh` can't auto-detect the base repo from a local git remote — it
+      # would fail with "failed to determine base repo: fatal: not a git
+      # repository". GH_REPO short-circuits that detection.
+      GH_REPO: ${{ github.repository }}
     steps:
       - name: Guard — secret configured
         id: guard
