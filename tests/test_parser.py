@@ -385,6 +385,44 @@ class TestArticleDisposicionBoundary:
         assert len(disposiciones[0].references) == 1
         assert disposiciones[0].references[0].source_article is None
 
+    def test_article_text_stops_at_level5_non_article_heading(self) -> None:
+        """Regression (#107): ``_SECTION_BREAK_RE`` used to only match
+        heading levels 1-4 (``^#{1,4}\\s+``), so a trailing level-5
+        non-article heading (e.g. a stray annex/appendix title) leaked
+        into the last article's body instead of stopping it.
+        """
+        body = dedent("""\
+            ###### Artículo 169.
+
+            Texto del artículo 169.
+
+            ##### ANEXO
+
+            Texto del anexo.
+        """)
+        articles = extract_articles(body)
+        assert len(articles) == 1
+        assert "Texto del artículo 169" in articles[0].text
+        assert "anexo" not in articles[0].text.lower()
+
+    def test_article_text_stops_at_level6_non_article_heading(self) -> None:
+        """Regression (#107): same as above but at heading level 6, the
+        level disposiciones actually use in the real corpus.
+        """
+        body = dedent("""\
+            ###### Artículo 169.
+
+            Texto del artículo 169.
+
+            ###### ANEXO. Título del anexo.
+
+            Texto del anexo.
+        """)
+        articles = extract_articles(body)
+        assert len(articles) == 1
+        assert "Texto del artículo 169" in articles[0].text
+        assert "anexo" not in articles[0].text.lower()
+
 
 # ---------------------------------------------------------------------------
 # References

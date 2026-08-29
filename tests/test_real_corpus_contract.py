@@ -96,6 +96,20 @@ class TestConstitutionContract:
         derogatorias = [d for d in law.disposiciones if d.kind == "derogatoria"]
         assert len(derogatorias) == 1
 
+    def test_article_169_text_is_exactly_the_boe_sentence(self, real_registry: LawRegistry) -> None:
+        """#107 AC: art. 169's body must be exactly the single BOE sentence.
+
+        Before #107, ``_SECTION_BREAK_RE`` only matched heading levels 1-4,
+        so the trailing level-5/6 non-article headings after the last
+        article leaked into its body.
+        """
+        law = real_registry.get_law(CONSTITUTION_ID)
+        article_169 = next(a for a in law.articles if a.number == "169")
+        assert article_169.text == (
+            "No podrá iniciarse la reforma constitucional en tiempo de guerra "
+            "o de vigencia de alguno de los estados previstos en el artículo 116."
+        )
+
 
 class TestKnownLawsHaveContent:
     @pytest.mark.parametrize("law_id, min_articles", KNOWN_LAWS_MIN_ARTICLES)
@@ -164,3 +178,9 @@ class TestLpacDisposicionesContract:
         derogatoria_ref_texts = {r.target_text for r in derogatoria.references}
         article_133_ref_texts = {r.target_text for r in article_133.references}
         assert not derogatoria_ref_texts & article_133_ref_texts
+
+    def test_article_133_text_does_not_contain_disposicion_derogatoria(self, real_registry: LawRegistry) -> None:
+        """#107 AC: art. 133's body must not swallow the trailing disposicion."""
+        law = real_registry.get_law(LPAC_ID)
+        article_133 = next(a for a in law.articles if a.number == "133")
+        assert "disposición derogatoria única" not in article_133.text.lower()
