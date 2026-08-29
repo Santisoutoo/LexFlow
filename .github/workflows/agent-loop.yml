@@ -241,7 +241,14 @@ jobs:
           MODEL: ${{ steps.pick.outputs.model }}
         run: |
           git config user.name "lexflow-agent"
-          git config user.email "agent-loop@users.noreply.github.com"
+          # NOT @users.noreply.github.com: that domain makes GitHub link the
+          # commit author to whichever real account owns that username.
+          # "agent-loop" turned out to belong to an unrelated real user
+          # (github.com/agent-loop, created 2024) -- every commit here was
+          # silently attributed to a stranger's profile. `.invalid` is the
+          # RFC 2606 reserved TLD, guaranteed to never resolve to a real
+          # account.
+          git config user.email "lexflow-agent@noreply.lexflow-agent-loop.invalid"
           slug=$(printf '%s' "$ISSUE_TITLE" \
             | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]\+/-/g; s/^-//; s/-$//' | cut -c1-40)
           git checkout -b "${{ steps.pick.outputs.branch_prefix }}/agent-issue-${{ steps.pick.outputs.number }}-$slug"
@@ -251,7 +258,11 @@ jobs:
           # worker-prompt instruction: don't rely on the LLM to format a
           # trailer correctly — this fires on every `git commit`.
           model_slug=$(printf '%s' "$MODEL" | tr '[:upper:]/.' '[:lower:]--')
-          trailer="Co-authored-by: Cursor (${MODEL}) <${model_slug}@users.noreply.github.com>"
+          # Same .invalid domain as the git identity above: a model-derived
+          # slug (e.g. "kimi-k3-max") landing on @users.noreply.github.com
+          # risks linking to whichever real account happens to own that
+          # username, exactly like "agent-loop" did.
+          trailer="Co-authored-by: Cursor (${MODEL}) <${model_slug}@noreply.lexflow-agent-loop.invalid>"
           mkdir -p .git/hooks
           cat > .git/hooks/prepare-commit-msg <<HOOK
           #!/usr/bin/env bash
