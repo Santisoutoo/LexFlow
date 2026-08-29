@@ -533,6 +533,14 @@ def _classify_reference(context: str) -> ReferenceKind:
 
 _SENTENCE_BOUNDARIES = ".;\n"
 
+# Matches a bare list-item marker (``a)``, ``1.``, ...) preceded by one to
+# three newlines, sitting at the very end of a context window — e.g. the
+# "\n\na) " between "las siguientes disposiciones:" and "Ley 30/1992" in a
+# derogatoria list. Trimming naively on the last newline would cut the
+# marker off from the lead-in sentence that actually carries the "derog"
+# keyword, misclassifying the citation as CITES instead of REPEALS (#109).
+_TRAILING_LIST_MARKER_RE = re.compile(r"(?:\r?\n[ \t]*){1,3}(?:\d{1,2}|[a-z])[.)][ \t]*$", re.IGNORECASE)
+
 
 def _context_before(text: str, start: int) -> str:
     """Return the citation's preceding context, sentence-bounded.
@@ -543,8 +551,17 @@ def _context_before(text: str, start: int) -> str:
     classification. Example: "Se modifica la Ley 1/1990 en su artículo 3.
     Lo dispuesto en la Ley 2/1995 sigue vigente." — the second citation
     must classify as CITES, not MODIFIES.
+
+    Before trimming, a trailing bare list-item marker (``a)``, ``1.``,
+    ...) is stripped along with its leading newline(s) so the lead-in
+    sentence of an enumerated list (e.g. "Quedan derogadas expresamente
+    las siguientes disposiciones:") stays in the window instead of being
+    cut off by the newline right before the marker (#109).
     """
     raw = text[max(0, start - _CLASSIFY_CONTEXT_CHARS) : start]
+    marker_match = _TRAILING_LIST_MARKER_RE.search(raw)
+    if marker_match:
+        raw = raw[: marker_match.start()]
     last_boundary = max(raw.rfind(ch) for ch in _SENTENCE_BOUNDARIES)
     if last_boundary >= 0:
         return raw[last_boundary + 1 :]
