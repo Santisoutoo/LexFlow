@@ -168,6 +168,8 @@ jobs:
           {
             cat .github/agent/external-reviewer-prompt.md
             echo
+            cat .github/agent/caveman-style.md
+            echo
             echo "<pr number=\"${{ steps.guard.outputs.number }}\">"
             cat "$RUNNER_TEMP/pr-meta.txt"
             echo

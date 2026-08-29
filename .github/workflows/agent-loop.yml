@@ -299,8 +299,8 @@ jobs:
           } > "$RUNNER_TEMP/plan-prompt.txt"
           set +e
           ENGINE_MODE=ask bash .github/agent/run-engine.sh "cursor" "gpt-5.3-codex" "$RUNNER_TEMP/plan-prompt.txt" \
-            > "$RUNNER_TEMP/plan.md"
-          rc=$?
+            | tee "$RUNNER_TEMP/plan.md"
+          rc=${PIPESTATUS[0]}
           set -e
           if [ "$rc" != "0" ] || [ ! -s "$RUNNER_TEMP/plan.md" ]; then
             echo "Planner produced no usable plan (exit $rc) — Implement will proceed without one."
@@ -334,6 +334,8 @@ jobs:
         run: |
           {
             cat .github/agent/worker-prompt.md
+            echo
+            cat .github/agent/caveman-style.md
             if [ -s "$RUNNER_TEMP/plan.md" ]; then
               echo
               echo "## Plan de implementación a seguir"
@@ -449,6 +451,8 @@ jobs:
             {
               cat .github/agent/reviewer-prompt.md
               echo
+              cat .github/agent/caveman-style.md
+              echo
               echo "<issue number=\"${{ steps.pick.outputs.number }}\">"
               printf 'TITLE: %s\n\n' "$ISSUE_TITLE"
               cat "$RUNNER_TEMP/issue-body.md"
@@ -501,6 +505,8 @@ jobs:
           echo "Reviewer requested fixes; running one fix round."
           {
             cat .github/agent/worker-prompt.md
+            echo
+            cat .github/agent/caveman-style.md
             echo
             echo "A reviewer examined your diff for issue #${{ steps.pick.outputs.number }} and requires fixes."
             echo "Address ONLY the numbered problems below, then commit. Same finish protocol."

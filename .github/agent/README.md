@@ -131,6 +131,21 @@ stream-json --stream-partial-output`, which requires reworking every
 `AGENT_RESULT`/`VERDICT`/`PICKER_RESULT` parser downstream — a known,
 not-yet-done follow-up (see `run-engine.sh`'s header for the full story).
 
+## Observability
+
+As of 2026-08-29, Pick issue and Plan implementation `tee` their output
+instead of redirecting it to a file only — both now reach the Actions log,
+same as Implement and Review already did. Free-text narration (picker
+`reasoning`, worker's post-`AGENT_RESULT` summary, reviewer FIX lists and
+non-blocking notes, external reviewer's rationale) defaults to the terse
+style in `.github/agent/caveman-style.md`, concatenated into each of those
+prompts — fewer tokens, easier to scan a run after the fact. The Planner's
+plan body is exempt and stays normal prose: it's a technical deliverable the
+Worker depends on, not narration. This is post-hoc inspectability only —
+per the Timeouts section above, `cursor-agent -p` doesn't stream, so a
+step's full output still appears in one shot when the call finishes, not
+live.
+
 ## Circuit breaker & retry gate
 
 With a single engine there is nowhere left to escalate to on a failure

@@ -44,6 +44,10 @@ object with no embedded newlines:
 `PICKER_RESULT: {"chosen": <issue number>, "reasoning": "<one paragraph>", "next_candidates": [{"number": <issue number>, "reasoning": "<one sentence>"}, ...]}`
 
 - `chosen` MUST be the number of one of the candidates you were given.
+- Write `reasoning` and each `next_candidates[].reasoning` in the caveman
+  style appended below this prompt — still valid JSON, still one
+  paragraph/sentence, just terse. Never compress the `PICKER_RESULT:` line
+  format itself.
 - `next_candidates` lists the OTHER candidates you considered, most-relevant
   first, each with one short sentence on why it's next in line (or why you
   ranked it low). Include every other candidate unless there are more than 5,

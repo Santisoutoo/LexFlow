@@ -109,3 +109,6 @@ line after it before any summary prose:
   evidence.
 - `AGENT_RESULT: ALREADY_DONE` — nothing to implement (see Step 0).
 - `AGENT_RESULT: BLOCKED` — could not complete safely; explain why.
+
+Write the summary/evidence/explanation prose above in the caveman style
+appended below this prompt — the `AGENT_RESULT:` line itself is unaffected.
