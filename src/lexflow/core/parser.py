@@ -338,7 +338,7 @@ def extract_articles(body: str) -> list[Article]:
 # compares each line against two patterns. Hoisting the regexes to
 # module scope avoids 2-5 million ``re.compile`` calls during a cold
 # parse of the 12 k-law corpus.
-_SECTION_BREAK_RE = re.compile(r"^#{1,4}\s+")
+_SECTION_BREAK_RE = re.compile(r"^#{1,6}\s+")
 _INLINE_ARTICLE_HEADING_RE = re.compile(r"^#{1,6}\s+Art[ií]culo", re.IGNORECASE)
 
 
@@ -346,12 +346,15 @@ def _extract_article_text(raw: str) -> str:
     """Clean raw text between two article headings.
 
     Strips leading/trailing whitespace and stops at the next non-article
-    heading (``##``, ``###``, ``####`` without 'Articulo'), or at a
-    disposicion heading (``###### Disposición adicional ...`` etc — #106).
-    Disposiciones use the same heading level as articles (six hashes), so
-    without this second check the LAST article of a law swallowed the
-    entire disposiciones block as its own body (Ley 39/2015's 15
-    derogatoria references mis-attributed to "art. 133").
+    heading of any level (``#`` through ``######`` without 'Articulo'),
+    including a disposicion heading (``###### Disposición adicional ...``
+    etc — #106, #107). Disposiciones use the same heading level as
+    articles (six hashes), so without this check the LAST article of a
+    law swallowed the entire disposiciones block as its own body (Ley
+    39/2015's 15 derogatoria references mis-attributed to "art. 133").
+    The explicit ``_DISPOSICION_HEADING_RE`` check below is now largely
+    redundant with the level 1-6 ``_SECTION_BREAK_RE`` but is kept for
+    clarity and as a safety net.
     """
     lines: list[str] = []
     for line in raw.split("\n"):
