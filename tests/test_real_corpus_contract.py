@@ -20,6 +20,7 @@ from fastapi.testclient import TestClient
 
 from lexflow.api.app import app
 from lexflow.api.dependencies import get_law_registry
+from lexflow.core.enums import ReferenceKind
 from lexflow.core.registry import LawRegistry
 
 CORPUS_PATH = Path(__file__).resolve().parent.parent / "data" / "legalize-es"
@@ -192,3 +193,10 @@ class TestLpacDisposicionesContract:
         ley_30_1992_ref = next(r for r in derogatoria.references if "Ley 30/1992" in r.target_text)
         assert ley_30_1992_ref.source_article == "disposición derogatoria única"
         assert ley_30_1992_ref.source_article != "133"
+
+    def test_ley_30_1992_reference_classified_as_repeals(self, real_registry: LawRegistry) -> None:
+        """#109 AC: the Ley 30/1992 reference (list item "a)") must classify as repeals."""
+        law = real_registry.get_law(LPAC_ID)
+        derogatoria = next(d for d in law.disposiciones if d.kind == "derogatoria")
+        ley_30_1992_ref = next(r for r in derogatoria.references if "Ley 30/1992" in r.target_text)
+        assert ley_30_1992_ref.kind == ReferenceKind.REPEALS
