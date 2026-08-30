@@ -55,11 +55,16 @@ def compute_drift_report(registry: LawRegistry) -> CorpusDriftReport:
     trusting the already-coerced :class:`~lexflow.core.models.LawMetadata`,
     because the enum fallback in :func:`~lexflow.core.parser._safe_enum`
     already swallowed the raw unknown value by the time it reaches
-    ``LawMetadata``. ``zero_article_count`` instead reads
-    ``registry.get_law(...).article_count`` from laws already in the
-    registry's cache (the graph warm-up stage fully parses the whole
-    corpus, so by the time this runs — after ``graph_ready`` — the cache
-    is already complete and this step is a dict lookup, not a re-parse).
+    ``LawMetadata``. ``zero_article_count`` reads
+    ``registry.get_law(...).article_count``, which forces a parse for
+    any law not already cached — deliberately, and NOT gated on
+    :meth:`~lexflow.core.registry.LawRegistry.is_parsed`. The graph
+    warm-up stage *usually* fully parses the whole corpus as a side
+    effect, so this is normally a dict lookup, but ``get_graph``/
+    ``load_or_build`` can also return a graph loaded straight from
+    ``graph_cache.json`` on a hash match, which never touches
+    ``LawRegistry._cache`` (#55 review). Gating on ``is_parsed`` would
+    silently undercount to 0 on that warm-cache-hit path.
     """
     unknown_status_ids: list[str] = []
     empty_identifier_ids: list[str] = []
@@ -71,7 +76,7 @@ def compute_drift_report(registry: LawRegistry) -> CorpusDriftReport:
             unknown_status_ids.append(law_id)
         if not registry.get_metadata(law_id).identifier:
             empty_identifier_ids.append(law_id)
-        if registry.is_parsed(law_id) and registry.get_law(law_id).article_count == 0:
+        if registry.get_law(law_id).article_count == 0:
             zero_article_ids.append(law_id)
 
     return CorpusDriftReport(
