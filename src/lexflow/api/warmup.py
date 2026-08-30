@@ -15,8 +15,9 @@ Splits startup work into three tiers so the server can accept requests
   3. Graph build/load (sub-second if cache hits; 30-90 s cold; also
      fully parses every law as a side effect).
   4. Corpus drift report (#55) — unknown-enum, empty-identifier and
-     zero-article counts. Cheap: reuses the cache the graph stage
-     already populated.
+     zero-article counts. Cheap on a cold start (reuses the cache the
+     graph stage just populated); forces its own per-law parse on a
+     warm-cache-hit graph, where the cache stayed empty.
   5. Semantic index build/load (opt-in; cache-hydrate when warm, else a
      full embed pass — minutes for the real model on first run, #548).
      Best-effort: a missing/failed embedder is logged and skipped, never
@@ -159,9 +160,12 @@ async def _run_warmup() -> None:
         logger.info("Warmup: graph stage complete (%.2fs)", time.monotonic() - stage_started)
 
         # Stage 4 — corpus drift report (#55). Runs AFTER the graph stage
-        # on purpose: ``get_graph`` fully parses every law into the
-        # registry cache as a side effect, so ``zero_article_count`` here
-        # is a cache lookup instead of forcing its own full-corpus parse.
+        # so that, on a cold start, ``get_graph`` has already parsed every
+        # law into the registry cache and ``zero_article_count`` here is a
+        # cache lookup instead of forcing its own full-corpus parse. On a
+        # warm-cache-hit graph (loaded from ``graph_cache.json``, cache
+        # untouched), ``compute_drift_report`` still forces the parses it
+        # needs itself — never gated on ``is_parsed`` (#55 review).
         stage_started = time.monotonic()
         drift_report = await asyncio.to_thread(compute_drift_report, registry)
         with _state_lock:
