@@ -14,10 +14,10 @@ Covers:
 
 from __future__ import annotations
 
-import asyncio
 import json
 from collections.abc import AsyncIterator
 
+import anyio.to_thread
 import pytest
 from fastapi.testclient import TestClient
 from pytest import MonkeyPatch
@@ -333,17 +333,17 @@ class TestToolUseLoopE2E:
         monkeypatch: MonkeyPatch,
     ) -> None:
         """S4.1 (#888) + #77 S1.1: tool dispatch AND DB persistence/history
-        must go through ``asyncio.to_thread`` — spy on it in
+        must go through ``anyio.to_thread.run_sync`` — spy on it in
         :mod:`lexflow.chat.streaming` and assert both call sites use it.
         """
         calls: list[tuple[object, ...]] = []
-        real_to_thread = asyncio.to_thread
+        real_run_sync = anyio.to_thread.run_sync
 
-        async def _spy_to_thread(func, /, *args, **kwargs):
+        async def _spy_run_sync(func, /, *args, **kwargs):
             calls.append((func, *args))
-            return await real_to_thread(func, *args, **kwargs)
+            return await real_run_sync(func, *args, **kwargs)
 
-        monkeypatch.setattr("lexflow.chat.streaming.asyncio.to_thread", _spy_to_thread)
+        monkeypatch.setattr("lexflow.chat.streaming.anyio.to_thread.run_sync", _spy_run_sync)
 
         provider = _ToolUsingProvider()
         patch_ollama_provider(lambda: provider)
