@@ -242,6 +242,19 @@ def _thread_history(thread: ChatThread) -> list[ProviderMessage]:
     return messages
 
 
+def _refresh_and_load_history(session: Session, thread: ChatThread) -> list[ProviderMessage]:
+    """Refresh *thread* from the DB and materialise its provider history.
+
+    Both operations are synchronous SQLModel/SQLite calls (``refresh``
+    hits the DB, ``thread.messages`` is a lazy relationship that loads on
+    first access) — grouped into one helper so the caller can offload
+    them to a worker thread with a single ``asyncio.to_thread`` call
+    (#77 S1.1).
+    """
+    session.refresh(thread)
+    return _thread_history(thread)
+
+
 async def stream_chat_reply(
     *,
     session: Session,
@@ -266,8 +279,9 @@ async def stream_chat_reply(
     media_type="text/event-stream")``.
     """
     # 1. Persist the user turn first so a crash during streaming doesn't
-    #    swallow the user's question.
-    _persist_user_turn(session, thread, user_message_content)
+    #    swallow the user's question. Sync SQLite commit — offloaded so it
+    #    doesn't stall other concurrent requests/streams (#77 S1.1).
+    await asyncio.to_thread(_persist_user_turn, session, thread, user_message_content)
 
     # 2. Resolve provider + assemble context.
     try:
@@ -279,8 +293,9 @@ async def stream_chat_reply(
         return
 
     # Refresh so the freshly persisted user turn shows up in history.
-    session.refresh(thread)
-    history = _thread_history(thread)
+    # Same offload rationale as above — ``refresh`` + the lazy
+    # ``thread.messages`` load are both blocking DB calls.
+    history = await asyncio.to_thread(_refresh_and_load_history, session, thread)
 
     # 3. Stream. The agentic loop (#195) iterates ``stream_chat_typed``
     #    up to ``_MAX_TOOL_ITERATIONS`` times: each iteration either
@@ -381,7 +396,8 @@ async def stream_chat_reply(
         break
 
     # 4. Persist whatever we got. Even an empty reply gets a row so the
-    #    UI doesn't render a "ghost turn".
-    _persist_assistant_turn(session, thread, "".join(assistant_chunks))
+    #    UI doesn't render a "ghost turn". Offloaded for the same reason
+    #    as the user-turn persist above (#77 S1.1).
+    await asyncio.to_thread(_persist_assistant_turn, session, thread, "".join(assistant_chunks))
 
     yield format_sse(SseEvent.DONE, {})
