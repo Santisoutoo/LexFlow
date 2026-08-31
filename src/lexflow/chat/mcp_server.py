@@ -335,7 +335,10 @@ TOOL_SPECS: list[dict[str, Any]] = [
     },
     {
         "name": "get_law",
-        "description": "Retrieve the full content of a law by its BOE identifier.",
+        "description": (
+            "Retrieve a law's metadata and table of contents by its BOE identifier "
+            "(compact payload — no full article text; use get_article for that)."
+        ),
         "parameters": {
             "type": "object",
             "properties": {"law_id": {"type": "string"}},
