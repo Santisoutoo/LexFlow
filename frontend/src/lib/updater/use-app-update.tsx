@@ -52,6 +52,8 @@ export function useAppUpdateContext(): AppUpdateContextValue {
   return ctx;
 }
 
+const ACTIVE_UPDATE_STATUSES: AppUpdateUiStatus[] = ['downloading', 'ready', 'restarting'];
+
 function useAppUpdateState(service: UpdaterService | null): AppUpdateContextValue {
   const [status, setStatus] = useState<AppUpdateUiStatus>('idle');
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
@@ -60,8 +62,19 @@ function useAppUpdateState(service: UpdaterService | null): AppUpdateContextValu
 
   const snoozedVersionRef = useRef<string | null>(null);
   const actionGuardRef = useRef(false);
+  const statusRef = useRef<AppUpdateUiStatus>('idle');
+  const errorPhaseRef = useRef<'download' | 'install' | null>(null);
+
+  statusRef.current = status;
 
   const applyCheckResult = useCallback((update: UpdateInfo | null) => {
+    if (ACTIVE_UPDATE_STATUSES.includes(statusRef.current)) {
+      if (update && update.version !== getAppVersion()) {
+        setUpdateInfo(update);
+      }
+      return;
+    }
+
     if (!update || update.version === getAppVersion()) {
       setUpdateInfo(null);
       setStatus('idle');
@@ -115,6 +128,7 @@ function useAppUpdateState(service: UpdaterService | null): AppUpdateContextValu
   const updateNow = useCallback(() => {
     if (!service || actionGuardRef.current) return;
     actionGuardRef.current = true;
+    errorPhaseRef.current = null;
     setErrorMessage(null);
     setProgress({ downloaded: 0, total: null });
     setStatus('downloading');
@@ -124,6 +138,7 @@ function useAppUpdateState(service: UpdaterService | null): AppUpdateContextValu
         await service.download((p) => setProgress(p));
         setStatus('ready');
       } catch (err) {
+        errorPhaseRef.current = 'download';
         setErrorMessage(err instanceof Error ? err.message : 'Download failed');
         setStatus('error');
       } finally {
@@ -142,11 +157,13 @@ function useAppUpdateState(service: UpdaterService | null): AppUpdateContextValu
   const restartToApply = useCallback(() => {
     if (!service || actionGuardRef.current) return;
     actionGuardRef.current = true;
+    errorPhaseRef.current = null;
     setStatus('restarting');
     void (async () => {
       try {
         await service.installAndRelaunch();
       } catch (err) {
+        errorPhaseRef.current = 'install';
         setErrorMessage(err instanceof Error ? err.message : 'Install failed');
         setStatus('error');
       } finally {
@@ -156,10 +173,13 @@ function useAppUpdateState(service: UpdaterService | null): AppUpdateContextValu
   }, [service]);
 
   const retry = useCallback(() => {
-    if (status === 'error') {
-      updateNow();
+    if (status !== 'error') return;
+    if (errorPhaseRef.current === 'install') {
+      restartToApply();
+      return;
     }
-  }, [status, updateNow]);
+    updateNow();
+  }, [status, updateNow, restartToApply]);
 
   return {
     status,
