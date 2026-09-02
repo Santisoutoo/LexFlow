@@ -49,6 +49,14 @@ Everything runs on the Cursor CLI (`cursor-agent`) — opencode was removed
 3. Run `scripts/setup-github.sh` (or `gh label create`) so the labels
    `agent-pr`, `agent:wip`, `agent:failed`, `agent:blocked`,
    `agent:infra-stuck`, `external-contribution` exist.
+4. **`CURSOR_QUOTA_FALLBACK_MODELS`** (Actions repo variable, optional): a
+   comma-separated list of Cursor-native model ids to retry against when the
+   primary model for a call hits a quota/rate-limit error — see "Intra-run
+   quota fallback" below. Defaults to `composer-2.5,cursor-grok-4.6-high`
+   inline in each workflow if the variable isn't set, so this step needs no
+   action to already work; set it (`gh variable set
+   CURSOR_QUOTA_FALLBACK_MODELS --body "..."`) only to change the chain,
+   e.g. once quota on the routed vendor models recovers.
 
 ## Issue selection
 
@@ -146,15 +154,69 @@ per the Timeouts section above, `cursor-agent -p` doesn't stream, so a
 step's full output still appears in one shot when the call finishes, not
 live.
 
+## Intra-run quota fallback
+
+A 429/quota error on the primary model for a call is not necessarily a dead
+end within the same run: Cursor-native models (Composer, Grok) draw from a
+quota pool separate from the routed third-party models
+(Claude/GPT/Gemini/Kimi) this loop defaults to, so one pool being exhausted
+doesn't mean the others are too. `run-engine.sh` (see its header for the
+full mechanism) retries a quota-shaped failure against the next model in
+`ENGINE_QUOTA_FALLBACK_MODELS` — default `composer-2.5,cursor-grok-4.6-high`
+— with fresh idle/hard-ceiling timers, capped at 3 total attempts (primary +
+2 fallbacks) per call. That default chain is deliberately Composer/Grok-only
+as of 2026-09-02, since those were the only models with remaining quota when
+this was added; revisit via the `CURSOR_QUOTA_FALLBACK_MODELS` repo variable
+(see "One-time setup" above) once the routed vendor models' quota recovers.
+
+Wired into **Plan implementation**, **Implement**, **Review** (all of
+`agent-loop.yml`), and **external-pr-review.yml**'s Review diff step — each
+step's `env:` sets the variable independently (never job-level), so the
+setting is always explicit per step rather than silently inherited. The
+Review step's own 3-model verdict cascade (`gpt-5.3-codex` → `gpt-5.6-sol` →
+`kimi-k3-max`) is a separate, pre-existing mechanism gated on "did a
+`VERDICT:` line parse," not on quota text — it stays as-is, but each of its
+3 attempts (plus the fix-round) now ALSO gets the Composer/Grok fallback
+underneath it if that specific attempt hits quota. This combination targets
+the live 2026-09-02 outage: verified against production runs (issue #13)
+that the failures were happening in Review, not Implement — all 3 cascade
+models were exhausting the same routed-vendor quota pool the primary model
+was, and the original quota-detection regex
+(`429|rate.?limit|quota|insufficient.?(credit|balance)`) never matched
+Cursor's actual error text (`ActionRequiredError: You've hit your usage
+limit ...`), so these failures were silently mislabeled
+`implement-infra-other` instead of `implement-quota-exhausted` even before
+this fallback existed. Both bugs are fixed together — see `run-engine.sh`'s
+`QUOTA_REGEX` for the corrected pattern. Verified locally against a fake
+`cursor-agent` shim reproducing the exact production error text (regex
+matches, retry fires, Composer succeeds); NOT yet verified that
+`composer-2.5` actually behaves correctly in headless `-p --force` mode in
+CI — only `--list-models` confirmed it exists (`cursor-grok-4.6-high` has
+run for real, as tier-1 in `MODEL_TOP`). First live confirmation happens on
+the next real `workflow_dispatch` or quota-exhausted schedule run after this
+merges.
+
+An invalid API key is checked first and never triggers a retry — swapping
+models can't fix a bad credential, so that class of failure still fails on
+the very first attempt, same as before this existed. When all attempts in
+the chain exhaust quota (or an unrelated failure ends the chain early), the
+existing safety nets are unaffected — `implement-quota-exhausted` labeling,
+the infra-attempt counter, `agent:infra-stuck`, and the Circuit breaker
+below all still fire, just after a stronger signal (every configured model
+already failed) instead of after a single model's failure.
+
 ## Circuit breaker & retry gate
 
-With a single engine there is nowhere left to escalate to on a failure
-streak — the "Circuit breaker" step in `agent-loop.yml`, run before Pick
-issue, checks whether the last 3 real attempts all concluded `failure` (via
-`gh run list`, a proxy signal — it can't see infra-vs-attempt failure, only
-overall conclusion). If so, it skips this run rather than burning a 4th
-attempt against a possibly-exhausted Cursor quota; the skipped run itself
-concludes success/skip, which correctly resets the streak next cycle.
+The "Circuit breaker" step in `agent-loop.yml`, run before Pick issue,
+checks whether the last 3 real attempts all concluded `failure` (via `gh run
+list`, a proxy signal — it can't see infra-vs-attempt failure, only overall
+conclusion). Each of those runs already exhausted its own intra-run quota
+fallback (primary → Composer → Grok, see "Intra-run quota fallback" above)
+before concluding `failure`, so 3 in a row is a stronger signal than it used
+to be — if it still trips, this step skips the current run rather than
+burning a 4th attempt against a likely broader outage; the skipped run
+itself concludes success/skip, which correctly resets the streak next
+cycle.
 
 Separately, the Implement step best-effort greps the worker's captured
 output for `429`/`rate limit`/`quota`/`insufficient credit` text and tags the
