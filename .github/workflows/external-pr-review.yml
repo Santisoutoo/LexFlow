@@ -56,7 +56,12 @@ env:
 jobs:
   review:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # 15 -> 35 (2026-09-02, quota fallback): up to 3 attempts (primary +
+    # Composer + Grok) at ENGINE_HARD_CEILING_SECONDS=600 each puts the
+    # theoretical worst case around 30min of model calls alone, and unlike
+    # agent-loop.yml this job has no other long steps ahead of it to absorb
+    # the slack.
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7
         with:
@@ -164,6 +169,11 @@ jobs:
           # run-engine.sh's header for the full explanation.
           ENGINE_IDLE_TIMEOUT_SECONDS: "560"
           ENGINE_HARD_CEILING_SECONDS: "600"
+          # Intra-run quota fallback (see run-engine.sh header). This job
+          # today has zero recovery from a quota-exhausted model — a quota
+          # hit just falls straight to the generic "needs manual review"
+          # comment below.
+          ENGINE_QUOTA_FALLBACK_MODELS: ${{ vars.CURSOR_QUOTA_FALLBACK_MODELS || 'composer-2.5,cursor-grok-4.6-high' }}
         run: |
           {
             cat .github/agent/external-reviewer-prompt.md

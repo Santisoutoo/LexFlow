@@ -43,7 +43,14 @@ permissions:
 jobs:
   run-one-issue:
     runs-on: ubuntu-latest
-    timeout-minutes: 90 # hard cap so a stuck issue can't burn the Cursor budget
+    # 90 -> 130 (2026-09-02, quota fallback): the per-attempt ceilings below
+    # are unchanged (tuned after real incidents, see run-engine.sh header),
+    # but Implement can now take up to 3 attempts (primary + Composer +
+    # Grok) against a possibly-exhausted quota. Theoretical worst case
+    # (3 full-ceiling Implement attempts) is 120min; realistic case is much
+    # shorter since a 429 rejects almost instantly and a hung/idle-killed
+    # attempt never has quota text to trigger a retry.
+    timeout-minutes: 130 # hard cap so a stuck issue can't burn the Cursor budget
     steps:
       - uses: actions/checkout@v7
         with:
@@ -145,10 +152,15 @@ jobs:
           # list can already list it (conclusion=null, in progress), which
           # would otherwise always keep the breaker closed.
           #
-          # With a single engine there is nowhere left to escalate to — this
-          # just skips the run rather than burning a 4th attempt against a
-          # possibly-exhausted Cursor quota. The skipped run itself concludes
-          # success/skip, which resets the streak next cycle.
+          # Cross-run signal, distinct from the intra-run quota fallback in
+          # run-engine.sh (primary -> Composer -> Grok, all within a single
+          # Implement/Plan/Review call): this breaker only sees a run as
+          # failed once THAT chain is already exhausted. If 3 runs in a row
+          # still fail after each one already tried all 3 models, retrying a
+          # 4th time is unlikely to help — this just skips the run rather
+          # than burning it against a likely broader outage. The skipped run
+          # itself concludes success/skip, which resets the streak next
+          # cycle.
           #
           # Since the poll cron was added, no-op poll ticks self-cancel
           # (conclusion=cancelled) instead of completing as a plain success —
@@ -297,6 +309,11 @@ jobs:
           # ceiling without killing real work).
           ENGINE_IDLE_TIMEOUT_SECONDS: "570"
           ENGINE_HARD_CEILING_SECONDS: "600"
+          # Intra-run quota fallback (see run-engine.sh header). Step-scoped
+          # on purpose — never move to job-level env, or the Review step's
+          # own 3-model verdict cascade further down would inherit it and
+          # change behavior unintentionally.
+          ENGINE_QUOTA_FALLBACK_MODELS: ${{ vars.CURSOR_QUOTA_FALLBACK_MODELS || 'composer-2.5,cursor-grok-4.6-high' }}
         run: |
           {
             cat .github/agent/planner-prompt.md
@@ -342,6 +359,10 @@ jobs:
           # the streaming-based real fix this is standing in for.
           ENGINE_IDLE_TIMEOUT_SECONDS: "2340"
           ENGINE_HARD_CEILING_SECONDS: "2400"
+          # Intra-run quota fallback (see run-engine.sh header). Step-scoped,
+          # same reason as Plan implementation above.
+          ENGINE_QUOTA_FALLBACK_MODELS: ${{ vars.CURSOR_QUOTA_FALLBACK_MODELS || 'composer-2.5,cursor-grok-4.6-high' }}
+          ENGINE_MODEL_USED_FILE: ${{ runner.temp }}/engine-model-used.txt
         run: |
           {
             cat .github/agent/worker-prompt.md
@@ -374,6 +395,15 @@ jobs:
           commits=$(git rev-list --count origin/main..HEAD)
           echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
           echo "commits=$commits" >> "$GITHUB_OUTPUT"
+          # Written on EVERY path below (success or any failure kind), so
+          # Cleanup can always report the model that actually ran — which
+          # may differ from steps.pick.outputs.model if the quota fallback
+          # in run-engine.sh kicked in. run-engine.sh always writes this
+          # file when ENGINE_MODEL_USED_FILE is set, even on total failure
+          # (it records the last model attempted).
+          if [ -s "$RUNNER_TEMP/engine-model-used.txt" ]; then
+            echo "model_used=$(cat "$RUNNER_TEMP/engine-model-used.txt")" >> "$GITHUB_OUTPUT"
+          fi
           # `result` is written ONLY once we know its final, true value — it
           # used to be written before the DONE-but-empty-diff guard below
           # could still invalidate it, so Cleanup's infra-vs-attempt split
@@ -384,7 +414,12 @@ jobs:
             # could print these words in unrelated prose, so this is a
             # heuristic, not proof — but it's a faster, more specific signal
             # than waiting for 3 generic infra fails to escalate to a human.
-            if grep -qiE '429|rate.?limit|quota|insufficient.?(credit|balance)' "$RUNNER_TEMP/worker-output.txt"; then
+            # Kept in sync with run-engine.sh's QUOTA_REGEX (see its header
+            # for why "usage limit"/"ActionRequiredError" had to be added
+            # 2026-09-02 — Cursor's real quota-exhaustion text, verified
+            # against production failures, never matched the original
+            # 429/rate-limit/quota-only pattern).
+            if grep -qiE '429|rate.?limit|quota|insufficient.?(credit|balance)|usage.?limit|actionrequirederror' "$RUNNER_TEMP/worker-output.txt"; then
               reason="implement-quota-exhausted"
             else
               case "$rc" in
@@ -457,6 +492,20 @@ jobs:
           # doesn't stream, so a short idle window kills real (if slow) work.
           ENGINE_IDLE_TIMEOUT_SECONDS: "840"
           ENGINE_HARD_CEILING_SECONDS: "900"
+          # Intra-run quota fallback (see run-engine.sh header). Added
+          # 2026-09-02 after confirming in production (issue #13, runs
+          # 33524339447 onward) that this step's own 3-model vendor cascade
+          # (gpt-5.3-codex -> gpt-5.6-sol -> kimi-k3-max) still fails
+          # entirely when Cursor's whole routed-model budget is exhausted —
+          # exactly the outage this fallback exists for. Applies to every
+          # cursor-agent call in this step (each cascade attempt AND the
+          # fix-round below): a quota hit on any one of them now also tries
+          # Composer/Grok before that attempt counts as failed. Theoretical
+          # worst case multiplies (up to 3 fallback sub-attempts per cascade
+          # slot), but a real quota rejection returns in seconds (verified
+          # against the runs above), not anywhere near the ceiling, so this
+          # doesn't meaningfully change the step's real-world duration.
+          ENGINE_QUOTA_FALLBACK_MODELS: ${{ vars.CURSOR_QUOTA_FALLBACK_MODELS || 'composer-2.5,cursor-grok-4.6-high' }}
         run: |
           compose_review_prompt() {
             {
@@ -595,7 +644,7 @@ jobs:
           git push "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" "HEAD:refs/heads/$branch"
           {
             echo "## Descripción"
-            echo "Implementación autónoma del issue #${{ steps.pick.outputs.number }} por el agent loop (modelo \`${{ steps.pick.outputs.model }}\`)."
+            echo "Implementación autónoma del issue #${{ steps.pick.outputs.number }} por el agent loop (modelo \`${{ steps.implement.outputs.model_used || steps.pick.outputs.model }}\`)."
             echo
             echo "## Issue relacionado"
             echo "closes #${{ steps.pick.outputs.number }}"
@@ -660,7 +709,7 @@ jobs:
             infra_attempts=$(gh issue view "$n" --json comments \
               --jq '[.comments[].body | select(contains("<!-- agent-infra -->"))] | length')
             infra_attempts=$((infra_attempts + 1))
-            gh issue comment "$n" --body "<!-- agent-infra --> Agent loop infra failure $infra_attempts ($reason, engine=${{ steps.pick.outputs.engine }}, model=${{ steps.pick.outputs.model }}, not a real attempt): $RUN_URL"
+            gh issue comment "$n" --body "<!-- agent-infra --> Agent loop infra failure $infra_attempts ($reason, engine=${{ steps.pick.outputs.engine }}, model=${{ steps.implement.outputs.model_used || steps.pick.outputs.model }}, not a real attempt): $RUN_URL"
             if [ "$infra_attempts" -ge 3 ]; then
               gh issue edit "$n" --add-label "agent:infra-stuck" || true
             fi
