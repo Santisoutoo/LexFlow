@@ -91,6 +91,18 @@ describe('AppUpdateNotice ready', () => {
       expect(service.installAndRelaunch).toHaveBeenCalled();
     });
   });
+
+  it('scheduled poll while ready keeps ready state', async () => {
+    persistLastCheckAt(0);
+    const service = createMockService();
+    renderNotice(service);
+    await userEvent.click(await screen.findByRole('button', { name: /actualizar ahora/i }));
+    expect(await screen.findByRole('button', { name: /reiniciar para aplicar/i })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /force-poll/i }));
+    expect(await screen.findByRole('button', { name: /reiniciar para aplicar/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /actualizar ahora/i })).toBeNull();
+  });
 });
 
 describe('AppUpdateNotice error', () => {
@@ -111,6 +123,25 @@ describe('AppUpdateNotice error', () => {
     await waitFor(() => {
       expect(service.download).toHaveBeenCalledTimes(2);
     });
+  });
+
+  it('retry after install failure calls installAndRelaunch not download', async () => {
+    persistLastCheckAt(0);
+    const service = createMockService({
+      installAndRelaunch: vi
+        .fn()
+        .mockRejectedValueOnce(new Error('fallo de instalación'))
+        .mockResolvedValueOnce(undefined),
+    });
+    renderNotice(service);
+    await userEvent.click(await screen.findByRole('button', { name: /actualizar ahora/i }));
+    await userEvent.click(await screen.findByRole('button', { name: /reiniciar para aplicar/i }));
+    expect(await screen.findByText(/fallo de instalación/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /reintentar/i }));
+    await waitFor(() => {
+      expect(service.installAndRelaunch).toHaveBeenCalledTimes(2);
+    });
+    expect(service.download).toHaveBeenCalledTimes(1);
   });
 });
 
