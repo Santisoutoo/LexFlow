@@ -131,7 +131,7 @@ class TestModelsEndpoint:
         monkeypatch: MonkeyPatch,
     ) -> None:
         """An SDK error type not special-cased by ``_probe`` must degrade to
-        a placeholder instead of escaping through ``asyncio.gather`` (#88 S2.2)."""
+        a placeholder instead of escaping through ``asyncio.gather`` (#886 S2.2)."""
         from lexflow.chat import provider_registry as registry_mod
 
         class _BoomProvider:

@@ -1,5 +1,5 @@
 /**
- * Tests for `LawMarkdown` (#88 S2.3).
+ * Tests for `LawMarkdown` (#886 S2.3).
  *
  * External links rendered from legal-text Markdown must carry
  * `rel="noopener noreferrer"` alongside `target="_blank"` to prevent

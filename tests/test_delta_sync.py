@@ -122,7 +122,7 @@ def test_name_status_diff_inserts_end_of_options_before_revspec(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A leading ``-`` in ``cached_commit`` must not be parsed as a git
-    option (#88 S2.1) — ``--end-of-options`` must sit right before the
+    option (#886 S2.1) — ``--end-of-options`` must sit right before the
     revspec in the argv passed to ``subprocess.check_output``."""
     captured: dict[str, list[str]] = {}
 
