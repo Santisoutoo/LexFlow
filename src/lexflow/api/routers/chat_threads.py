@@ -13,7 +13,7 @@ Five endpoints:
 
 Persistence is SQLite via :mod:`lexflow.chat.db`.
 
-Security invariant (issue #90, S4.2): there is no ``user``/owner column on
+Security invariant (issue #888, S4.2): there is no ``user``/owner column on
 ``ChatThread`` — every endpoint here operates over the single global table,
 same as :mod:`lexflow.user_tags.models` and :mod:`lexflow.chat.secrets`.
 This is safe ONLY because LexFlow enforces loopback-only binding by default

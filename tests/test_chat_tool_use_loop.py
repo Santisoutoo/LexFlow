@@ -326,7 +326,7 @@ class TestToolUseLoopE2E:
         mock_registry,
         monkeypatch: MonkeyPatch,
     ) -> None:
-        """S4.1 (#90): tool dispatch must go through ``asyncio.to_thread``.
+        """S4.1 (#888): tool dispatch must go through ``asyncio.to_thread``.
 
         A slow/scanning tool call must not block the event loop — spy on
         ``asyncio.to_thread`` in :mod:`lexflow.chat.streaming` and assert it

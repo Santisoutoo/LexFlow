@@ -176,14 +176,14 @@ global table/keyring slot with **no owner/user column** — `GET
 because there is only ever meant to be one caller.
 
 This is safe today because the process itself is the trust boundary:
-[`main.py`](../../main.py)'s `_resolve_bind_host()` (issue #87, S1.3) refuses
+[`main.py`](../../main.py)'s `_resolve_bind_host()` (issue #885, S1.3) refuses
 to bind anywhere but loopback (`127.0.0.1`) unless an operator explicitly
 sets `LEXFLOW_ALLOW_UNSAFE_NETWORK_BIND=1` — and even then it logs a loud
 warning that there is no auth layer. As long as that boundary holds, "every
 thread/tag/secret is global" is equivalent to "every thread/tag/secret
 belongs to the one person who can reach this port".
 
-Consequences for contributors (issue #90, S4.2):
+Consequences for contributors (issue #888, S4.2):
 
 - **Do not** add a networked / multi-caller deployment mode without first
   adding a real user-scope column to `ChatThread` and `UserTag`, and

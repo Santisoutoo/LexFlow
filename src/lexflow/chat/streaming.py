@@ -334,7 +334,7 @@ async def stream_chat_reply(
                 if not pending_calls or finish_reason == "stop":
                     break
                 for call in pending_calls:
-                    # S4.1 (#90): tool dispatch is synchronous (SQLite scans,
+                    # S4.1 (#888): tool dispatch is synchronous (SQLite scans,
                     # sometimes a cold embedding-index build) — running it
                     # inline on the event loop would freeze every other
                     # request/stream for the duration. Off-load to a worker

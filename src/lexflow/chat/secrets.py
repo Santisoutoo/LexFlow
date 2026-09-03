@@ -13,10 +13,10 @@ fallback path: providers still accept ``OPENAI_API_KEY`` etc. when
 present, so headless deployments and CI keep working. When the env
 var is absent, providers look here.
 
-Security invariant (issue #90, S4.2): keys are stored under one global
+Security invariant (issue #888, S4.2): keys are stored under one global
 ``_SERVICE_NAME`` / provider slot — no per-user namespacing. Safe only
 under the loopback-only bind enforced by ``main.py``'s
-``_resolve_bind_host`` (issue #87, S1.3): there is no second, mutually
+``_resolve_bind_host`` (issue #885, S1.3): there is no second, mutually
 distrusting caller able to reach this process and read/overwrite the
 shared keyring entry. See
 ``docs/architecture/api-contract.md#multi-tenancy``.
