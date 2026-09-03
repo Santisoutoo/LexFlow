@@ -40,7 +40,7 @@ class Reference(BaseModel):
             "Where this reference appears: an article number, or a "
             "disposición label (e.g. 'disposición derogatoria única') "
             "when the reference is inside a disposición rather than an "
-            "article (#108)."
+            "article (#823)."
         ),
     )
     kind: ReferenceKind = Field(
@@ -137,7 +137,7 @@ class Section(BaseModel):
 
 
 class Disposicion(BaseModel):
-    """A closing disposition of a law (#106).
+    """A closing disposition of a law (#823).
 
     Legalize-es laws end with a block of headings — ``Disposición
     adicional``, ``transitoria``, ``derogatoria`` and ``final`` — that sit
@@ -232,7 +232,7 @@ class Law(BaseModel):
     )
     disposiciones: list[Disposicion] = Field(
         default_factory=list,
-        description="Closing dispositions (adicional/transitoria/derogatoria/final, #106).",
+        description="Closing dispositions (adicional/transitoria/derogatoria/final, #823).",
     )
     references: list[Reference] = Field(
         default_factory=list,

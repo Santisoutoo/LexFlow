@@ -348,7 +348,7 @@ def _extract_article_text(raw: str) -> str:
     Strips leading/trailing whitespace and stops at the next non-article
     heading of any level (``#`` through ``######`` without 'Articulo'),
     including a disposicion heading (``###### Disposición adicional ...``
-    etc — #106, #107). Disposiciones use the same heading level as
+    etc — #823, #823). Disposiciones use the same heading level as
     articles (six hashes), so without this check the LAST article of a
     law swallowed the entire disposiciones block as its own body (Ley
     39/2015's 15 derogatoria references mis-attributed to "art. 133").
@@ -376,7 +376,7 @@ def _build_article(number: str, title: str | None, text: str, references: list[R
 
 
 # ---------------------------------------------------------------------------
-# Disposicion extraction (#106)
+# Disposicion extraction (#823)
 # ---------------------------------------------------------------------------
 
 # Disposicion headings in legalize-es are markdown level 6, same as
@@ -428,7 +428,7 @@ def extract_disposiciones(body: str) -> list[Disposicion]:
 
 
 def _disposicion_source_label(kind: str, number: str | None) -> str:
-    """Build a reference ``source_article`` label for a disposición (#108).
+    """Build a reference ``source_article`` label for a disposición (#823).
 
     References found inside a disposición's text were previously left
     unattributed (``source_article=None``), which made ``Reference``
@@ -538,7 +538,7 @@ _SENTENCE_BOUNDARIES = ".;\n"
 # "\n\na) " between "las siguientes disposiciones:" and "Ley 30/1992" in a
 # derogatoria list. Trimming naively on the last newline would cut the
 # marker off from the lead-in sentence that actually carries the "derog"
-# keyword, misclassifying the citation as CITES instead of REPEALS (#109).
+# keyword, misclassifying the citation as CITES instead of REPEALS (#823).
 _TRAILING_LIST_MARKER_RE = re.compile(r"(?:\r?\n[ \t]*){1,3}(?:\d{1,2}|[a-z])[.)][ \t]*$", re.IGNORECASE)
 
 
@@ -556,7 +556,7 @@ def _context_before(text: str, start: int) -> str:
     ...) is stripped along with its leading newline(s) so the lead-in
     sentence of an enumerated list (e.g. "Quedan derogadas expresamente
     las siguientes disposiciones:") stays in the window instead of being
-    cut off by the newline right before the marker (#109).
+    cut off by the newline right before the marker (#823).
     """
     raw = text[max(0, start - _CLASSIFY_CONTEXT_CHARS) : start]
     marker_match = _TRAILING_LIST_MARKER_RE.search(raw)
@@ -674,7 +674,7 @@ def parse_law_content(content: str, file_path: str) -> Law:
 
 
 def _collect_all_references(articles: list[Article], disposiciones: list[Disposicion]) -> list[Reference]:
-    """Flatten references from all articles, then all disposiciones (#106)."""
+    """Flatten references from all articles, then all disposiciones (#823)."""
     refs: list[Reference] = []
     for article in articles:
         refs.extend(article.references)

@@ -78,7 +78,7 @@ class ReferenceKind(StrEnum):
 
 
 class DisposicionKind(StrEnum):
-    """Category of a closing disposition (#106).
+    """Category of a closing disposition (#823).
 
     Matches the four heading families legalize-es uses for the block of
     dispositions that follows a law's articles: additional, transitional,

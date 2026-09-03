@@ -91,16 +91,16 @@ class TestConstitutionContract:
         assert law.sections, "Constitution should parse a non-empty section tree"
 
     def test_parses_to_15_disposiciones_incl_one_derogatoria(self, real_registry: LawRegistry) -> None:
-        """#106 AC: 169 articles + 15 disposiciones incl. exactly 1 derogatoria."""
+        """#823 AC: 169 articles + 15 disposiciones incl. exactly 1 derogatoria."""
         law = real_registry.get_law(CONSTITUTION_ID)
         assert len(law.disposiciones) == 15
         derogatorias = [d for d in law.disposiciones if d.kind == "derogatoria"]
         assert len(derogatorias) == 1
 
     def test_article_169_text_is_exactly_the_boe_sentence(self, real_registry: LawRegistry) -> None:
-        """#107 AC: art. 169's body must be exactly the single BOE sentence.
+        """#823 AC: art. 169's body must be exactly the single BOE sentence.
 
-        Before #107, ``_SECTION_BREAK_RE`` only matched heading levels 1-4,
+        Before #823, ``_SECTION_BREAK_RE`` only matched heading levels 1-4,
         so the trailing level-5/6 non-article headings after the last
         article leaked into its body.
         """
@@ -162,7 +162,7 @@ class TestTitledArticleContract:
 
 
 class TestLpacDisposicionesContract:
-    """#106 regression: Ley 39/2015's 15 derogatoria refs were mis-attributed
+    """#823 regression: Ley 39/2015's 15 derogatoria refs were mis-attributed
     to "art. 133" because disposiciones weren't extracted separately from the
     last article's body.
     """
@@ -181,13 +181,13 @@ class TestLpacDisposicionesContract:
         assert not derogatoria_ref_texts & article_133_ref_texts
 
     def test_article_133_text_does_not_contain_disposicion_derogatoria(self, real_registry: LawRegistry) -> None:
-        """#107 AC: art. 133's body must not swallow the trailing disposicion."""
+        """#823 AC: art. 133's body must not swallow the trailing disposicion."""
         law = real_registry.get_law(LPAC_ID)
         article_133 = next(a for a in law.articles if a.number == "133")
         assert "disposición derogatoria única" not in article_133.text.lower()
 
     def test_ley_30_1992_reference_attributed_to_derogatoria_not_article_133(self, real_registry: LawRegistry) -> None:
-        """#108 AC: the Ley 30/1992 reference's source is the disposición, not art. 133."""
+        """#823 AC: the Ley 30/1992 reference's source is the disposición, not art. 133."""
         law = real_registry.get_law(LPAC_ID)
         derogatoria = next(d for d in law.disposiciones if d.kind == "derogatoria")
         ley_30_1992_ref = next(r for r in derogatoria.references if "Ley 30/1992" in r.target_text)
@@ -195,7 +195,7 @@ class TestLpacDisposicionesContract:
         assert ley_30_1992_ref.source_article != "133"
 
     def test_ley_30_1992_reference_classified_as_repeals(self, real_registry: LawRegistry) -> None:
-        """#109 AC: the Ley 30/1992 reference (list item "a)") must classify as repeals."""
+        """#823 AC: the Ley 30/1992 reference (list item "a)") must classify as repeals."""
         law = real_registry.get_law(LPAC_ID)
         derogatoria = next(d for d in law.disposiciones if d.kind == "derogatoria")
         ley_30_1992_ref = next(r for r in derogatoria.references if "Ley 30/1992" in r.target_text)

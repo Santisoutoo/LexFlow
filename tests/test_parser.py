@@ -268,7 +268,7 @@ class TestExtractArticles:
 
 
 # ---------------------------------------------------------------------------
-# Disposiciones (#106)
+# Disposiciones (#823)
 # ---------------------------------------------------------------------------
 
 
@@ -347,7 +347,7 @@ class TestExtractDisposiciones:
 
 class TestArticleDisposicionBoundary:
     def test_last_article_text_stops_before_disposicion(self) -> None:
-        """Regression (#106): a trailing disposición block used to be
+        """Regression (#823): a trailing disposición block used to be
         swallowed into the last article's body because disposiciones use
         the same level-6 heading depth as articles.
         """
@@ -366,7 +366,7 @@ class TestArticleDisposicionBoundary:
         assert "disposición adicional" not in articles[0].text.lower()
 
     def test_disposicion_references_not_attributed_to_last_article(self) -> None:
-        """Regression (#106): Ley 39/2015's derogatoria references used to
+        """Regression (#823): Ley 39/2015's derogatoria references used to
         be mis-attributed to 'art. 133' because the derogatoria text was
         parsed as part of article 133's body.
         """
@@ -386,7 +386,7 @@ class TestArticleDisposicionBoundary:
         assert disposiciones[0].references[0].source_article == "disposición derogatoria única"
 
     def test_article_text_stops_at_level5_non_article_heading(self) -> None:
-        """Regression (#107): ``_SECTION_BREAK_RE`` used to only match
+        """Regression (#823): ``_SECTION_BREAK_RE`` used to only match
         heading levels 1-4 (``^#{1,4}\\s+``), so a trailing level-5
         non-article heading (e.g. a stray annex/appendix title) leaked
         into the last article's body instead of stopping it.
@@ -406,7 +406,7 @@ class TestArticleDisposicionBoundary:
         assert "anexo" not in articles[0].text.lower()
 
     def test_article_text_stops_at_level6_non_article_heading(self) -> None:
-        """Regression (#107): same as above but at heading level 6, the
+        """Regression (#823): same as above but at heading level 6, the
         level disposiciones actually use in the real corpus.
         """
         body = dedent("""\

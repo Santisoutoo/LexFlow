@@ -93,7 +93,7 @@ class TestRegression:
         assert kinds[-1] == ReferenceKind.CITES
 
     def test_list_form_derogation_keeps_lead_in_context(self) -> None:
-        # #109: the "Quedan derogadas..." lead-in sits on the line before
+        # #823: the "Quedan derogadas..." lead-in sits on the line before
         # the "a)" list item — trimming at the newline right before "a)"
         # must not drop that lead-in sentence.
         text = (
