@@ -1976,7 +1976,7 @@ export interface components {
             heading: string;
             /**
              * Text
-             * @description Prose that belongs directly to this section — e.g. a preámbulo, a section's intro paragraph, or an anexo table —  as opposed to text that belongs to a nested article or subsection (#55). Empty when the section has no prose of its own (e.g. a Título whose content is only articles).
+             * @description Prose that belongs directly to this section — e.g. a preámbulo, a section's intro paragraph, or an anexo table —  as opposed to text that belongs to a nested article or subsection (#825). Empty when the section has no prose of its own (e.g. a Título whose content is only articles).
              * @default
              */
             text: string;
@@ -2189,7 +2189,7 @@ export interface components {
              */
             graph_ready: boolean;
             /**
-             * @description Corpus data-fidelity drift snapshot (#55): unknown enum values, empty identifiers, zero-article laws. `None` until the drift stage of warm-up completes.
+             * @description Corpus data-fidelity drift snapshot (#825): unknown enum values, empty identifiers, zero-article laws. `None` until the drift stage of warm-up completes.
              */
             drift_report?: components["schemas"]["CorpusDriftReport"] | null;
             /**

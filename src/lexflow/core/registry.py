@@ -466,7 +466,7 @@ class LawRegistry:
     def _index_law_for_search(self, law_id: str) -> None:
         """Add one law's searchable entries (title, articles, non-article prose).
 
-        Non-article prose — preámbulos, section intros, anexo tables (#55) —
+        Non-article prose — preámbulos, section intros, anexo tables (#825) —
         was invisible to search because only ``law.articles`` was indexed;
         a query term that only occurred in a Constitución preámbulo or an
         anexo table returned zero hits even though the text was parsed.
@@ -501,7 +501,7 @@ class LawRegistry:
                 )
 
     def _index_section_prose(self, law_id: str, law_title: str, sections: list[Section]) -> None:
-        """Recursively add each section's own prose as a search entry (#55)."""
+        """Recursively add each section's own prose as a search entry (#825)."""
         for section in sections:
             if section.text.strip():
                 self._search_index.add_entry(

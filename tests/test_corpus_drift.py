@@ -1,4 +1,4 @@
-"""Tests for the corpus drift report (#55 Sprint 4)."""
+"""Tests for the corpus drift report (#825 Sprint 4)."""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ class TestComputeDriftReport:
         assert report.unknown_status_sample_ids == ["BOE-A-2099-1"]
 
     def test_zero_article_law_counted_even_when_not_yet_parsed(self, tmp_path: Path) -> None:
-        """Regression (#55 review): must not undercount to 0 on a fresh registry.
+        """Regression (#825 review): must not undercount to 0 on a fresh registry.
 
         Before the fix, ``compute_drift_report`` gated the zero-article
         check on ``registry.is_parsed(law_id)``, so a law never appeared

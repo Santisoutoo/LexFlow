@@ -1,4 +1,4 @@
-"""Corpus data-fidelity drift report, computed during warm-up (#55 Sprint 4).
+"""Corpus data-fidelity drift report, computed during warm-up (#825 Sprint 4).
 
 Before this module, every drift signal (unknown enum value, empty
 identifier, a law with zero articles) was warn-and-continue: logged once
@@ -63,7 +63,7 @@ def compute_drift_report(registry: LawRegistry) -> CorpusDriftReport:
     effect, so this is normally a dict lookup, but ``get_graph``/
     ``load_or_build`` can also return a graph loaded straight from
     ``graph_cache.json`` on a hash match, which never touches
-    ``LawRegistry._cache`` (#55 review). Gating on ``is_parsed`` would
+    ``LawRegistry._cache`` (#825 review). Gating on ``is_parsed`` would
     silently undercount to 0 on that warm-cache-hit path.
     """
     unknown_status_ids: list[str] = []

@@ -285,7 +285,7 @@ def _build_section_list(
 
 
 def _extract_section_text(direct_body: str) -> str:
-    """Pull a section's own prose out of its direct content slice (#55).
+    """Pull a section's own prose out of its direct content slice (#825).
 
     ``direct_body`` starts at this section's OWN heading line (e.g.
     ``### PREÁMBULO``), which is dropped here since the heading text is

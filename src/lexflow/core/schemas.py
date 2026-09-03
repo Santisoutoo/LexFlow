@@ -378,7 +378,7 @@ class WarmupStatusResponse(BaseModel):
     drift_report: CorpusDriftReport | None = Field(
         default=None,
         description=(
-            "Corpus data-fidelity drift snapshot (#55): unknown enum values, "
+            "Corpus data-fidelity drift snapshot (#825): unknown enum values, "
             "empty identifiers, zero-article laws. `None` until the drift "
             "stage of warm-up completes."
         ),

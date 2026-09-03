@@ -200,7 +200,7 @@ class TestWarmupSemanticStage:
 
 
 class TestWarmupDriftStage:
-    """#55: the drift-report stage runs after graph and surfaces via /system/warmup."""
+    """#825: the drift-report stage runs after graph and surfaces via /system/warmup."""
 
     async def test_drift_report_populated_after_run(self, monkeypatch: pytest.MonkeyPatch) -> None:
         warmup = TestWarmupSemanticStage._stub_core_stages(monkeypatch)

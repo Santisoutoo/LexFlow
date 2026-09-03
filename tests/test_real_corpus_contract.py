@@ -276,7 +276,7 @@ class TestDuplicateArticleDisambiguation:
         assert first.json()["article"]["text"] != second.json()["article"]["text"]
 
 
-# #55 Sprint 4 — non-article prose (preámbulo, anexo) must be retrievable
+# #825 Sprint 4 — non-article prose (preámbulo, anexo) must be retrievable
 # via the API and indexed for search. ANEXO_ID is a real law whose entire
 # operative content is a data table with no Artículo headings at all.
 ANEXO_ID = "BOE-A-1962-14073"
@@ -293,7 +293,7 @@ def _find_section(sections: list[dict], heading_substring: str) -> dict | None:
 
 
 class TestNonArticleProseContract:
-    """#55 AC: Constitución PREÁMBULO + BOE-A-1962-14073 anexo table are
+    """#825 AC: Constitución PREÁMBULO + BOE-A-1962-14073 anexo table are
     retrievable via the API and indexed for search — not silently dropped.
     """
 
@@ -334,7 +334,7 @@ class TestNonArticleProseContract:
 
 
 class TestCorpusDriftReport:
-    """#55 AC: report shows 0 empty identifiers (post-Sprint 1) on the real
+    """#825 AC: report shows 0 empty identifiers (post-Sprint 1) on the real
     corpus, and correctly counts + samples the drift signals that do exist
     (e.g. ``annulled``/``expired`` status values not yet in ``LawStatus``,
     a separate enum-completeness gap this report surfaces but doesn't fix).

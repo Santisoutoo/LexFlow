@@ -121,7 +121,7 @@ class TestExtractHeadingTree:
 
 
 class TestSectionText:
-    """#55: ``Section.text`` carries a section's own prose (preámbulo,
+    """#825: ``Section.text`` carries a section's own prose (preámbulo,
     section intro, anexo), separate from its nested articles/subsections.
     """
 

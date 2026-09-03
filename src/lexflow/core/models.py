@@ -133,7 +133,7 @@ class Section(BaseModel):
             "Prose that belongs directly to this section — e.g. a "
             "preámbulo, a section's intro paragraph, or an anexo table —  "
             "as opposed to text that belongs to a nested article or "
-            "subsection (#55). Empty when the section has no prose of "
+            "subsection (#825). Empty when the section has no prose of "
             "its own (e.g. a Título whose content is only articles)."
         ),
     )

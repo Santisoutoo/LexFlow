@@ -102,7 +102,7 @@ def test_load_or_build_hash_change_rebuilds(tmp_path: Path, monkeypatch: pytest.
 
 
 def test_load_stale_version_cache_returns_none(tmp_path: Path) -> None:
-    """Regression (#55 review): a pre-bump cache must not silently load.
+    """Regression (#825 review): a pre-bump cache must not silently load.
 
     A ``search_index.json`` written by an older builder (before section
     prose / disposiciones were added to the index, e.g. version "1") has a
