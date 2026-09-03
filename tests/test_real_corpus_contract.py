@@ -117,14 +117,14 @@ class TestConstitutionEndpointContract:
         assert body["articles"][0]["text"].strip()
 
 
-# Ley 39/2015 — the AC law for #112. Its article headings carry titles
+# Ley 39/2015 — the AC law for #822. Its article headings carry titles
 # (``###### Artículo 1. Objeto de la Ley.``), which used to land whole in
 # ``number`` and break lookup by the bare number.
 LPAC_ID = "BOE-A-2015-10565"
 
 
 class TestTitledArticleContract:
-    """#112 AC: number/title split must hold on real titled headings."""
+    """#822 AC: number/title split must hold on real titled headings."""
 
     def test_first_article_number_and_title(self, real_registry: LawRegistry) -> None:
         law = real_registry.get_law(LPAC_ID)

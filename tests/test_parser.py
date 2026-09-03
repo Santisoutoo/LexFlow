@@ -195,7 +195,7 @@ class TestExtractArticles:
         assert "Texto del primero" in articles[0].text
 
     def test_heading_title_split_from_number(self) -> None:
-        """Regression (#112): the corpus format ``Artículo 1. Objeto de la
+        """Regression (#822): the corpus format ``Artículo 1. Objeto de la
         Ley.`` used to land whole in ``number`` (``"1. Objeto de la Ley"``),
         so ``find_article(law, "1")`` missed and ``/articles/1`` 404'd on
         every titled article. Number and title are now separate groups.

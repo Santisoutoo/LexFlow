@@ -290,7 +290,7 @@ def _build_section_list(
 # hashes, so capping at five silently extracted ZERO articles from every law
 # (the test fixture used five hashes, which masked it). See #561.
 #
-# The heading tail splits into number + optional title (#112): the corpus
+# The heading tail splits into number + optional title (#822): the corpus
 # format is ``Artículo 1. Objeto de la Ley.`` — capturing the whole tail as
 # the number made ``find_article(law, "1")`` miss every titled article and
 # 404'd ``/articles/1``. All separators are horizontal whitespace (``[ \t]``)
@@ -312,7 +312,7 @@ def extract_articles(body: str) -> list[Article]:
 
     Finds ``Articulo N.`` patterns, splitting each heading into the article
     number and its optional title (``Artículo 1. Objeto de la Ley.`` →
-    number ``"1"``, title ``"Objeto de la Ley"`` — #112), and captures text
+    number ``"1"``, title ``"Objeto de la Ley"`` — #822), and captures text
     until the next article heading or section heading.
     """
     matches = list(_ARTICLE_RE.finditer(body))

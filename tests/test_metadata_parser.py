@@ -20,7 +20,7 @@ def _corpus_file_or_skip(path: Path) -> Path:
 
 
 def test_parse_metadata_only_reads_oversized_frontmatter() -> None:
-    """Regression (#111): long references_* fields exceed the old 4 KB cap."""
+    """Regression (#822): long references_* fields exceed the old 4 KB cap."""
     law_path = _corpus_file_or_skip(BOE_A_1968_1060)
 
     metadata = parse_metadata_only(law_path)
