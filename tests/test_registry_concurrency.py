@@ -61,8 +61,8 @@ class TestPerLawParseLocking:
 
         # Serialised behind the old global lock: ~0.4s. Parallel: ~0.2s.
         assert elapsed < 0.35
-        assert registry.is_parsed("BOE-A-2000-1")
-        assert registry.is_parsed("BOE-A-2000-2")
+        assert "BOE-A-2000-1" in registry._cache
+        assert "BOE-A-2000-2" in registry._cache
 
     def test_law_ids_not_blocked_by_inflight_cold_parse(self, tmp_path: Path) -> None:
         """``law_ids`` must not block on a slow parse of an unrelated law."""
