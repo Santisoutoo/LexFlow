@@ -1,4 +1,4 @@
-"""Concurrency tests for LawRegistry per-law parse locking (#77 S1.3).
+"""Concurrency tests for LawRegistry per-law parse locking (#871 S1.3).
 
 ``_ensure_parsed`` used to hold the GLOBAL registry lock for the whole
 ``parse_law_file`` call, so two users opening different cold laws

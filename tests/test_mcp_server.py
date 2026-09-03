@@ -61,7 +61,7 @@ class TestGetLaw:
         assert isinstance(result.get("articles"), list)
 
     def test_payload_omits_raw_text_and_sections(self, patched_registry: LawRegistry) -> None:
-        """#77 S1.2: raw_text/sections duplicate articles, must not ship."""
+        """#871 S1.2: raw_text/sections duplicate articles, must not ship."""
         law_id = patched_registry.law_ids[0]
         result = _unwrap(mcp_server.get_law)(law_id=law_id)
         assert "raw_text" not in result

@@ -139,7 +139,7 @@ def _isolated_index() -> Iterator[None]:
 
 @pytest.fixture()
 def _warm_index(mock_registry: LawRegistry, _isolated_index: None) -> None:
-    """Pre-build the index (#77 S1.4 — cold-start 503 is a separate concern
+    """Pre-build the index (#871 S1.4 — cold-start 503 is a separate concern
     from the fusion/wire-shape tests below).
     """
     del _isolated_index
@@ -175,7 +175,7 @@ class TestHybridSearchEndpoint:
 
 
 class TestHybridSearchWarmup:
-    """Cold-start 503 contract mirrors ``/laws/search/semantic`` (#77 S1.4)."""
+    """Cold-start 503 contract mirrors ``/laws/search/semantic`` (#871 S1.4)."""
 
     def test_cold_index_returns_503(
         self, client: TestClient, mock_registry: LawRegistry, _isolated_index: None

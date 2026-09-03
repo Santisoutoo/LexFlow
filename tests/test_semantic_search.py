@@ -152,7 +152,7 @@ def _isolated_index():
 @pytest.fixture()
 def _warm_index(mock_registry: LawRegistry, _isolated_index: None) -> None:
     """Pre-build the index so endpoint tests exercise the query path, not
-    the cold-start 503 (#77 S1.4 — covered separately by
+    the cold-start 503 (#871 S1.4 — covered separately by
     ``TestSemanticSearchWarmup``).
     """
     del _isolated_index
@@ -213,7 +213,7 @@ class TestSemanticSearchEndpoint:
 
 
 class TestSemanticSearchWarmup:
-    """Cold-start 503 contract for ``Depends(get_search_index)`` (#77 S1.4)."""
+    """Cold-start 503 contract for ``Depends(get_search_index)`` (#871 S1.4)."""
 
     def test_cold_index_returns_503_and_kicks_background_build(
         self,

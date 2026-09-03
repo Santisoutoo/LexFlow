@@ -23,7 +23,7 @@ from lexflow.utils.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-# Audit #77 S1.4: guards the background warm-up thread so repeated cold
+# Audit #871 S1.4: guards the background warm-up thread so repeated cold
 # requests don't spawn duplicate builders. ``threading.Lock`` rather than
 # an ``asyncio`` primitive — callers hit this from request-handling
 # threads via ``get_ready_semantic_index``, never from the event loop.
@@ -65,7 +65,7 @@ def get_ready_semantic_index(registry: LawRegistry) -> SemanticIndex:
     """Return the semantic index only if it is already built.
 
     Non-blocking counterpart to :func:`ensure_semantic_index` for the
-    request path (#77 S1.4): a cold index would otherwise force a full
+    request path (#871 S1.4): a cold index would otherwise force a full
     corpus parse + embed pass (minutes) inline on the event loop. Instead
     this kicks a background build (at most once — repeated cold requests
     reuse the same in-flight build) and raises

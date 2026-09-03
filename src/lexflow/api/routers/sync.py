@@ -223,7 +223,7 @@ def _fallback_rebuild() -> None:
     # rebuilds against the fresh corpus. Cheap: the index re-embed
     # finishes in ~1 s for the 12 K-article corpus.
     reset_semantic_index()
-    # #77 S1.4: clear the "background build already started" guard too —
+    # #871 S1.4: clear the "background build already started" guard too —
     # otherwise the next cold request after this reset would skip kicking
     # a NEW build (the flag from the pre-sync build would still read True).
     reset_semantic_warmup_state()

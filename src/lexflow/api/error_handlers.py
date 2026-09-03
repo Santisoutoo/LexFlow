@@ -80,6 +80,6 @@ def register_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(SemanticIndexWarmingError)
     async def _semantic_index_warming(_request: Request, exc: SemanticIndexWarmingError) -> JSONResponse:
-        # #77 S1.4: a background build was just kicked off (or is already
+        # #871 S1.4: a background build was just kicked off (or is already
         # running) — retryable, not a real failure, hence 503 not 500.
         return _envelope(503, "semantic_warming", str(exc))

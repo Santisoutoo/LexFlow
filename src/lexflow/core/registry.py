@@ -44,7 +44,7 @@ class LawRegistry:
         self._metadata_cache: dict[str, LawMetadata] = {}
         self._search_index = SearchIndex()
         self._lock = Lock()
-        # Audit #77 S1.3: one lock per law id so two users opening
+        # Audit #871 S1.3: one lock per law id so two users opening
         # different cold laws parse in parallel instead of serialising
         # behind ``self._lock``. Created lazily, guarded by ``self._lock``
         # itself — cheap (a dict insert), unlike the parse it protects.
@@ -86,7 +86,7 @@ class LawRegistry:
     def _get_parse_lock(self, law_id: str) -> Lock:
         """Return the per-law lock, creating it under ``self._lock`` if new.
 
-        Audit #77 S1.3: the lock dict itself needs guarding (concurrent
+        Audit #871 S1.3: the lock dict itself needs guarding (concurrent
         first-touches of the same new law must get the SAME lock object),
         but that guard only covers a dict lookup/insert — never the parse
         itself.
@@ -101,7 +101,7 @@ class LawRegistry:
     def _ensure_parsed(self, law_id: str) -> Law:
         """Parse a law file and store it in the cache. Thread-safe.
 
-        Audit #77 S1.3: parsing runs under a PER-LAW lock, not the global
+        Audit #871 S1.3: parsing runs under a PER-LAW lock, not the global
         registry lock — two users opening different cold laws now parse
         concurrently. Only the final cache write takes ``self._lock``,
         and only briefly. A same-law race (two threads both missing the

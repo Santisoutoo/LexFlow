@@ -204,7 +204,7 @@ def search_semantic_top_k(query: str, limit: int = 10) -> dict:  # type: ignore[
 
 
 def _summarize_law(law: Law) -> dict[str, Any]:
-    """Build the compact ``get_law`` payload sent to the model (#77 S1.2).
+    """Build the compact ``get_law`` payload sent to the model (#871 S1.2).
 
     ``Law.model_dump()`` ships ``raw_text`` plus ``sections`` — both
     duplicate content already present in ``articles`` — as JSON re-sent

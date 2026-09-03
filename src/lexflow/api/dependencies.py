@@ -67,7 +67,7 @@ def reset_graph_cache() -> None:
 def get_search_index(registry: LawRegistry = Depends(get_law_registry)) -> SemanticIndex:
     """Provide the process-wide :class:`SemanticIndex`, READY only.
 
-    Audit #77 S1.4: unlike :func:`get_graph`, this must NOT build inline —
+    Audit #871 S1.4: unlike :func:`get_graph`, this must NOT build inline —
     a cold semantic index takes a full corpus parse + embed pass (minutes)
     and blocking the request would freeze the whole event loop. If the
     index isn't built yet, this kicks a background build (see

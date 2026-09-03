@@ -332,7 +332,7 @@ class TestToolUseLoopE2E:
         mock_registry,
         monkeypatch: MonkeyPatch,
     ) -> None:
-        """S4.1 (#888) + #77 S1.1: tool dispatch AND DB persistence/history
+        """S4.1 (#888) + #871 S1.1: tool dispatch AND DB persistence/history
         must go through ``anyio.to_thread.run_sync`` — spy on it in
         :mod:`lexflow.chat.streaming` and assert both call sites use it.
         """
@@ -358,7 +358,7 @@ class TestToolUseLoopE2E:
         assert len(tool_calls) == 1
         assert tool_calls[0][1].name == "get_stats"
 
-        # #77 S1.1: user-turn persist, refresh+history load and
+        # #871 S1.1: user-turn persist, refresh+history load and
         # assistant-turn persist are ALSO offloaded — every sync DB call
         # in the generator runs off the event loop, not just tool dispatch.
         offloaded_funcs = {func for func, *_ in calls}
