@@ -181,6 +181,42 @@ class TestSectionText:
         assert sections[0].text == ""
         assert len(sections[0].articles) == 2
 
+    def test_preamble_reference_collected_in_law_references(self) -> None:
+        body = dedent("""\
+            ### PREAMBULO
+
+            De conformidad con la Ley 39/2015, de 1 de octubre.
+
+            ##### Articulo 1.
+
+            Cuerpo del articulo.
+        """)
+        law = parse_law_content(
+            f"---\nidentifier: TEST-1\ntitle: Ley de prueba\nrank: ley\nstatus: in_force\n---\n{body}",
+            "test.md",
+        )
+        preamble_refs = [r for r in law.references if r.source_article == "preámbulo"]
+        assert len(preamble_refs) == 1
+        assert "Ley 39/2015" in preamble_refs[0].target_text
+
+    def test_section_intro_reference_attributed_to_heading(self) -> None:
+        body = dedent("""\
+            ## TITULO I. Disposiciones generales
+
+            Esta parte desarrolla la Ley 40/2015, de 1 de octubre.
+
+            ##### Articulo 1.
+
+            Cuerpo del articulo.
+        """)
+        law = parse_law_content(
+            f"---\nidentifier: TEST-2\ntitle: Ley de prueba\nrank: ley\nstatus: in_force\n---\n{body}",
+            "test.md",
+        )
+        intro_refs = [r for r in law.references if "TITULO I" in (r.source_article or "")]
+        assert len(intro_refs) == 1
+        assert "Ley 40/2015" in intro_refs[0].target_text
+
 
 # ---------------------------------------------------------------------------
 # Articles

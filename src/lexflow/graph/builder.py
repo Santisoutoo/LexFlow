@@ -146,11 +146,17 @@ def _add_law_edges(graph: LegalGraph, law_id: str, law: Law, citation_index: dic
 def _remove_law_from_graph(graph: LegalGraph, law_id: str) -> None:
     """Remove a law node; preserve its incoming refs as dangling."""
     for source, attrs in graph.incoming_edges(law_id):
+        raw_kind = attrs.get("kind") or ReferenceKind.CITES.value
+        try:
+            kind = ReferenceKind(raw_kind)
+        except ValueError:
+            kind = ReferenceKind.CITES
         graph.add_dangling(
             law_id,
             source,
             source_article=attrs.get("source_article"),
             reference_text=attrs.get("reference_text", "") or "",
+            kind=kind,
         )
     graph.drop_source_from_dangling(law_id)
     graph.remove_law(law_id)

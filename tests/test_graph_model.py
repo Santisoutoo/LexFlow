@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lexflow.core.enums import LawRank, LawStatus
+from lexflow.core.enums import LawRank, LawStatus, ReferenceKind
 from lexflow.core.models import LawMetadata
 from lexflow.core.registry import LawRegistry
 from lexflow.graph.algorithms import pagerank, top_laws
@@ -109,3 +109,31 @@ def test_get_subgraph_cap_keeps_highest_degree() -> None:
     graph.add_reference("HI", "X")  # HI has degree 2, LO degree 1
     sub = graph.get_subgraph("SEED", depth=1, max_nodes=2)
     assert set(sub.nodes) == {"SEED", "HI"}  # higher-degree neighbour wins the single slot
+
+
+def test_add_reference_merges_stronger_kind_cites_then_repeals() -> None:
+    graph = LegalGraph()
+    _law(graph, "A", "Ley A")
+    _law(graph, "B", "Ley B")
+    graph.add_reference("A", "B", kind=ReferenceKind.CITES)
+    graph.add_reference("A", "B", kind=ReferenceKind.REPEALS)
+    assert graph.graph["A"]["B"]["kind"] == ReferenceKind.REPEALS.value
+
+
+def test_add_reference_merges_stronger_kind_repeals_then_cites() -> None:
+    graph = LegalGraph()
+    _law(graph, "A", "Ley A")
+    _law(graph, "B", "Ley B")
+    graph.add_reference("A", "B", kind=ReferenceKind.REPEALS)
+    graph.add_reference("A", "B", kind=ReferenceKind.CITES)
+    assert graph.graph["A"]["B"]["kind"] == ReferenceKind.REPEALS.value
+
+
+def test_add_reference_three_way_kind_merge() -> None:
+    graph = LegalGraph()
+    _law(graph, "A", "Ley A")
+    _law(graph, "B", "Ley B")
+    graph.add_reference("A", "B", kind=ReferenceKind.CITES)
+    graph.add_reference("A", "B", kind=ReferenceKind.MODIFIES)
+    graph.add_reference("A", "B", kind=ReferenceKind.CITES)
+    assert graph.graph["A"]["B"]["kind"] == ReferenceKind.MODIFIES.value

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import networkx as nx
 
-from lexflow.core.enums import ReferenceKind
+from lexflow.core.enums import ReferenceKind, stronger_reference_kind
 from lexflow.core.models import LawMetadata
 
 # A handful of laws (the Constitution, Ley 39/2015, …) are cited by thousands
@@ -72,6 +72,15 @@ class LegalGraph:
         """
         if source_id not in self._g or target_id not in self._g:
             return False
+        if self._g.has_edge(source_id, target_id):
+            edge = self._g[source_id][target_id]
+            existing_raw = edge.get("kind", ReferenceKind.CITES.value)
+            try:
+                existing_kind = ReferenceKind(existing_raw)
+            except ValueError:
+                existing_kind = ReferenceKind.CITES
+            edge["kind"] = stronger_reference_kind(existing_kind, kind).value
+            return True
         self._g.add_edge(
             source_id,
             target_id,

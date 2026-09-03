@@ -586,7 +586,11 @@ def extract_disposiciones(body: str) -> list[Disposicion]:
         text_end = matches[idx + 1].start() if idx + 1 < len(matches) else len(body)
         raw_text = _extract_article_text(body[text_start:text_end])
         source = _disposicion_source_label(kind, number)
-        references = extract_references(raw_text, source_article=source)
+        references = extract_references(
+            raw_text,
+            source_article=source,
+            container_kind=DisposicionKind(kind),
+        )
         disposiciones.append(_build_disposicion(heading, kind, number, title, raw_text, references))
 
     return disposiciones
@@ -673,30 +677,46 @@ _MODIFIES_PATTERNS = re.compile(
     r"modifica|se\s+da\s+nueva\s+redacci[oó]n|se\s+sustituye",
     re.IGNORECASE,
 )
+_POST_MODIFIES_PATTERNS = re.compile(
+    r"queda\s+redactad|se\s+añade|con\s+la\s+siguiente\s+redacci[oó]n",
+    re.IGNORECASE,
+)
 _DEVELOPS_PATTERNS = re.compile(
     r"desarroll|en\s+aplicaci[oó]n\s+de|en\s+cumplimiento\s+de",
     re.IGNORECASE,
 )
+_FINAL_MODIFICATION_HINT = re.compile(r"modific", re.IGNORECASE)
+
+# Period after a short line-start ordinal ("1.", "2.") is list numbering, not a sentence end.
+_ORDINAL_LIST_PERIOD_RE = re.compile(r"^\d{1,2}\.$")
 
 
-def _classify_reference(context: str) -> ReferenceKind:
-    """Pick a :class:`ReferenceKind` from the preceding context (#144).
+def _classify_reference(
+    before: str,
+    after: str = "",
+    *,
+    container_kind: DisposicionKind | None = None,
+) -> ReferenceKind:
+    """Pick a :class:`ReferenceKind` from surrounding context (#144, #20).
 
     Precedence is REPEALS → MODIFIES → DEVELOPS → CITES (default). The
     heuristic favours the "stronger" relation when multiple markers
     co-occur, e.g. "se modifica la Ley X, y queda derogada la Ley Y"
-    parsed near "Ley Y" should classify as REPEALS.
+    parsed near "Ley Y" should classify as REPEALS. Post-citation markers
+    in *after* (``queda redactada``, ``se añade``) count toward MODIFIES.
     """
-    if _REPEALS_PATTERNS.search(context):
+    if _REPEALS_PATTERNS.search(before) or _REPEALS_PATTERNS.search(after):
         return ReferenceKind.REPEALS
-    if _MODIFIES_PATTERNS.search(context):
+    if _MODIFIES_PATTERNS.search(before) or _POST_MODIFIES_PATTERNS.search(after) or _MODIFIES_PATTERNS.search(after):
         return ReferenceKind.MODIFIES
-    if _DEVELOPS_PATTERNS.search(context):
+    if _DEVELOPS_PATTERNS.search(before) or _DEVELOPS_PATTERNS.search(after):
         return ReferenceKind.DEVELOPS
+    if container_kind == DisposicionKind.DEROGATORIA:
+        return ReferenceKind.REPEALS
+    if container_kind == DisposicionKind.FINAL and _FINAL_MODIFICATION_HINT.search(before):
+        return ReferenceKind.MODIFIES
     return ReferenceKind.CITES
 
-
-_SENTENCE_BOUNDARIES = ".;\n"
 
 # Matches a bare list-item marker (``a)``, ``1.``, ...) preceded by one to
 # three newlines, sitting at the very end of a context window — e.g. the
@@ -705,6 +725,30 @@ _SENTENCE_BOUNDARIES = ".;\n"
 # marker off from the lead-in sentence that actually carries the "derog"
 # keyword, misclassifying the citation as CITES instead of REPEALS (#109).
 _TRAILING_LIST_MARKER_RE = re.compile(r"(?:\r?\n[ \t]*){1,3}(?:\d{1,2}|[a-z])[.)][ \t]*$", re.IGNORECASE)
+
+
+def _is_article_abbrev_period(raw: str, dot_index: int) -> bool:
+    """True when *dot_index* ends an ``art.`` abbreviation, not a sentence."""
+    prefix = raw[:dot_index].rstrip()
+    return bool(re.search(r"art$", prefix, re.IGNORECASE))
+
+
+def _is_ordinal_list_period(raw: str, dot_index: int) -> bool:
+    """True when *dot_index* ends a line-start ordinal like ``1.`` or ``2.``."""
+    line_start = raw.rfind("\n", 0, dot_index) + 1
+    token = raw[line_start : dot_index + 1].strip()
+    return bool(_ORDINAL_LIST_PERIOD_RE.match(token))
+
+
+def _find_last_sentence_boundary(raw: str) -> int:
+    """Return the index of the last real sentence boundary in *raw*, or -1."""
+    for idx in range(len(raw) - 1, -1, -1):
+        ch = raw[idx]
+        if ch in ";\n":
+            return idx
+        if ch == "." and not _is_article_abbrev_period(raw, idx) and not _is_ordinal_list_period(raw, idx):
+            return idx
+    return -1
 
 
 def _context_before(text: str, start: int) -> str:
@@ -727,26 +771,48 @@ def _context_before(text: str, start: int) -> str:
     marker_match = _TRAILING_LIST_MARKER_RE.search(raw)
     if marker_match:
         raw = raw[: marker_match.start()]
-    last_boundary = max(raw.rfind(ch) for ch in _SENTENCE_BOUNDARIES)
+    last_boundary = _find_last_sentence_boundary(raw)
     if last_boundary >= 0:
         return raw[last_boundary + 1 :]
+    return raw
+
+
+def _context_after(text: str, end: int, *, chars: int = _CLASSIFY_CONTEXT_CHARS) -> str:
+    """Return the citation's following context, sentence-bounded (#20)."""
+    raw = text[end : min(len(text), end + chars)]
+    first_boundary = -1
+    for idx, ch in enumerate(raw):
+        if ch in ";\n":
+            first_boundary = idx
+            break
+        if ch == "." and not _is_article_abbrev_period(raw, idx) and not _is_ordinal_list_period(raw, idx):
+            first_boundary = idx
+            break
+    if first_boundary >= 0:
+        return raw[: first_boundary + 1]
     return raw
 
 
 def extract_references(
     text: str,
     source_article: str | None = None,
+    *,
+    container_kind: DisposicionKind | None = None,
 ) -> list[Reference]:
     """Find all cross-references in a text block.
 
-    Each reference is classified by inspecting the ~120 characters of
-    preceding context — see :func:`_classify_reference`.
+    Each reference is classified by inspecting preceding and following
+    context windows — see :func:`_classify_reference`.
     """
     refs: list[Reference] = []
 
     for match in _LAW_REF_RE.finditer(text):
         ref_text = match.group(0)
-        kind = _classify_reference(_context_before(text, match.start()))
+        kind = _classify_reference(
+            _context_before(text, match.start()),
+            _context_after(text, match.end()),
+            container_kind=container_kind,
+        )
         refs.append(
             Reference(
                 target_id=_resolve_reference_id(ref_text),
@@ -758,7 +824,11 @@ def extract_references(
 
     for match in _BOE_REF_RE.finditer(text):
         ref_text = match.group(0)
-        kind = _classify_reference(_context_before(text, match.start()))
+        kind = _classify_reference(
+            _context_before(text, match.start()),
+            _context_after(text, match.end()),
+            container_kind=container_kind,
+        )
         refs.append(
             Reference(
                 target_id=ref_text,
@@ -829,7 +899,7 @@ def parse_law_content(content: str, file_path: str) -> Law:
         # (``Primero.``, ``Único.``, ...) instead of ``Artículo`` headings.
         articles = extract_ordinal_articles(body)
     disposiciones = extract_disposiciones(body)
-    all_references = _collect_all_references(articles, disposiciones)
+    all_references = _collect_all_references(articles, disposiciones, sections)
 
     return Law(
         metadata=metadata,
@@ -842,11 +912,35 @@ def parse_law_content(content: str, file_path: str) -> Law:
     )
 
 
-def _collect_all_references(articles: list[Article], disposiciones: list[Disposicion]) -> list[Reference]:
-    """Flatten references from all articles, then all disposiciones (#106)."""
+def _section_source_label(section: Section) -> str:
+    """Build a reference ``source_article`` label for section prose (#20)."""
+    heading_lower = section.heading.lower()
+    if "preámbulo" in heading_lower or "preambulo" in heading_lower:
+        return "preámbulo"
+    return section.heading
+
+
+def _collect_section_references(sections: list[Section]) -> list[Reference]:
+    """Flatten references from section prose (preámbulo, intros, anexos, #20)."""
+    refs: list[Reference] = []
+    for section in sections:
+        if section.text.strip():
+            refs.extend(extract_references(section.text, source_article=_section_source_label(section)))
+        refs.extend(_collect_section_references(section.subsections))
+    return refs
+
+
+def _collect_all_references(
+    articles: list[Article],
+    disposiciones: list[Disposicion],
+    sections: list[Section] | None = None,
+) -> list[Reference]:
+    """Flatten references from articles, disposiciones, and section prose (#106, #20)."""
     refs: list[Reference] = []
     for article in articles:
         refs.extend(article.references)
     for disposicion in disposiciones:
         refs.extend(disposicion.references)
+    if sections:
+        refs.extend(_collect_section_references(sections))
     return refs

@@ -203,6 +203,14 @@ class TestLpacDisposicionesContract:
         ley_30_1992_ref = next(r for r in derogatoria.references if "Ley 30/1992" in r.target_text)
         assert ley_30_1992_ref.kind == ReferenceKind.REPEALS
 
+    def test_derogatoria_list_citations_classify_as_repeals(self, real_registry: LawRegistry) -> None:
+        """#20 AC: derogatoria list items must classify as ``repeals`` (was 0 before)."""
+        law = real_registry.get_law(LPAC_ID)
+        derogatoria = next(d for d in law.disposiciones if d.kind == "derogatoria")
+        list_targets = {"Ley 30/1992", "Ley 11/2007", "Ley 2/2011"}
+        list_refs = [r for r in derogatoria.references if any(t in r.target_text for t in list_targets)]
+        assert len([r for r in list_refs if r.kind == ReferenceKind.REPEALS]) >= 3
+
 
 # #54 Sprint 3 — article completeness: phantoms, ranges, zero-article, duplicates.
 BEPS_ID = "BOE-A-2021-21097"
