@@ -69,7 +69,7 @@ No CORS + no auth layer means the browser's *simple request* rules are
 the only thing standing between a third-party page and a handful of
 routes that spawn subprocesses or mutate expensive state: a bodyless
 `POST`, a plain `GET`, or a `multipart/form-data` upload never
-triggers a CORS preflight. Issue #87 (S1.2) closes this with
+triggers a CORS preflight. Issue #885 (S1.2) closes this with
 [`lexflow.api.csrf_boundary.CSRFBoundaryMiddleware`](../../src/lexflow/api/csrf_boundary.py),
 required on:
 

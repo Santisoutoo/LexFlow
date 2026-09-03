@@ -111,7 +111,7 @@ def create_server(body: McpServerCreateRequest) -> McpServerView:
     existing user entry (409). Built-in entries are never editable
     via this endpoint — they're a code-defined catalog.
 
-    Security (issue #87, S1.1): the new entry is persisted **disabled**.
+    Security (issue #885, S1.1): the new entry is persisted **disabled**.
     An added server's ``command`` is only ever spawned as a subprocess
     once it's enabled (``chat/mcp_client.py::_all_attached_servers``
     skips disabled entries), so this is a no-auto-connect boundary —

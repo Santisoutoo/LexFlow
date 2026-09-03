@@ -18,7 +18,7 @@ export const API_BASE = import.meta.env.VITE_API_URL || '';
 export const API_PREFIX = '/api/v1';
 
 /**
- * CSRF boundary contract (issue #87, S1.2 — backend counterpart in
+ * CSRF boundary contract (issue #885, S1.2 — backend counterpart in
  * `lexflow.api.csrf_boundary`). A handful of spawn/state-triggering
  * routes (`/sync`, `/system/semantic-install`, `GET /mcp/tools`,
  * `POST /mcp/bundles`) never trigger a CORS preflight on their own

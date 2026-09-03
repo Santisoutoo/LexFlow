@@ -190,7 +190,7 @@ class TestInstallBundleEndpoint:
         body = response.json()
         assert body["name"] == "uploaded-server"
         assert body["kind"] == "user"
-        # Issue #87 (S1.1) — bundle install must not auto-connect either.
+        # Issue #885 (S1.1) — bundle install must not auto-connect either.
         assert body["enabled"] is False
 
     def test_rejects_corrupt_zip(self, client: TestClient, _isolated_config_dir: Path) -> None:

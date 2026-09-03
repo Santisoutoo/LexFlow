@@ -1,4 +1,4 @@
-"""Tests for the loopback-bind security boundary in ``main.py`` (#87, S1.3).
+"""Tests for the loopback-bind security boundary in ``main.py`` (#885, S1.3).
 
 ``main()`` itself starts a real uvicorn server, so these tests exercise
 the pure decision function :func:`main._resolve_bind_host` instead —

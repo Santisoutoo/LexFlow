@@ -230,7 +230,7 @@ def _manifest_to_entry(manifest: BundleManifest, install_dir: Path) -> UserMcpSe
     bundle's install dir so the user doesn't have to know where the
     backend dropped it.
 
-    Security (issue #87, S1.1): the entry is persisted **disabled** —
+    Security (issue #885, S1.1): the entry is persisted **disabled** —
     installing a ``.mcpb`` bundle must not auto-spawn its command. The
     user has to explicitly enable it in Settings first.
     """

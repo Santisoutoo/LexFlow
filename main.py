@@ -1,6 +1,6 @@
 """LexFlow entry point — starts the FastAPI development server.
 
-Security boundary (issue #87, S1.3): LexFlow has no auth layer — it's
+Security boundary (issue #885, S1.3): LexFlow has no auth layer — it's
 a single-user local app that trusts "whoever can reach this port".
 Binding to a non-loopback address turns that trust boundary into a
 LAN-wide (or internet-wide, behind a bad NAT/firewall rule) unauth

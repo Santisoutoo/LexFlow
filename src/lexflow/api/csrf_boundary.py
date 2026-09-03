@@ -1,4 +1,4 @@
-"""CSRF boundary for spawn/state-changing routes (issue #87, S1.2).
+"""CSRF boundary for spawn/state-changing routes (issue #885, S1.2).
 
 LexFlow has no auth layer (single-user local app), and CORS stays off
 on purpose (see ``CLAUDE.md`` §6) because the SPA and API share an
@@ -42,7 +42,7 @@ from lexflow.utils.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-# The browser-reachable subset flagged in issue #87: bodyless/simple
+# The browser-reachable subset flagged in issue #885: bodyless/simple
 # requests that either spawn a subprocess, mutate corpus state, or
 # start an installer. Exact ``path`` match (post-prefix routing has
 # already resolved these to their canonical form).

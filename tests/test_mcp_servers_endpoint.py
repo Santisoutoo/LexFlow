@@ -86,7 +86,7 @@ class TestCreateServer:
         assert response.status_code == 201
         body = response.json()
         assert body["kind"] == "user"
-        # Issue #87 (S1.1) — no auto-connect: a freshly added server is
+        # Issue #885 (S1.1) — no auto-connect: a freshly added server is
         # persisted disabled until the user explicitly enables it.
         assert body["enabled"] is False
 

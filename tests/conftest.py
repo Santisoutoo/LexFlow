@@ -73,7 +73,7 @@ def _isolated_config_dir(
 def client() -> TestClient:
     """Provide a synchronous test client for the FastAPI application.
 
-    Carries the SPA's CSRF-boundary header (issue #87, S1.2) by default
+    Carries the SPA's CSRF-boundary header (issue #885, S1.2) by default
     so tests exercising the protected routes (``/sync``,
     ``/system/semantic-install``, ``/mcp/tools``, ``/mcp/bundles``)
     don't all need to pass it explicitly — mirrors what

@@ -26,7 +26,7 @@ The packaging story has two stages — Docker today, native binaries planned.
 - Healthcheck: `urllib.request.urlopen('http://localhost:8000/health')`
   every 30 s (see [observability.md](./observability.md) for the endpoint).
 
-> **Loopback bind guard (issue #87, S1.3).** `main.py` refuses to bind
+> **Loopback bind guard (issue #885, S1.3).** `main.py` refuses to bind
 > off-loopback unless `LEXFLOW_ALLOW_UNSAFE_NETWORK_BIND=1` is set —
 > Docker's `0.0.0.0` bind is required for the container's own network
 > namespace, but LexFlow still has no auth layer behind it. The actual

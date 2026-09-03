@@ -10,7 +10,7 @@ from pathlib import Path
 PROJECT_ROOT: Path = Path(__file__).resolve().parents[3]
 DEFAULT_DATA_PATH: Path = PROJECT_ROOT / "data" / "legalize-es"
 
-# Issue #87 (S1.2) — default Origin allow-list for the CSRF boundary.
+# Issue #885 (S1.2) — default Origin allow-list for the CSRF boundary.
 # Covers the dev Vite server and the single-process prod bind (both
 # localhost and 127.0.0.1, since browsers treat them as distinct
 # origins).
@@ -47,7 +47,7 @@ class Settings:
             re-ranker is ``cross-encoder``.
         LEXFLOW_CSRF_HEADER_NAME — name of the custom header the SPA
             must set on state-changing / spawn-triggering routes
-            (issue #87, S1.2). Default ``X-Lexflow-Client``.
+            (issue #885, S1.2). Default ``X-Lexflow-Client``.
         LEXFLOW_CSRF_HEADER_VALUE — required value of that header.
             Default ``spa``.
         LEXFLOW_CSRF_ALLOWED_ORIGINS — comma-separated allow-list

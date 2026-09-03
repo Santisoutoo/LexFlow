@@ -146,7 +146,7 @@ de verdad lo quieras global.
 
 LexFlow no tiene capa de autenticación — es una app local de un solo
 usuario que confía en "quien pueda llegar a este puerto". Desde el
-issue #87 (S1.3), `main.py` se niega a arrancar con `LEXFLOW_HOST`
+issue #885 (S1.3), `main.py` se niega a arrancar con `LEXFLOW_HOST`
 apuntando fuera de loopback salvo que también se fije
 `LEXFLOW_ALLOW_UNSAFE_NETWORK_BIND=1` — y aun así emite un warning
 alto en el log. No pongas ese flag en una red que no controles: expone

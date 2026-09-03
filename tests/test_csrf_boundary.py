@@ -1,4 +1,4 @@
-"""Tests for the CSRF boundary on spawn/state-changing routes (#87, S1.2).
+"""Tests for the CSRF boundary on spawn/state-changing routes (#885, S1.2).
 
 The repo-wide ``client`` fixture (``tests/conftest.py``) already carries
 the required header on every request, matching what the real SPA sends

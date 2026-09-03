@@ -125,7 +125,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CSRF boundary (#87, S1.2) added BEFORE RequestIdMiddleware so it ends
+# CSRF boundary (#885, S1.2) added BEFORE RequestIdMiddleware so it ends
 # up as the inner layer — Starlette wraps middleware in reverse
 # registration order, and we want the request-id already bound (for
 # the access log line) by the time a request gets rejected here.

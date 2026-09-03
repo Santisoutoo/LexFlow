@@ -13,7 +13,7 @@ uv run python main.py
 The FastAPI app is built in [`src/lexflow/api/app.py`](../../src/lexflow/api/app.py)
 and exposes:
 
-> **Loopback is a hard security boundary (issue #87, S1.3).** LexFlow has
+> **Loopback is a hard security boundary (issue #885, S1.3).** LexFlow has
 > no authentication layer, so binding off-loopback would expose the full
 > API — including anything a configured MCP server's `command` can do —
 > to your whole network. `main.py` refuses `LEXFLOW_HOST` values that

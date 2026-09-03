@@ -264,7 +264,7 @@ function ServerRow({ row, onChange }: { row: McpServerView; onChange: () => Prom
 
   const onToggle = async (next: boolean) => {
     if (isBuiltin) return; // UI disables it; defensive.
-    // Security (issue #87, S1.1) — enabling a server is the FIRST
+    // Security (issue #885, S1.1) — enabling a server is the FIRST
     // moment its command can be spawned as a subprocess (the backend
     // now persists every added/imported server disabled). Require an
     // explicit, informed consent step before that first spawn.
