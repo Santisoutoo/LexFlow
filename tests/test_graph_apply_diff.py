@@ -7,7 +7,7 @@ resolution) is exercised deterministically, independent of the parser.
 from __future__ import annotations
 
 from lexflow.core.delta_sync import CorpusDiff
-from lexflow.core.enums import LawRank, LawStatus
+from lexflow.core.enums import LawRank, LawStatus, ReferenceKind
 from lexflow.core.models import Law, LawMetadata, Reference
 from lexflow.graph.builder import apply_diff_to_graph, build_graph
 from lexflow.graph.model import LegalGraph
@@ -115,3 +115,31 @@ def test_unresolved_target_stays_dangling_after_modify() -> None:
 
     assert _edges(graph) == set()
     assert graph.dangling["GHOST"][0]["source"] == "A"
+
+
+def test_remove_law_preserves_incoming_edge_kind() -> None:
+    reg = FakeRegistry({"A": ("Ley A", ["B"]), "B": ("Ley B", [])})
+    graph = build_graph(reg)  # type: ignore[arg-type]
+    graph.graph["A"]["B"]["kind"] = ReferenceKind.REPEALS.value
+
+    reg.drop_law("B")
+    apply_diff_to_graph(graph, reg, CorpusDiff(added=[], modified=[], removed=["B"]))  # type: ignore[arg-type]
+
+    assert graph.dangling["B"][0]["kind"] == ReferenceKind.REPEALS.value
+
+
+def test_upsert_merges_duplicate_target_kinds() -> None:
+    reg = FakeRegistry({"A": ("Ley A", ["B"]), "B": ("Ley B", [])})
+    graph = build_graph(reg)  # type: ignore[arg-type]
+    assert graph.graph["A"]["B"]["kind"] == ReferenceKind.CITES.value
+
+    merged_refs = [
+        Reference(target_id="B", target_text="Ley B", source_article="1", kind=ReferenceKind.CITES),
+        Reference(target_id="B", target_text="Ley B", source_article="2", kind=ReferenceKind.REPEALS),
+    ]
+    law = Law(metadata=reg.get_metadata("A"), file_path="A.md", references=merged_refs)
+    graph.clear_outgoing("A")
+    from lexflow.graph.builder import _add_law_edges
+
+    _add_law_edges(graph, "A", law, {})
+    assert graph.graph["A"]["B"]["kind"] == ReferenceKind.REPEALS.value

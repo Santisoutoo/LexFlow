@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 # caches held the sparse edge set (3,779 edges), so a hub's depth-2 ego-graph
 # came back with ~4 nodes instead of the resolved graph (#664). Follow-up:
 # key the cache on a builder-logic hash so this can't silently regress again.
-CACHE_VERSION = "3"
+CACHE_VERSION = "4"
 
 
 def save_graph(graph: LegalGraph, cache_path: Path, data_hash: str) -> None:

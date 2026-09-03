@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from lexflow.core.enums import ReferenceKind
+from lexflow.core.enums import DisposicionKind, ReferenceKind
 from lexflow.core.parser import extract_references
 
 
@@ -119,3 +119,28 @@ class TestRegression:
         # invent a REPEALS classification out of thin air.
         text = "Véanse las siguientes normas:\n\na) Ley 5/2000, de 1 de enero."
         assert _kinds(text) == [ReferenceKind.CITES]
+
+    def test_derogatoria_list_items_b_through_g_classify_as_repeals(self) -> None:
+        text = (
+            "2. Quedan derogadas expresamente las siguientes disposiciones:\n"
+            "\n"
+            "a) Ley 30/1992, de 26 de noviembre.\n"
+            "\n"
+            "b) Ley 11/2007, de 22 de junio.\n"
+            "\n"
+            "c) Ley 17/2009, de 23 de noviembre.\n"
+        )
+        kinds = [r.kind for r in extract_references(text, container_kind=DisposicionKind.DEROGATORIA)]
+        assert kinds == [ReferenceKind.REPEALS, ReferenceKind.REPEALS, ReferenceKind.REPEALS]
+
+    def test_article_range_not_split_at_articulos_boundary(self) -> None:
+        text = "Los artículos 4 a 7 de la Ley 2/2011 quedan sin efecto."
+        assert _kinds(text) == [ReferenceKind.CITES]
+
+    def test_post_citation_queda_redactada_classifies_as_modifies(self) -> None:
+        text = "Se modifica la Ley 36/2011, de 10 de octubre, que queda redactada en los siguientes términos:"
+        assert _kinds(text) == [ReferenceKind.MODIFIES]
+
+    def test_post_citation_redactada_without_leading_modifica(self) -> None:
+        text = "La Ley 36/2011, de 10 de octubre, queda redactada en los siguientes términos:"
+        assert _kinds(text) == [ReferenceKind.MODIFIES]

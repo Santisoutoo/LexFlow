@@ -77,6 +77,21 @@ class ReferenceKind(StrEnum):
     DEVELOPS = "develops"
 
 
+# Strongest-first precedence for merging parallel refs on one graph edge (#20).
+_REFERENCE_KIND_PRECEDENCE: tuple[ReferenceKind, ...] = (
+    ReferenceKind.REPEALS,
+    ReferenceKind.MODIFIES,
+    ReferenceKind.DEVELOPS,
+    ReferenceKind.CITES,
+)
+
+
+def stronger_reference_kind(a: ReferenceKind, b: ReferenceKind) -> ReferenceKind:
+    """Return the stronger of two reference kinds (repeals > modifies > develops > cites)."""
+    order = {kind: idx for idx, kind in enumerate(_REFERENCE_KIND_PRECEDENCE)}
+    return a if order[a] <= order[b] else b
+
+
 class DisposicionKind(StrEnum):
     """Category of a closing disposition (#106).
 
