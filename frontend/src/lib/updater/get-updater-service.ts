@@ -1,5 +1,5 @@
 /**
- * Factory for the active `UpdaterService` — mock in dev/QA, stub in Tauri (#14).
+ * Factory for the active `UpdaterService` — mock in dev/QA, stub in Tauri (#698).
  */
 
 import type { UpdaterService } from './updater-service';

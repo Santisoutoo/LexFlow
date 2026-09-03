@@ -1,5 +1,5 @@
 /**
- * Thin interface for desktop app updates — UI talks only to this (#14).
+ * Thin interface for desktop app updates — UI talks only to this (#698).
  *
  * Real Tauri wiring lands in #128; dev/web uses `MockUpdaterService`.
  */

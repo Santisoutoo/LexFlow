@@ -1,5 +1,5 @@
 /**
- * Tests for the desktop app-update notice (#14).
+ * Tests for the desktop app-update notice (#698).
  */
 
 import { render, screen, waitFor } from '@testing-library/react';

@@ -1,5 +1,5 @@
 /**
- * Non-blocking desktop app-update banner (#14).
+ * Non-blocking desktop app-update banner (#698).
  *
  * Fixed bottom placement mirrors floating search / HelpDrawer offsets in
  * AppShell. Consumes `AppUpdateProvider` context — no Tauri compile-time deps.

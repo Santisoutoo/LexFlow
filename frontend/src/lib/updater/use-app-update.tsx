@@ -1,5 +1,5 @@
 /**
- * App-update state machine — poll scheduling, snooze, download/install (#14).
+ * App-update state machine — poll scheduling, snooze, download/install (#698).
  */
 
 import {

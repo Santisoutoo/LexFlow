@@ -1,4 +1,4 @@
-// Dev-only: screenshot app-update notice states (#14). node scripts/shot-update.mjs
+// Dev-only: screenshot app-update notice states (#698). node scripts/shot-update.mjs
 import { chromium } from '@playwright/test';
 
 const availableOut = process.argv[2] ?? '.shot-update-available.png';

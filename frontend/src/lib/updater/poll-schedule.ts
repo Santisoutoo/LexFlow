@@ -1,5 +1,5 @@
 /**
- * Pure helpers for the daily app-update poll policy (#14).
+ * Pure helpers for the daily app-update poll policy (#698).
  *
  * Checks run at most once per 24h — not on every cold start.
  */

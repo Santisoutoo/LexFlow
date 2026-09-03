@@ -1,5 +1,5 @@
 /**
- * Mock updater for dev/web — simulates check, download, and install (#14).
+ * Mock updater for dev/web — simulates check, download, and install (#698).
  */
 
 import type { UpdaterService } from './updater-service';
