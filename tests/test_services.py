@@ -24,7 +24,7 @@ class TestFindArticle:
         assert article.text == "Texto 2"
 
     def test_occurrence_selects_duplicate(self) -> None:
-        """#54: laws with embedded annex statutes repeat article numbers —
+        """#824: laws with embedded annex statutes repeat article numbers —
         ``occurrence`` reaches the 2nd (3rd, ...) match instead of always
         returning the first.
         """

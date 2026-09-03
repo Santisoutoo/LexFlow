@@ -268,7 +268,7 @@ class TestExtractArticles:
         assert count(tree) == len(extract_articles(body)) == 3
 
     def test_non_heading_mention_is_not_a_boundary(self) -> None:
-        """Regression (#54): a body line reading "Artículo N" without a
+        """Regression (#824): a body line reading "Artículo N" without a
         heading marker must NOT split a new article — only a genuine
         ``#{1,6} Artículo ...`` heading is a boundary. Real corpus proof:
         BOE-A-2021-21097 has 340 real headings but used to parse to 1,573
@@ -291,7 +291,7 @@ class TestExtractArticles:
 
 
 # ---------------------------------------------------------------------------
-# Plural article ranges — placeholder articles (#54)
+# Plural article ranges — placeholder articles (#824)
 # ---------------------------------------------------------------------------
 
 
@@ -350,7 +350,7 @@ class TestExtractArticleRanges:
 
 
 # ---------------------------------------------------------------------------
-# Ordinal operative clauses — fallback for article-less norms (#54)
+# Ordinal operative clauses — fallback for article-less norms (#824)
 # ---------------------------------------------------------------------------
 
 
@@ -634,7 +634,7 @@ class TestParseLawContent:
         assert len(law.articles) == 1
 
     def test_falls_back_to_ordinals_when_no_articles(self) -> None:
-        """#54: a norm with zero ``Artículo`` headings but ordinal
+        """#824: a norm with zero ``Artículo`` headings but ordinal
         operative clauses (``Primero.``, ``Segundo.``, ...) still ends up
         with a non-empty, queryable ``law.articles``.
         """

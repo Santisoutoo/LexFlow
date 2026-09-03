@@ -78,7 +78,7 @@ def get_article(
             ge=1,
             description=(
                 "1-based selector for laws with duplicate article numbers "
-                "(e.g. annex statutes embedded in the same norm, #54). "
+                "(e.g. annex statutes embedded in the same norm, #824). "
                 "Defaults to the first match."
             ),
         ),
@@ -86,7 +86,7 @@ def get_article(
 ) -> ArticleResponse:
     """Return a single article by its number within a law.
 
-    Some norms embed annex statutes that repeat article numbers (#54);
+    Some norms embed annex statutes that repeat article numbers (#824);
     pass ``occurrence`` to reach the 2nd, 3rd, ... match instead of the
     first.
     """

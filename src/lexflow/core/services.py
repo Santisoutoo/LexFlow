@@ -49,7 +49,7 @@ def find_article(law: Law, article_number: str, occurrence: int = 1) -> Article 
     ``occurrence`` is 1-based and defaults to 1 (existing behaviour: the
     first match wins), so callers unaware of duplicate ids keep working
     unchanged. Laws with embedded annex statutes (e.g. river-basin plans
-    inside a single BOE norm, #54) can repeat an article number dozens of
+    inside a single BOE norm, #824) can repeat an article number dozens of
     times with unrelated content; without a selector, every one of those
     duplicates was permanently shadowed by whichever came first.
     """

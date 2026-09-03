@@ -85,7 +85,7 @@ class TestGetArticle:
         assert result["article_number"] == "9999"
 
     def test_occurrence_selects_duplicate_article(self, sample_law_dir: Path, monkeypatch: MonkeyPatch) -> None:
-        """#54: ``occurrence`` reaches the 2nd match of a duplicate article id."""
+        """#824: ``occurrence`` reaches the 2nd match of a duplicate article id."""
         frontmatter = 'title: "Norma con anexos"\nidentifier: "TEST-DUP"\ncountry: "es"\nrank: "otro"\n'
         body = "# Norma con anexos\n\n###### Articulo 2.\n\nPrimer anexo.\n\n###### Articulo 2.\n\nSegundo anexo.\n"
         law_file = sample_law_dir / "es" / "TEST-DUP.md"

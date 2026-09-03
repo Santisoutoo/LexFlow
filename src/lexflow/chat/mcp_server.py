@@ -230,7 +230,7 @@ def get_article(law_id: str, article_number: str, occurrence: int = 1) -> dict: 
         law_id: BOE identifier of the law.
         article_number: Article number string (e.g. '1', '2 bis').
         occurrence: 1-based selector for laws with duplicate article
-            numbers, e.g. annex statutes embedded in the same norm (#54).
+            numbers, e.g. annex statutes embedded in the same norm (#824).
             Defaults to the first match.
 
     Returns:

@@ -58,7 +58,7 @@ class TestGetArticle:
 
 @pytest.fixture()
 def duplicate_article_client(tmp_path: Path) -> Iterator[TestClient]:
-    """A law whose article "2" repeats — e.g. an annex statute (#54)."""
+    """A law whose article "2" repeats — e.g. an annex statute (#824)."""
     frontmatter = 'title: "Norma con anexos"\nidentifier: "TEST-DUP"\ncountry: "es"\nrank: "otro"\n'
     body = (
         "# Norma con anexos\n\n"
@@ -81,7 +81,7 @@ def duplicate_article_client(tmp_path: Path) -> Iterator[TestClient]:
 
 
 class TestGetArticleOccurrence:
-    """#54: annex statutes embedded in the same law repeat article ids."""
+    """#824: annex statutes embedded in the same law repeat article ids."""
 
     def test_default_occurrence_returns_first_match(self, duplicate_article_client: TestClient) -> None:
         response = duplicate_article_client.get("/api/v1/laws/TEST-DUP/articles/2")

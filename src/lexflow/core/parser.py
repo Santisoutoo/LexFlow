@@ -300,7 +300,7 @@ def _build_section_list(
 # exotic numberings): keep the old whole-tail behaviour rather than dropping
 # the article entirely.
 _ARTICLE_NUMBER_PATTERN = r"\d+(?:[ \t]+(?:bis|ter|quater|quinquies|sexies|septies|octies|nonies|decies))*"
-# The leading ``#{1,6}`` heading marker is REQUIRED (#54): making it
+# The leading ``#{1,6}`` heading marker is REQUIRED (#824): making it
 # optional let any body line matching "Artículo N" act as an article
 # boundary, e.g. a table cell or cross-reference mid-paragraph. On
 # BOE-A-2021-21097 (340 real headings) that inflated the parse to 1,573
@@ -314,7 +314,7 @@ _ARTICLE_RE = re.compile(
 )
 
 # Plural range headings collapse a run of (usually repealed) articles into
-# one heading, e.g. ``Artículos 325 a 332. (Derogados)`` (#54). Note the
+# one heading, e.g. ``Artículos 325 a 332. (Derogados)`` (#824). Note the
 # extra ``s`` on ``Artículos`` — that alone already keeps this pattern from
 # ever colliding with ``_ARTICLE_RE`` (which requires whitespace right
 # after ``Articulo``, not a trailing ``s``).
@@ -357,7 +357,7 @@ def extract_articles(body: str) -> list[Article]:
 
 
 def _extract_range_placeholder_articles(body: str, existing_numbers: set[str]) -> list[tuple[int, Article]]:
-    """Materialise placeholder articles for plural range headings (#54).
+    """Materialise placeholder articles for plural range headings (#824).
 
     Without this, a heading like ``Artículos 325 a 332. (Derogados)`` left
     every number in the range unreachable via :func:`find_article` — a
@@ -431,7 +431,7 @@ def _build_article(number: str, title: str | None, text: str, references: list[R
 
 
 # ---------------------------------------------------------------------------
-# Ordinal operative clauses (#54) — fallback for article-less norms
+# Ordinal operative clauses (#824) — fallback for article-less norms
 # ---------------------------------------------------------------------------
 
 # 1,857 laws (15.2% of the corpus) have zero ``Artículo`` headings; ~38% of
@@ -802,7 +802,7 @@ def parse_law_content(content: str, file_path: str) -> Law:
     sections = extract_heading_tree(body)
     articles = extract_articles(body)
     if not articles:
-        # #54: ~38% of the 1,857 zero-article laws use numbered ordinals
+        # #824: ~38% of the 1,857 zero-article laws use numbered ordinals
         # (``Primero.``, ``Único.``, ...) instead of ``Artículo`` headings.
         articles = extract_ordinal_articles(body)
     disposiciones = extract_disposiciones(body)

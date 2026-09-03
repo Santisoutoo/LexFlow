@@ -203,7 +203,7 @@ class TestLpacDisposicionesContract:
         assert ley_30_1992_ref.kind == ReferenceKind.REPEALS
 
 
-# #54 Sprint 3 — article completeness: phantoms, ranges, zero-article, duplicates.
+# #824 Sprint 3 — article completeness: phantoms, ranges, zero-article, duplicates.
 BEPS_ID = "BOE-A-2021-21097"
 CODIGO_CIVIL_ID = "BOE-A-1889-4763"
 INSTRUCCION_ID = "BOE-A-2026-7297"
