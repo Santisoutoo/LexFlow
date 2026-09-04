@@ -633,7 +633,7 @@
   "graph": {
     "searchPlaceholder": "Search the graph…",
     "advancedFilters": "Advanced filters",
-    "legend": "Legend",
+    "legendTitle": "Legend",
     "edges": "Edges",
     "zoomIn": "Zoom in",
     "zoomOut": "Zoom out",
@@ -651,6 +651,14 @@
       "trySuggestions": "Try one of the most connected laws in the corpus:"
     },
     "filterDimHint": "Disabled types are dimmed on the canvas; they are not hidden.",
+    "legend": {
+      "clusters": "Clusters",
+      "cluster": "Cluster {{id}}",
+      "nodeKinds": "Node kinds"
+    },
+    "filters": {
+      "subgraphHint": "Filters apply to the current subgraph only. Scope and jurisdiction need the global view."
+    },
     "rail": {
       "rank": "Rank",
       "status": "Status",

@@ -77,12 +77,47 @@ export const NODE_KIND_LABELS: Record<GraphNodeKind, string> = {
 
 /** Solid fill per node kind. */
 export const GRAPH_KIND_FILL: Record<GraphNodeKind, string> = {
-  law:       'hsl(232 72% 52%)', // indigo — primary anchor
-  article:   'hsl(36 95% 56%)',  // amber  — accent / recent
+  law: 'hsl(232 72% 52%)', // indigo — primary anchor
+  article: 'hsl(36 95% 56%)', // amber  — accent / recent
   reference: 'hsl(266 65% 60%)', // violet
   amendment: 'hsl(195 70% 50%)', // cyan
-  repealed:  'hsl(220 8% 55%)',  // neutral grey
+  repealed: 'hsl(220 8% 55%)', // neutral grey
 };
+
+/**
+ * Fixed HSL palette for modularity clusters (#24). Node fill colour is
+ * community-driven; kind is encoded by shape instead.
+ */
+export const COMMUNITY_PALETTE: readonly string[] = [
+  'hsl(232 72% 52%)',
+  'hsl(36 95% 56%)',
+  'hsl(195 70% 50%)',
+  'hsl(266 65% 60%)',
+  'hsl(150 55% 45%)',
+  'hsl(0 70% 55%)',
+  'hsl(280 60% 55%)',
+  'hsl(20 85% 55%)',
+  'hsl(170 50% 42%)',
+  'hsl(310 55% 52%)',
+  'hsl(55 80% 48%)',
+  'hsl(210 55% 48%)',
+  'hsl(95 45% 42%)',
+  'hsl(350 65% 52%)',
+];
+
+/** Neutral fill when `community` is missing or zero (single-node subgraphs). */
+export const COMMUNITY_NEUTRAL = 'hsl(220 9% 62%)';
+
+/**
+ * Resolve a stable fill colour for a modularity cluster id.
+ *
+ * @param communityId - Backend `community` field; `0`/missing → neutral.
+ */
+export function resolveCommunityFill(communityId: number | null | undefined): string {
+  if (communityId == null || communityId === 0) return COMMUNITY_NEUTRAL;
+  const idx = Math.abs(communityId) % COMMUNITY_PALETTE.length;
+  return COMMUNITY_PALETTE[idx] ?? COMMUNITY_NEUTRAL;
+}
 
 /**
  * Brand indigo used for selection state, edge highlight and the bar /
@@ -119,10 +154,10 @@ export const GRAPH_PRIMARY_FILL_SOFT = 'hsl(232 72% 52% / 0.10)';
  * omits ``kind`` (legacy edges from before #144).
  */
 export const GRAPH_EDGE_STROKE: Record<GraphEdgeKind, string> = {
-  cites:    'hsl(232 60% 60%)', // indigo (light)
+  cites: 'hsl(232 60% 60%)', // indigo (light)
   develops: 'hsl(195 65% 55%)', // cyan (matches `amendment` node)
-  modifies: 'hsl(36 90% 55%)',  // amber (matches `article` node)
-  repeals:  'hsl(0 70% 55%)',   // red
+  modifies: 'hsl(36 90% 55%)', // amber (matches `article` node)
+  repeals: 'hsl(0 70% 55%)', // red
 };
 
 /**
@@ -130,8 +165,102 @@ export const GRAPH_EDGE_STROKE: Record<GraphEdgeKind, string> = {
  * and any tooltip / filter chip that lists edge kinds.
  */
 export const EDGE_KIND_LABELS: Record<GraphEdgeKind, string> = {
-  cites:    'Cita',
+  cites: 'Cita',
   develops: 'Desarrolla',
   modifies: 'Modifica',
-  repeals:  'Deroga',
+  repeals: 'Deroga',
 };
+
+/** Options for the shared canvas node painter (#24). */
+export interface PaintNodeOptions {
+  x: number;
+  y: number;
+  radius: number;
+  kind: GraphNodeKind;
+  fill: string;
+  scale: number;
+  selected: boolean;
+}
+
+function strokeDiamond(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
+  ctx.moveTo(x, y - r);
+  ctx.lineTo(x + r, y);
+  ctx.lineTo(x, y + r);
+  ctx.lineTo(x - r, y);
+  ctx.closePath();
+}
+
+function strokeTriangle(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
+  const h = r * 1.15;
+  ctx.moveTo(x, y - h);
+  ctx.lineTo(x + r, y + h * 0.6);
+  ctx.lineTo(x - r, y + h * 0.6);
+  ctx.closePath();
+}
+
+/**
+ * Draw a graph node on canvas — community drives fill; kind drives shape.
+ */
+export function paintNode(ctx: CanvasRenderingContext2D, opts: PaintNodeOptions): void {
+  const { x, y, radius, kind, fill, scale, selected } = opts;
+
+  if (selected) {
+    ctx.beginPath();
+    ctx.arc(x, y, radius + 5, 0, 2 * Math.PI);
+    ctx.fillStyle = GRAPH_PRIMARY_SOFT;
+    ctx.fill();
+  }
+
+  ctx.beginPath();
+  switch (kind) {
+    case 'law':
+      ctx.arc(x, y, radius, 0, 2 * Math.PI);
+      ctx.fillStyle = fill;
+      ctx.fill();
+      break;
+    case 'article': {
+      const inner = radius * 0.85;
+      ctx.arc(x, y, inner, 0, 2 * Math.PI);
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.lineWidth = 1.5 / scale;
+      ctx.strokeStyle = 'hsl(0 0% 100% / 0.85)';
+      ctx.stroke();
+      break;
+    }
+    case 'reference':
+      strokeDiamond(ctx, x, y, radius);
+      ctx.fillStyle = fill;
+      ctx.fill();
+      break;
+    case 'amendment':
+      strokeTriangle(ctx, x, y, radius);
+      ctx.fillStyle = fill;
+      ctx.fill();
+      break;
+    case 'repealed':
+      ctx.arc(x, y, radius, 0, 2 * Math.PI);
+      ctx.lineWidth = 2 / scale;
+      ctx.setLineDash([3 / scale, 2 / scale]);
+      ctx.strokeStyle = fill;
+      ctx.globalAlpha *= 0.75;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      break;
+    default:
+      ctx.arc(x, y, radius, 0, 2 * Math.PI);
+      ctx.fillStyle = fill;
+      ctx.fill();
+  }
+
+  if (selected) {
+    ctx.beginPath();
+    if (kind === 'reference') strokeDiamond(ctx, x, y, radius);
+    else if (kind === 'amendment') strokeTriangle(ctx, x, y, radius);
+    else ctx.arc(x, y, radius, 0, 2 * Math.PI);
+    ctx.lineWidth = 2 / scale;
+    ctx.strokeStyle = GRAPH_PRIMARY;
+    ctx.stroke();
+  }
+}
+

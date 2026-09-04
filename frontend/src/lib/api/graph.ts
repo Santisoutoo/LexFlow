@@ -26,7 +26,7 @@ import { http, qs } from './http';
  * `kind` collapses to `repealed` when the backend status marks it so;
  * the canvas dims accordingly.
  */
-function projectNode(n: BackendGraphNode): GraphData['nodes'][number] {
+export function projectNode(n: BackendGraphNode): GraphData['nodes'][number] {
   return {
     id: n.id,
     kind: (n.status ?? '') === 'repealed' ? 'repealed' : 'law',
