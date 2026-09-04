@@ -106,7 +106,13 @@ def get_global_graph(
         for n in sub.nodes
     ]
     edges = [
-        GraphEdgeData(source=u, target=v, source_article=sub.edges[u, v].get("source_article")) for u, v in sub.edges
+        GraphEdgeData(
+            source=u,
+            target=v,
+            source_article=sub.edges[u, v].get("source_article"),
+            kind=sub.edges[u, v].get("kind"),
+        )
+        for u, v in sub.edges
     ]
     return GraphGlobalResponse(nodes=nodes, edges=edges, total_available=total_available)
 

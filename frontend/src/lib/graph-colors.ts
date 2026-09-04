@@ -16,12 +16,42 @@
  *                           consumer that forgets to handle the new kind.
  * * Recolour brand        → swap the HSL string here; consumers update
  *                           automatically.
- * * Tailwind / CSS tokens → if these become CSS variables in
- *                           `index.css`, switch this module to read
- *                           `hsl(var(--graph-law))` and friends.
+ * * Tailwind / CSS tokens → `--graph-*` tokens in `index.css`; resolved at
+ *                           paint time via `resolveGraphKindFill`.
  */
 
 import type { GraphEdge, GraphNodeKind } from './types';
+
+const GRAPH_KIND_CSS_VAR: Record<GraphNodeKind, string> = {
+  law: '--graph-law',
+  article: '--graph-article',
+  reference: '--graph-reference',
+  amendment: '--graph-amendment',
+  repealed: '--graph-repealed',
+};
+
+/**
+ * Resolve an HSL CSS token (channel triple under `--token`) for canvas use.
+ */
+export function resolveCssHslToken(token: string, fallback: string): string {
+  if (typeof document === 'undefined') return fallback;
+  try {
+    const value = getComputedStyle(document.documentElement).getPropertyValue(token).trim();
+    return value ? `hsl(${value})` : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/** Theme-aware node fill — reads `--graph-*` tokens with literal fallback. */
+export function resolveGraphKindFill(kind: GraphNodeKind): string {
+  return resolveCssHslToken(GRAPH_KIND_CSS_VAR[kind], GRAPH_KIND_FILL[kind]);
+}
+
+/** Theme-aware label colour — reads `--fg`. */
+export function resolveLabelColor(): string {
+  return resolveCssHslToken('--fg', '#9aa0aa');
+}
 
 /**
  * Edge kinds that the backend ships on `GraphEdge.kind` (#144). Mirrors

@@ -143,7 +143,11 @@ export function LawDetailPage() {
           </div>
         )}
         {tab === 'grafo' && lawId && (
-          <LawDetailGraphTab lawId={lawId} graph={graph} onOpenGlobalGraph={() => navigate('/graph')} />
+          <LawDetailGraphTab
+            lawId={lawId}
+            graph={graph}
+            onOpenGlobalGraph={() => navigate(`/graph?law=${encodeURIComponent(lawId)}`)}
+          />
         )}
         {tab === 'refs' && (
           <LawDetailRefsTab refs={lawRefs} onRefClick={setSelectedRef} />

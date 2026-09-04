@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Search, Plus, Minus, Filter, Download, Pin, X, Maximize2 } from 'lucide-react';
 import { Badge, Button, Chip, Input } from '@/components/ui';
@@ -13,6 +13,7 @@ import { useGraph, useGraphTop, useWarmup } from '@/lib/queries';
 import { EDGE_KIND_LABELS, GRAPH_EDGE_STROKE, GRAPH_KIND_FILL, NODE_KIND_LABELS, type GraphEdgeKind } from '@/lib/graph-colors';
 import type { GraphNodeKind } from '@/lib/types';
 import { buildNodeIndex, resolveNeighbourNodes } from './graph/neighbour-utils';
+import { GraphNodeRail } from './graph/GraphNodeRail';
 import { cn } from '@/lib/utils';
 
 const ALL_KINDS: GraphNodeKind[] = ['law', 'article', 'reference', 'amendment', 'repealed'];
@@ -26,6 +27,7 @@ const FALLBACK_SEED_LAW_ID = 'BOE-A-1978-31229';
 
 export function GraphPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { t } = useTranslation();
   const [filters, setFilters] = useState<Set<GraphNodeKind>>(new Set(ALL_KINDS));
   const graphRef = useRef<GraphCanvasHandle>(null);
@@ -40,7 +42,18 @@ export function GraphPage() {
   // override the derived seed via `manualSeed`. Persisted only in
   // component state — a remount resets to the top-PageRank default.
   const [manualSeed, setManualSeed] = useState<string | null>(null);
-  const seedLawId = manualSeed ?? topLaws?.[0]?.lawId ?? FALLBACK_SEED_LAW_ID;
+  const urlLaw = searchParams.get('law');
+  const seedLawId = manualSeed ?? urlLaw ?? topLaws?.[0]?.lawId ?? FALLBACK_SEED_LAW_ID;
+
+  const pickSeed = useCallback(
+    (lawId: string) => {
+      setManualSeed(lawId);
+      const next = new URLSearchParams(searchParams);
+      next.set('law', lawId);
+      setSearchParams(next, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
   const [selected, setSelected] = useState<string | null>(null);
   useEffect(() => {
     // Initialise the right-rail selection to the seed once it resolves.
@@ -106,7 +119,7 @@ export function GraphPage() {
             <button
               key={law.lawId}
               type="button"
-              onClick={() => setManualSeed(law.lawId)}
+              onClick={() => pickSeed(law.lawId)}
               className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-[12.5px] hover:border-indigo-500/60 hover:bg-primary-soft/40"
             >
               <span className="font-mono text-[11px] text-muted">{law.lawId}</span>
@@ -149,16 +162,18 @@ export function GraphPage() {
             />
           </span>
           <span className="hidden h-6 w-px bg-border md:block" />
-          {ALL_KINDS.map((t) => (
+          {ALL_KINDS.map((kind) => (
             <Chip
-              key={t}
-              active={filters.has(t)}
-              onClick={() => toggle(t)}
-              icon={<span className="size-2 rounded-full" style={{ background: GRAPH_KIND_FILL[t] }} />}
+              key={kind}
+              active={filters.has(kind)}
+              onClick={() => toggle(kind)}
+              title={t('graph.filterDimHint')}
+              icon={<span className="size-2 rounded-full" style={{ background: GRAPH_KIND_FILL[kind] }} />}
             >
-              {NODE_KIND_LABELS[t]}
+              {NODE_KIND_LABELS[kind]}
             </Chip>
           ))}
+          <p className="hidden w-full text-[11px] text-muted md:block">{t('graph.filterDimHint')}</p>
           {/* Deslop sprint #798 — advanced filters + PNG export aren't
               wired yet; honest-disable. Hidden on mobile (#830) to keep the
               toolbar to a single compact row. */}
@@ -234,13 +249,16 @@ export function GraphPage() {
               </span>
             </div>
             <h2 className="font-display text-xl font-semibold">{node.label}</h2>
-            <p className="mt-1.5 text-[13px] text-muted">{t(`graph.kindDesc.${node.kind}`)}</p>
+            <GraphNodeRail node={node} selectedId={node.id} />
 
             <div className="label-caps mb-2 mt-4">{t('graph.connections')}</div>
             <div className="flex flex-col gap-1.5">
               {neighbours.map(({ edge: e, otherNode: o, otherId }) => (
                 <Chip key={e.id} onClick={() => setSelected(otherId)} className="w-full justify-start text-left">
                   <span className="truncate">{o.label}</span>
+                  <span className="ml-auto shrink-0 text-[11px] text-muted">
+                    {EDGE_KIND_LABELS[e.kind ?? 'cites']}
+                  </span>
                 </Chip>
               ))}
             </div>
@@ -248,10 +266,7 @@ export function GraphPage() {
             {/* Audit #409: only law-kind nodes have a meaningful
                 ``/laws/<id>`` target; article / reference / amendment
                 ids would 404. Disable the button (and encode the id)
-                until we can resolve a parent law from those kinds.
-                The IDs from xyflow are URL-safe today but
-                ``encodeURIComponent`` is the right defensive pattern
-                if the corpus ever ships ids with reserved characters. */}
+                until we can resolve a parent law from those kinds. */}
             <Button
               className="mt-5 w-full"
               onClick={() => selected && node?.kind === 'law' && navigate(`/laws/${encodeURIComponent(selected)}`)}

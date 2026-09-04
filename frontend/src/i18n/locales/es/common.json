@@ -650,12 +650,12 @@
       "seedMissing": "La norma seed pedida ({{seed}}) no está en el grafo actual.",
       "trySuggestions": "Prueba con una de las más conectadas del corpus:"
     },
-    "kindDesc": {
-      "law": "Norma con 169 artículos y 1.248 referencias entrantes.",
-      "article": "Artículo perteneciente al Título I, Capítulo II.",
-      "reference": "Norma supranacional o doctrina citada por la norma activa.",
-      "amendment": "Norma que modifica la activa.",
-      "repealed": "Norma derogada — visible para contexto histórico."
+    "filterDimHint": "Los tipos desactivados se atenúan en el canvas; no se ocultan.",
+    "rail": {
+      "rank": "Rango",
+      "status": "Estado",
+      "pagerank": "PageRank",
+      "genericNode": "Nodo del subgrafo local."
     }
   },
   "dashboards": {

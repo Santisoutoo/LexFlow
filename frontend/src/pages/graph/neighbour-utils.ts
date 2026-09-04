@@ -14,6 +14,9 @@ import type { GraphData, GraphNode, GraphEdge } from '@/lib/types';
 /** Maximum number of neighbour edges surfaced in the right-rail. */
 const MAX_NEIGHBOURS = 12;
 
+/** Default cap for related-law chips on the law-detail rail. */
+export const MAX_RELATED_LAWS = 10;
+
 /**
  * Build a stable `id → GraphNode` index from a node array.
  *
@@ -78,6 +81,32 @@ export function resolveNeighbourNodes(
     if (!otherNode) continue;
 
     result.push({ edge, otherNode, otherId });
+  }
+
+  return result;
+}
+
+/**
+ * Return 1-hop law neighbours of `currentLawId` for the related-laws rail.
+ *
+ * Deduplicates by target id (a law can be linked by multiple edges) and
+ * ignores non-law nodes. Caps at `max`.
+ */
+export function resolveRelatedLawNeighbours(
+  graph: GraphData,
+  currentLawId: string,
+  max = MAX_RELATED_LAWS,
+): GraphNode[] {
+  const index = buildNodeIndex(graph.nodes);
+  const neighbours = resolveNeighbourNodes(graph.edges, index, currentLawId);
+  const seen = new Set<string>();
+  const result: GraphNode[] = [];
+
+  for (const { otherNode, otherId } of neighbours) {
+    if (otherNode.kind !== 'law' || otherId === currentLawId || seen.has(otherId)) continue;
+    seen.add(otherId);
+    result.push(otherNode);
+    if (result.length >= max) break;
   }
 
   return result;

@@ -650,12 +650,12 @@
       "seedMissing": "The requested seed law ({{seed}}) isn't in the current graph.",
       "trySuggestions": "Try one of the most connected laws in the corpus:"
     },
-    "kindDesc": {
-      "law": "Law with 169 articles and 1,248 incoming references.",
-      "article": "Article belonging to Title I, Chapter II.",
-      "reference": "Supranational law or doctrine cited by the active law.",
-      "amendment": "Law that amends the active one.",
-      "repealed": "Repealed law — shown for historical context."
+    "filterDimHint": "Disabled types are dimmed on the canvas; they are not hidden.",
+    "rail": {
+      "rank": "Rank",
+      "status": "Status",
+      "pagerank": "PageRank",
+      "genericNode": "Local subgraph node."
     }
   },
   "dashboards": {

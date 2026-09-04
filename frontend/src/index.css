@@ -47,6 +47,12 @@
   --amber-500: 36 95% 56%;
   --success:   152 60% 40%;
 
+  --graph-law:       232 72% 52%;
+  --graph-article:   36 95% 56%;
+  --graph-reference: 266 65% 60%;
+  --graph-amendment: 195 70% 50%;
+  --graph-repealed:  220 8% 55%;
+
   color-scheme: light;
 }
 
@@ -71,6 +77,12 @@
   --amendment-soft-fg: 195 50% 80%;
 
   --violet-soft:   252 50% 18%;
+
+  --graph-law:       232 72% 62%;
+  --graph-article:   36 95% 66%;
+  --graph-reference: 266 65% 70%;
+  --graph-amendment: 195 70% 60%;
+  --graph-repealed:  220 8% 65%;
 
   color-scheme: dark;
 }

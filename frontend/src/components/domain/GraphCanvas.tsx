@@ -24,12 +24,15 @@
  * * Node sizing    → `BASE_RADIUS` + `nodeRadius`.
  * * Label density  → `LABEL_ZOOM`.
  * * Forces         → the `d3Force` tweaks in the mount effect.
+ * * Kind filters   → dim filtered-out kinds (`DIM_ALPHA`); nodes stay in
+ *   the simulation so layout stays stable (hide would restart forces).
  */
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import ForceGraph2D, { type ForceGraphMethods } from 'react-force-graph-2d';
 
-import { GRAPH_EDGE_STROKE, GRAPH_KIND_FILL, GRAPH_PRIMARY } from '@/lib/graph-colors';
+import { GRAPH_EDGE_STROKE, GRAPH_PRIMARY, resolveGraphKindFill, resolveLabelColor } from '@/lib/graph-colors';
+import { useUi } from '@/lib/store';
 import type { GraphData, GraphEdge, GraphNodeKind } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -106,6 +109,7 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
   // when the user toggles reduced-motion in system settings (see the
   // matchMedia change-listener effect below).
   const [reduced, setReduced] = useState(prefersReducedMotion);
+  const theme = useUi((s) => s.theme);
 
   // Stable across selection + filter changes (depends on `data` only) so the
   // simulation never restarts on a click or a chip toggle.
@@ -123,16 +127,8 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
     return { nodes, links, byId };
   }, [data]);
 
-  // The label colour is theme-dependent (`--fg`); the canvas can't read CSS
-  // vars, so resolve it once. Re-reads on remount; good enough for v1.
-  const labelColor = useMemo(() => {
-    try {
-      const v = getComputedStyle(document.documentElement).getPropertyValue('--fg').trim();
-      return v ? `hsl(${v})` : '#9aa0aa';
-    } catch {
-      return '#9aa0aa';
-    }
-  }, []);
+  // Re-read label + node fills whenever the UI theme flips (`data-theme`).
+  const labelColor = resolveLabelColor();
 
   // --- Auto-fit / imperative zoom (#830) ---------------------------------
   // `zoomToFit` used to fire once, only on the first `onEngineStop`, and never
@@ -248,6 +244,7 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
     <div ref={wrapperRef} className={cn('size-full', className)}>
       {size.w > 0 && size.h > 0 && (
         <ForceGraph2D
+          key={theme}
           ref={fgRef}
           width={size.w}
           height={size.h}
@@ -297,7 +294,7 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
 
             ctx.beginPath();
             ctx.arc(x, y, r, 0, 2 * Math.PI);
-            ctx.fillStyle = GRAPH_KIND_FILL[node.kind];
+            ctx.fillStyle = resolveGraphKindFill(node.kind);
             ctx.fill();
             if (isSel) {
               ctx.lineWidth = 2 / scale;

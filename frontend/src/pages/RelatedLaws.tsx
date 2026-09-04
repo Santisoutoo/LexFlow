@@ -24,9 +24,7 @@
 import { Network } from 'lucide-react';
 import { Chip } from '@/components/ui';
 import type { GraphData } from '@/lib/types';
-
-/** Maximum number of related-law chips surfaced in the right rail. */
-const MAX_RELATED = 10;
+import { resolveRelatedLawNeighbours } from './graph/neighbour-utils';
 
 interface RelatedLawsProps {
   /** Subgraph centred on the current law. Pass `undefined` while loading. */
@@ -47,9 +45,7 @@ interface RelatedLawsProps {
 export function RelatedLaws({ graph, currentLawId, onNavigate }: RelatedLawsProps) {
   if (!graph) return null;
 
-  const related = graph.nodes
-    .filter((n) => n.kind === 'law' && n.id !== currentLawId)
-    .slice(0, MAX_RELATED);
+  const related = resolveRelatedLawNeighbours(graph, currentLawId);
 
   if (related.length === 0) {
     return (

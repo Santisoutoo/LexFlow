@@ -3,8 +3,8 @@
  *
  * Subgraph nodes carry per-node `community` + `pagerank` (#143)
  * computed over the returned subgraph; the canvas uses them for
- * cluster colour + node size. Edges currently surface as `cites`
- * — typed edges (modifies / repeals / develops) wait on #144.
+ * cluster colour + node size. Edge `kind` is forwarded from the wire
+ * (cites / modifies / repeals / develops), defaulting to `cites`.
  */
 
 import type {
@@ -41,18 +41,32 @@ function projectNode(n: BackendGraphNode): GraphData['nodes'][number] {
   };
 }
 
+const VALID_EDGE_KINDS = new Set<NonNullable<GraphData['edges'][number]['kind']>>([
+  'cites',
+  'modifies',
+  'repeals',
+  'develops',
+]);
+
+/**
+ * Normalize a backend edge kind to the SPA union, defaulting to `cites`.
+ */
+export function normalizeEdgeKind(raw: string | null | undefined): GraphData['edges'][number]['kind'] {
+  if (raw != null && VALID_EDGE_KINDS.has(raw as NonNullable<GraphData['edges'][number]['kind']>)) {
+    return raw as NonNullable<GraphData['edges'][number]['kind']>;
+  }
+  return 'cites';
+}
+
 /**
  * Project a `BackendGraphEdge` with the SPA's `e-<i>` id convention.
- * `kind` is hard-coded to `'cites'` until #144 surfaces typed edges
- * on the wire (the backend supplies `kind`; the schema doesn't echo
- * it yet).
  */
-function projectEdge(e: BackendGraphEdge, index: number): GraphData['edges'][number] {
+export function projectEdge(e: BackendGraphEdge, index: number): GraphData['edges'][number] {
   return {
     id: `e-${index}`,
     source: e.source,
     target: e.target,
-    kind: 'cites',
+    kind: normalizeEdgeKind(e.kind),
   };
 }
 
