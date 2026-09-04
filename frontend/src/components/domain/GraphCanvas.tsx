@@ -31,7 +31,14 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import ForceGraph2D, { type ForceGraphMethods } from 'react-force-graph-2d';
 
-import { GRAPH_EDGE_STROKE, GRAPH_PRIMARY, resolveGraphKindFill, resolveLabelColor } from '@/lib/graph-colors';
+import {
+  EDGE_KIND_LABELS,
+  GRAPH_EDGE_STROKE,
+  NODE_KIND_LABELS,
+  paintNode,
+  resolveCommunityFill,
+  resolveLabelColor,
+} from '@/lib/graph-colors';
 import { useUi } from '@/lib/store';
 import type { GraphData, GraphEdge, GraphNodeKind } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -41,6 +48,8 @@ export interface GraphCanvasProps {
   visibleKinds: Set<GraphNodeKind>;
   selected: string | null;
   onSelect: (id: string) => void;
+  /** When set, nodes outside this set are dimmed (search / advanced filters). */
+  matchNodeIds?: Set<string> | null;
   className?: string;
 }
 
@@ -49,6 +58,8 @@ export interface GraphCanvasHandle {
   zoomIn: () => void;
   zoomOut: () => void;
   fit: () => void;
+  centerAt: (nodeId: string) => void;
+  exportPng: (filename?: string) => void;
 }
 
 /** Node shape fed to the force engine (it mutates x/y/vx/vy in place). */
@@ -57,6 +68,9 @@ interface FGNode {
   kind: GraphNodeKind;
   label: string;
   pagerank: number;
+  community: number;
+  status: string;
+  rank: string;
   x?: number;
   y?: number;
 }
@@ -78,6 +92,7 @@ const BASE_RADIUS: Record<GraphNodeKind, number> = {
 
 const LABEL_ZOOM = 1.3;
 const DIM_ALPHA = 0.18;
+const HIGHLIGHT_DIM_ALPHA = 0.12;
 
 function nodeRadius(node: FGNode): number {
   const base = BASE_RADIUS[node.kind] ?? 4.5;
@@ -98,13 +113,20 @@ function withAlpha(hsl: string, alpha: number): string {
   return hsl.replace(')', ` / ${alpha})`);
 }
 
+function resolveCanvasBackground(): string {
+  if (typeof document === 'undefined') return '#0f1117';
+  const value = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+  return value ? `hsl(${value})` : '#0f1117';
+}
+
 export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(function GraphCanvas(
-  { data, visibleKinds, selected, onSelect, className },
+  { data, visibleKinds, selected, onSelect, matchNodeIds, className },
   ref,
 ) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const fgRef = useRef<ForceGraphMethods<FGNode, FGLink> | undefined>(undefined);
   const [size, setSize] = useState({ w: 0, h: 0 });
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
   // `reduced` starts from the current OS preference but updates at runtime
   // when the user toggles reduced-motion in system settings (see the
   // matchMedia change-listener effect below).
@@ -120,6 +142,9 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
         kind: n.kind,
         label: n.label,
         pagerank: typeof n.meta?.pagerank === 'number' ? n.meta.pagerank : 0,
+        community: typeof n.meta?.community === 'number' ? n.meta.community : 0,
+        status: String(n.meta?.status ?? ''),
+        rank: String(n.meta?.rank ?? ''),
       }),
     );
     const byId = new Map(nodes.map((n) => [n.id, n]));
@@ -127,42 +152,108 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
     return { nodes, links, byId };
   }, [data]);
 
+  const adjacencyIndex = useMemo(() => {
+    const adjacency = new Map<string, Set<string>>();
+    const link = (a: string, b: string) => {
+      const bucket = adjacency.get(a) ?? new Set<string>();
+      bucket.add(b);
+      adjacency.set(a, bucket);
+    };
+    for (const edge of data.edges) {
+      link(edge.source, edge.target);
+      link(edge.target, edge.source);
+    }
+    return adjacency;
+  }, [data.edges]);
+
+  const highlightNeighbourhood = useMemo(() => {
+    const focusId = hoveredId ?? selected;
+    if (!focusId) return null;
+    const neighbourhood = new Set<string>([focusId]);
+    const neighbours = adjacencyIndex.get(focusId);
+    if (neighbours) {
+      for (const id of neighbours) neighbourhood.add(id);
+    }
+    return neighbourhood;
+  }, [hoveredId, selected, adjacencyIndex]);
+
   // Re-read label + node fills whenever the UI theme flips (`data-theme`).
   const labelColor = resolveLabelColor();
 
   // --- Auto-fit / imperative zoom (#830) ---------------------------------
-  // `zoomToFit` used to fire once, only on the first `onEngineStop`, and never
-  // re-fired — so the cluster sat tiny in a huge canvas and never re-centred on
-  // resize. Now: fit on every settle (incl. new data), refit on resize, and a
-  // `userZoomed` flag stops us yanking the view once the user takes over.
   const hasFitRef = useRef(false);
   const userZoomedRef = useRef(false);
-  const suppressZoomRef = useRef(false); // true during a programmatic zoom
+  const suppressZoomRef = useRef(false);
 
   const fitView = useCallback((ms = 400) => {
     const fg = fgRef.current;
     if (!fg) return;
     suppressZoomRef.current = true;
     fg.zoomToFit(ms, size.w < 480 ? 24 : 72);
-    window.setTimeout(() => { suppressZoomRef.current = false; }, ms + 150);
+    window.setTimeout(() => {
+      suppressZoomRef.current = false;
+    }, ms + 150);
     hasFitRef.current = true;
   }, [size.w]);
 
-  useImperativeHandle(ref, () => ({
-    zoomIn: () => { const fg = fgRef.current; if (fg) fg.zoom(fg.zoom() * 1.4, 250); },
-    zoomOut: () => { const fg = fgRef.current; if (fg) fg.zoom(fg.zoom() / 1.4, 250); },
-    fit: () => { userZoomedRef.current = false; fitView(400); },
-  }), [fitView]);
+  const centerOnNode = useCallback((nodeId: string) => {
+    const fg = fgRef.current;
+    const node = graphData.byId.get(nodeId);
+    if (!fg || !node || node.x == null || node.y == null) return;
+    suppressZoomRef.current = true;
+    fg.centerAt(node.x, node.y, 400);
+    window.setTimeout(() => {
+      suppressZoomRef.current = false;
+    }, 550);
+  }, [graphData.byId]);
 
-  // A new graph (new seed / filter that changes nodes) re-enables auto-fit.
+  const exportPng = useCallback((filename = 'lexflow-graph.png') => {
+    const canvas = wrapperRef.current?.querySelector('canvas');
+    if (!canvas) return;
+
+    const offscreen = document.createElement('canvas');
+    offscreen.width = canvas.width;
+    offscreen.height = canvas.height;
+    const ctx = offscreen.getContext('2d');
+    if (!ctx) return;
+
+    ctx.fillStyle = resolveCanvasBackground();
+    ctx.fillRect(0, 0, offscreen.width, offscreen.height);
+    ctx.drawImage(canvas, 0, 0);
+
+    const url = offscreen.toDataURL('image/png');
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+  }, []);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      zoomIn: () => {
+        const fg = fgRef.current;
+        if (fg) fg.zoom(fg.zoom() * 1.4, 250);
+      },
+      zoomOut: () => {
+        const fg = fgRef.current;
+        if (fg) fg.zoom(fg.zoom() / 1.4, 250);
+      },
+      fit: () => {
+        userZoomedRef.current = false;
+        fitView(400);
+      },
+      centerAt: (nodeId: string) => centerOnNode(nodeId),
+      exportPng: (filename?: string) => exportPng(filename),
+    }),
+    [fitView, centerOnNode, exportPng],
+  );
+
   useEffect(() => {
     hasFitRef.current = false;
     userZoomedRef.current = false;
   }, [graphData]);
 
-  // Fit ~0.6s after the data or the canvas size settles (initial load, new
-  // seed, or resize) — reliable regardless of exactly when `onEngineStop`
-  // fires — unless the user has taken over the view.
   useEffect(() => {
     if (size.w === 0 || size.h === 0 || userZoomedRef.current) return;
     const id = window.setTimeout(() => fitView(400), 600);
@@ -180,35 +271,16 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
     return () => ro.disconnect();
   }, []);
 
-  // Viewport visibility, tracked in state so the single animation-control
-  // effect below can compose it with reduced-motion. CodeRabbit #725: two
-  // effects toggling `fgRef` independently let the last event win (a
-  // reduced-motion change could resume an offscreen graph, and vice-versa).
-  // Defaults to true so the graph animates until proven offscreen.
   const [onScreen, setOnScreen] = useState(true);
 
-  /**
-   * Track whether the canvas is in the viewport. Only updates state — the
-   * combined effect below decides whether to actually pause/resume.
-   */
   useEffect(() => {
     const el = wrapperRef.current;
     if (!el || typeof IntersectionObserver === 'undefined') return;
-    const observer = new IntersectionObserver(
-      (entries) => setOnScreen(entries[0].isIntersecting),
-      // root:null (viewport); threshold 0 = toggle at fully offscreen / any re-entry.
-      { threshold: 0 },
-    );
+    const observer = new IntersectionObserver((entries) => setOnScreen(entries[0].isIntersecting), { threshold: 0 });
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
 
-  /**
-   * Track runtime changes to the OS reduced-motion preference. Only updates
-   * state; the combined effect applies it. Changing `reduced` also re-renders,
-   * updating `warmupTicks`/`cooldownTicks` on `<ForceGraph2D>` for subsequent
-   * data changes.
-   */
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const mql = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -217,16 +289,6 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
     return () => mql.removeEventListener('change', handleChange);
   }, []);
 
-  /**
-   * Single source of truth for the force-graph animation: run it only when the
-   * canvas is on-screen AND reduced-motion is off. Composing both conditions
-   * here — rather than toggling `fgRef` from each listener — stops them from
-   * fighting (a reduced-motion change can't resume an offscreen graph).
-   *
-   * Risk: if the simulation hasn't settled when paused (scrolled away early),
-   * the layout freezes mid-computation and resumes from there on return; the
-   * first zoom-to-fit (`onEngineStop`) fires only once the engine finally stops.
-   */
   useEffect(() => {
     const shouldAnimate = onScreen && !reduced;
     if (shouldAnimate) {
@@ -240,6 +302,37 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
   const resolve = (end: string | FGNode): FGNode | undefined =>
     typeof end === 'object' ? end : graphData.byId.get(end);
 
+  const nodeAlpha = useCallback(
+    (node: FGNode): number => {
+      let alpha = isVisible(node.kind) ? 1 : DIM_ALPHA;
+      if (matchNodeIds && !matchNodeIds.has(node.id)) alpha = Math.min(alpha, DIM_ALPHA);
+      if (highlightNeighbourhood && !highlightNeighbourhood.has(node.id)) {
+        alpha = Math.min(alpha, HIGHLIGHT_DIM_ALPHA);
+      }
+      return alpha;
+    },
+    [isVisible, matchNodeIds, highlightNeighbourhood],
+  );
+
+  const nodeLabel = useCallback((n: FGNode) => {
+    const node = n as FGNode;
+    const kind = NODE_KIND_LABELS[node.kind];
+    const pagerank = node.pagerank > 0 ? `\nPageRank: ${node.pagerank.toFixed(3)}` : '';
+    return `${node.label}\n${kind}${pagerank}`;
+  }, []);
+
+  const linkLabel = useCallback(
+    (l: FGLink) => {
+      const link = l as FGLink;
+      const source = typeof link.source === 'object' ? link.source : graphData.byId.get(link.source);
+      const target = typeof link.target === 'object' ? link.target : graphData.byId.get(link.target);
+      const kind = EDGE_KIND_LABELS[link.kind ?? 'cites'];
+      if (!source || !target) return kind;
+      return `${kind}\n${source.label} → ${target.label}`;
+    },
+    [graphData.byId],
+  );
+
   return (
     <div ref={wrapperRef} className={cn('size-full', className)}>
       {size.w > 0 && size.h > 0 && (
@@ -250,28 +343,60 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
           height={size.h}
           graphData={graphData}
           backgroundColor="rgba(0,0,0,0)"
-          // Reduced-motion: pre-settle off-screen (warmup) then freeze. Normal:
-          // animate the settle over a bounded number of ticks.
           warmupTicks={reduced ? 150 : 0}
           cooldownTicks={reduced ? 0 : 200}
           d3AlphaMin={0.02}
-          onEngineStop={() => { if (!userZoomedRef.current) fitView(400); }}
-          onZoomEnd={() => { if (!suppressZoomRef.current && hasFitRef.current) userZoomedRef.current = true; }}
+          onEngineStop={() => {
+            if (!userZoomedRef.current) fitView(400);
+          }}
+          onZoomEnd={() => {
+            if (!suppressZoomRef.current && hasFitRef.current) userZoomedRef.current = true;
+          }}
           enableNodeDrag={false}
           minZoom={0.4}
           maxZoom={6}
           nodeRelSize={1}
           onNodeClick={(n) => onSelect((n as FGNode).id)}
+          onNodeHover={(n) => setHoveredId(n ? (n as FGNode).id : null)}
           onBackgroundClick={() => {
             if (selected) onSelect('');
+          }}
+          nodeLabel={(n) => nodeLabel(n as FGNode)}
+          linkLabel={(l) => linkLabel(l as FGLink)}
+          linkDirectionalArrowLength={() => 5 / (fgRef.current?.zoom() ?? 1)}
+          linkDirectionalArrowColor={(l) => {
+            const link = l as FGLink;
+            return link.kind ? GRAPH_EDGE_STROKE[link.kind] : 'hsl(220 9% 50%)';
           }}
           linkColor={(l) => {
             const link = l as FGLink;
             const s = resolve(link.source);
             const t = resolve(link.target);
-            const dim = (s != null && !isVisible(s.kind)) || (t != null && !isVisible(t.kind));
+            const dim =
+              (s != null && !isVisible(s.kind)) ||
+              (t != null && !isVisible(t.kind)) ||
+              (matchNodeIds != null && s != null && t != null && (!matchNodeIds.has(s.id) || !matchNodeIds.has(t.id)));
+            const inHighlight =
+              highlightNeighbourhood != null &&
+              s != null &&
+              t != null &&
+              highlightNeighbourhood.has(s.id) &&
+              highlightNeighbourhood.has(t.id);
             const base = link.kind ? GRAPH_EDGE_STROKE[link.kind] : 'hsl(220 9% 50%)';
+            if (inHighlight) return withAlpha(base, 0.85);
             return withAlpha(base, dim ? 0.06 : 0.5);
+          }}
+          linkWidth={(l) => {
+            const link = l as FGLink;
+            const s = resolve(link.source);
+            const t = resolve(link.target);
+            const inHighlight =
+              highlightNeighbourhood != null &&
+              s != null &&
+              t != null &&
+              highlightNeighbourhood.has(s.id) &&
+              highlightNeighbourhood.has(t.id);
+            return inHighlight ? 2 : 1;
           }}
           nodeCanvasObjectMode={() => 'replace'}
           nodeCanvasObject={(n, ctx, scale) => {
@@ -279,30 +404,15 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
             const x = node.x ?? 0;
             const y = node.y ?? 0;
             const r = nodeRadius(node);
-            const visible = isVisible(node.kind);
             const isSel = node.id === selected;
+            const fill = resolveCommunityFill(node.community);
 
             ctx.save();
-            ctx.globalAlpha = visible ? 1 : DIM_ALPHA;
+            ctx.globalAlpha = nodeAlpha(node);
 
-            if (isSel) {
-              ctx.beginPath();
-              ctx.arc(x, y, r + 5, 0, 2 * Math.PI);
-              ctx.fillStyle = withAlpha(GRAPH_PRIMARY, 0.18);
-              ctx.fill();
-            }
+            paintNode(ctx, { x, y, radius: r, kind: node.kind, fill, scale, selected: isSel });
 
-            ctx.beginPath();
-            ctx.arc(x, y, r, 0, 2 * Math.PI);
-            ctx.fillStyle = resolveGraphKindFill(node.kind);
-            ctx.fill();
-            if (isSel) {
-              ctx.lineWidth = 2 / scale;
-              ctx.strokeStyle = GRAPH_PRIMARY;
-              ctx.stroke();
-            }
-
-            if (visible && (isSel || scale > LABEL_ZOOM)) {
+            if (isVisible(node.kind) && (isSel || scale > LABEL_ZOOM)) {
               const fontSize = 12 / scale;
               ctx.font = `${fontSize}px Inter, system-ui, sans-serif`;
               ctx.textAlign = 'center';

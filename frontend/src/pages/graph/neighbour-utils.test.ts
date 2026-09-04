@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import type { GraphEdge, GraphNode } from '@/lib/types';
+import type { GraphData, GraphEdge, GraphNode } from '@/lib/types';
 
-import { buildNodeIndex, resolveNeighbourNodes, resolveRelatedLawNeighbours } from './neighbour-utils';
+import {
+  buildAdjacencyIndex,
+  buildNodeIndex,
+  resolveNeighbourhood,
+  resolveNeighbourNodes,
+  resolveRelatedLawNeighbours,
+} from './neighbour-utils';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -13,6 +19,11 @@ function node(id: string, overrides: Partial<GraphNode> = {}): GraphNode {
 function edge(id: string, source: string, target: string, overrides: Partial<GraphEdge> = {}): GraphEdge {
   return { id, source, target, ...overrides };
 }
+
+const adjacencyEdges: GraphData['edges'] = [
+  { id: 'e0', source: 'a', target: 'b' },
+  { id: 'e1', source: 'b', target: 'c' },
+];
 
 // ─── buildNodeIndex ───────────────────────────────────────────────────────────
 
@@ -48,10 +59,10 @@ describe('resolveNeighbourNodes', () => {
   const index = buildNodeIndex([nodeA, nodeB, nodeC, nodeD]);
 
   const edges = [
-    edge('e1', 'a', 'b'),  // a → b (touches a)
-    edge('e2', 'c', 'a'),  // c → a (touches a)
-    edge('e3', 'b', 'd'),  // b → d (does NOT touch a)
-    edge('e4', 'a', 'c'),  // a → c (touches a)
+    edge('e1', 'a', 'b'), // a → b (touches a)
+    edge('e2', 'c', 'a'), // c → a (touches a)
+    edge('e3', 'b', 'd'), // b → d (does NOT touch a)
+    edge('e4', 'a', 'c'), // a → c (touches a)
   ];
 
   it('returns [] when selectedId is null', () => {
@@ -70,9 +81,9 @@ describe('resolveNeighbourNodes', () => {
   it('resolves the correct other-end node for each edge direction', () => {
     const result = resolveNeighbourNodes(edges, index, 'a');
     const byEdge = Object.fromEntries(result.map((r) => [r.edge.id, r.otherNode.id]));
-    expect(byEdge['e1']).toBe('b');  // a → b; other = b
-    expect(byEdge['e2']).toBe('c');  // c → a; other = c
-    expect(byEdge['e4']).toBe('c');  // a → c; other = c
+    expect(byEdge['e1']).toBe('b'); // a → b; other = b
+    expect(byEdge['e2']).toBe('c'); // c → a; other = c
+    expect(byEdge['e4']).toBe('c'); // a → c; other = c
   });
 
   it('sets otherId as a convenience alias for otherNode.id', () => {
@@ -89,10 +100,7 @@ describe('resolveNeighbourNodes', () => {
   });
 
   it('caps the result at 12 neighbours', () => {
-    // Build 15 edges all touching 'a'
-    const manyEdges = Array.from({ length: 15 }, (_, i) =>
-      edge(`ex${i}`, 'a', 'b'),
-    );
+    const manyEdges = Array.from({ length: 15 }, (_, i) => edge(`ex${i}`, 'a', 'b'));
     const result = resolveNeighbourNodes(manyEdges, index, 'a');
     expect(result.length).toBe(12);
   });
@@ -139,5 +147,28 @@ describe('resolveRelatedLawNeighbours', () => {
   it('caps at max', () => {
     const result = resolveRelatedLawNeighbours(graph, 'centre', 2);
     expect(result).toHaveLength(2);
+  });
+});
+
+// ─── buildAdjacencyIndex / resolveNeighbourhood ───────────────────────────────
+
+describe('buildAdjacencyIndex', () => {
+  it('builds undirected 1-hop adjacency', () => {
+    const adjacency = buildAdjacencyIndex(adjacencyEdges);
+    expect(adjacency.get('a')).toEqual(new Set(['b']));
+    expect(adjacency.get('b')).toEqual(new Set(['a', 'c']));
+    expect(adjacency.get('c')).toEqual(new Set(['b']));
+  });
+});
+
+describe('resolveNeighbourhood', () => {
+  it('returns focus plus neighbours', () => {
+    const adjacency = buildAdjacencyIndex(adjacencyEdges);
+    expect(resolveNeighbourhood('b', adjacency)).toEqual(new Set(['b', 'a', 'c']));
+  });
+
+  it('returns empty set when focus is null', () => {
+    const adjacency = buildAdjacencyIndex(adjacencyEdges);
+    expect(resolveNeighbourhood(null, adjacency)).toEqual(new Set());
   });
 });

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import type { BackendGraphEdge } from '../../api';
+import type { BackendGraphEdge, BackendGraphNode } from '../../api';
 
-import { normalizeEdgeKind, projectEdge } from './graph';
+import { normalizeEdgeKind, projectEdge, projectNode } from './graph';
 
 describe('normalizeEdgeKind', () => {
   it('forwards known kinds', () => {
@@ -33,5 +33,24 @@ describe('projectEdge', () => {
   it('falls back to cites when kind is missing', () => {
     const raw: BackendGraphEdge = { source: 'A', target: 'B' };
     expect(projectEdge(raw, 2).kind).toBe('cites');
+  });
+});
+
+describe('projectNode', () => {
+  it('forwards community and pagerank in meta', () => {
+    const raw: BackendGraphNode = {
+      id: 'LAW-1',
+      title: 'Test law',
+      status: 'in_force',
+      rank: 'ley',
+      community: 3,
+      pagerank: 0.042,
+    };
+    expect(projectNode(raw)).toMatchObject({
+      id: 'LAW-1',
+      kind: 'law',
+      label: 'Test law',
+      meta: { community: 3, pagerank: 0.042 },
+    });
   });
 });

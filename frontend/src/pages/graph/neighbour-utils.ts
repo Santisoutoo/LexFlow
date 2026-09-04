@@ -87,6 +87,43 @@ export function resolveNeighbourNodes(
 }
 
 /**
+ * Build an undirected 1-hop adjacency index from edge endpoints.
+ */
+export function buildAdjacencyIndex(edges: GraphData['edges']): Map<string, Set<string>> {
+  const adjacency = new Map<string, Set<string>>();
+
+  const link = (a: string, b: string) => {
+    const bucket = adjacency.get(a) ?? new Set<string>();
+    bucket.add(b);
+    adjacency.set(a, bucket);
+  };
+
+  for (const edge of edges) {
+    link(edge.source, edge.target);
+    link(edge.target, edge.source);
+  }
+
+  return adjacency;
+}
+
+/**
+ * Return the focus node plus its 1-hop neighbours for hover/selection highlight.
+ */
+export function resolveNeighbourhood(
+  focusId: string | null,
+  adjacency: Map<string, Set<string>>,
+): Set<string> {
+  if (!focusId) return new Set();
+
+  const neighbourhood = new Set<string>([focusId]);
+  const neighbours = adjacency.get(focusId);
+  if (!neighbours) return neighbourhood;
+
+  for (const id of neighbours) neighbourhood.add(id);
+  return neighbourhood;
+}
+
+/**
  * Return 1-hop law neighbours of `currentLawId` for the related-laws rail.
  *
  * Deduplicates by target id (a law can be linked by multiple edges) and

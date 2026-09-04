@@ -633,7 +633,7 @@
   "graph": {
     "searchPlaceholder": "Buscar en el grafo…",
     "advancedFilters": "Filtros avanzados",
-    "legend": "Leyenda",
+    "legendTitle": "Leyenda",
     "edges": "Aristas",
     "zoomIn": "Acercar",
     "zoomOut": "Alejar",
@@ -651,6 +651,14 @@
       "trySuggestions": "Prueba con una de las más conectadas del corpus:"
     },
     "filterDimHint": "Los tipos desactivados se atenúan en el canvas; no se ocultan.",
+    "legend": {
+      "clusters": "Grupos",
+      "cluster": "Grupo {{id}}",
+      "nodeKinds": "Tipos de nodo"
+    },
+    "filters": {
+      "subgraphHint": "Filtros locales sobre el subgrafo actual. Ámbito y jurisdicción requieren la vista global."
+    },
     "rail": {
       "rank": "Rango",
       "status": "Estado",
