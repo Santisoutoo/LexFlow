@@ -14,7 +14,7 @@
 | Routing              | React Router v6                                         |
 | State (UI prefs)     | Zustand (persisted to localStorage)                     |
 | Icons                | lucide-react                                            |
-| Graph                | inline SVG today, ready to swap to `@xyflow/react`    |
+| Graph                | `react-force-graph-2d` canvas (`GraphCanvas.tsx`)       |
 
 ## Layout
 
@@ -123,20 +123,12 @@ flipped by the Zustand store. Editing one of the HSL channel triples in
 | `g h` / `g e` / `g g` / `g c` / `g d` / `g s` | Go to Inicio / Explorador / Grafo / Chat / Cuadros / Ajustes |
 | `j` / `k`        | Next / previous diff change |
 
-## Swap to react-flow
+## Graph canvas
 
-`src/components/domain/GraphCanvas.tsx` is a small SVG renderer; for the
-1.000-node performance budget, replace its body with `@xyflow/react` (already
-in `package.json`):
-
-```tsx
-import { ReactFlow, Background, Controls, MiniMap } from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
-```
-
-The page-level state (filters, selected, hover) stays unchanged — pass the
-same `nodes` / `edges` after mapping `{ id, source, target }` to react-flow's
-shape.
+`src/components/domain/GraphCanvas.tsx` renders the knowledge graph with
+`react-force-graph-2d` (HTML5 canvas + d3-force). `GraphPage` owns filters,
+selection, and the right rail; the canvas receives the same `GraphData` shape
+whether loaded from the live API or mock mode.
 
 ## Accessibility
 

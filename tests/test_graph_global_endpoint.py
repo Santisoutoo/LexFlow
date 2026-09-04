@@ -136,3 +136,15 @@ class TestGlobalGraphEdges:
         for edge in body["edges"]:
             assert edge["source"] in node_ids
             assert edge["target"] in node_ids
+
+    def test_edges_include_kind(
+        self,
+        client: TestClient,
+        graph_from_fixture: LegalGraph,
+    ) -> None:
+        body = client.get("/api/v1/graph").json()
+        allowed = {"cites", "modifies", "repeals", "develops"}
+        for edge in body["edges"]:
+            assert "kind" in edge
+            if edge["kind"] is not None:
+                assert edge["kind"] in allowed

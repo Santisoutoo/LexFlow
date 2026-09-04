@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { GraphEdge, GraphNode } from '@/lib/types';
 
-import { buildNodeIndex, resolveNeighbourNodes } from './neighbour-utils';
+import { buildNodeIndex, resolveNeighbourNodes, resolveRelatedLawNeighbours } from './neighbour-utils';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -95,5 +95,49 @@ describe('resolveNeighbourNodes', () => {
     );
     const result = resolveNeighbourNodes(manyEdges, index, 'a');
     expect(result.length).toBe(12);
+  });
+});
+
+// ─── resolveRelatedLawNeighbours ─────────────────────────────────────────────
+
+describe('resolveRelatedLawNeighbours', () => {
+  const centre = node('centre');
+  const lawA = node('law-a', { label: 'Law A' });
+  const lawB = node('law-b', { label: 'Law B' });
+  const lawC = node('law-c', { label: 'Law C' });
+  const article = node('art-1', { kind: 'article' });
+  const graph = {
+    nodes: [centre, lawA, lawB, lawC, article],
+    edges: [
+      edge('e1', 'centre', 'law-a'),
+      edge('e2', 'centre', 'law-b'),
+      edge('e3', 'centre', 'law-c'),
+      edge('e4', 'centre', 'art-1'),
+      edge('e5', 'centre', 'law-a', { kind: 'modifies' }),
+    ],
+  };
+
+  it('returns only 1-hop law neighbours', () => {
+    const result = resolveRelatedLawNeighbours(graph, 'centre');
+    expect(result.map((n) => n.id).sort()).toEqual(['law-a', 'law-b', 'law-c']);
+  });
+
+  it('deduplicates multiple edges to the same law', () => {
+    const result = resolveRelatedLawNeighbours(graph, 'centre');
+    expect(result.filter((n) => n.id === 'law-a')).toHaveLength(1);
+  });
+
+  it('excludes the centre law id', () => {
+    const selfGraph = {
+      nodes: [centre, lawA],
+      edges: [edge('e1', 'centre', 'centre'), edge('e2', 'centre', 'law-a')],
+    };
+    const result = resolveRelatedLawNeighbours(selfGraph, 'centre');
+    expect(result.map((n) => n.id)).toEqual(['law-a']);
+  });
+
+  it('caps at max', () => {
+    const result = resolveRelatedLawNeighbours(graph, 'centre', 2);
+    expect(result).toHaveLength(2);
   });
 });
