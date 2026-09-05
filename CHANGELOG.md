@@ -1,5 +1,112 @@
 # Changelog
 
+## [0.76.0](https://github.com/Santisoutoo/LexFlow/compare/v0.75.0...v0.76.0) (2026-09-05)
+
+
+### Features
+
+* add autonomous agent loop (OpenCode worker + reviewer) ([b57fbaf](https://github.com/Santisoutoo/LexFlow/commit/b57fbaf12c48ac8d11b6a9a68e43162892179129))
+* add Cursor CLI as a second implementation engine ([1fdd84c](https://github.com/Santisoutoo/LexFlow/commit/1fdd84ce7911faa6dd0961f2497d7518b7836cc9))
+* add Cursor CLI as a second implementation engine ([385dc62](https://github.com/Santisoutoo/LexFlow/commit/385dc62d96da8948272cfced33cc52f26f105a7a))
+* **agent-loop:** add autonomous review for external PRs ([0209bbc](https://github.com/Santisoutoo/LexFlow/commit/0209bbc9d15db7e65abbeb1693eb8c3f839bb6a0))
+* **agent-loop:** add autonomous review for external PRs ([d9993e1](https://github.com/Santisoutoo/LexFlow/commit/d9993e1fc3836a06f606e71b3f02287dc515062a))
+* **agent-loop:** add retry gate for faster recovery after transient failures ([1a2074d](https://github.com/Santisoutoo/LexFlow/commit/1a2074d5bd6549f34ad3721a010f9de798d42698))
+* **agent-loop:** add retry gate for faster recovery after transient failures ([5e2208f](https://github.com/Santisoutoo/LexFlow/commit/5e2208f0b306e981aaaf85363b7648a7254617dd))
+* **agent-loop:** add scheduled orca-supervisor workflow ([5f459e7](https://github.com/Santisoutoo/LexFlow/commit/5f459e766e792e6505267ddb8233a7b409a672c5))
+* **agent-loop:** add scheduled orca-supervisor workflow ([8d113ef](https://github.com/Santisoutoo/LexFlow/commit/8d113ef1151bee93d5109db8eb1c228d41d4b96b))
+* **agent-loop:** migrate to Cursor-only engine with agent-driven picker and planner ([4a18b7b](https://github.com/Santisoutoo/LexFlow/commit/4a18b7b16f18599ed633510cc68f0b0d8ff8b6e5))
+* **agent-loop:** migrate to Cursor-only engine with agent-driven picker and planner ([c0aae72](https://github.com/Santisoutoo/LexFlow/commit/c0aae72abac9796131e08de7d772f313ddd04e99))
+* autonomous agent loop (OpenCode worker + reviewer + Orca supervision) ([685f520](https://github.com/Santisoutoo/LexFlow/commit/685f520b92f17e8518185e462eec0eba8052339c))
+* **ci:** surface picker/planner output to Actions log, add caveman narration ([701ef2a](https://github.com/Santisoutoo/LexFlow/commit/701ef2ad97e07f01ca780e6b6ee38365400c2336))
+* **ci:** surface picker/planner output to logs, add caveman narration style ([6b94963](https://github.com/Santisoutoo/LexFlow/commit/6b94963fdeb75f0fdcd8e6be5c1c9cb5721485fe))
+* **core,api:** serve non-article prose + corpus-drift report ([#55](https://github.com/Santisoutoo/LexFlow/issues/55)) ([e92f740](https://github.com/Santisoutoo/LexFlow/commit/e92f7402c898753357243dba728a12b160d886d9))
+* **core:** add Disposicion model and extraction of closing dispositions ([c5853dd](https://github.com/Santisoutoo/LexFlow/commit/c5853dd3e10b32085bee5dde314f02024a4223fd))
+* **frontend:** add in-app desktop update notice with mock updater ([02ce5d7](https://github.com/Santisoutoo/LexFlow/commit/02ce5d73d91a8c27af7e3dee4496a50943653f0f))
+* **graph:** community colours, hover highlight, wire dead controls ([123eb6a](https://github.com/Santisoutoo/LexFlow/commit/123eb6ac36c514e8f481ed864493396178b6dd85))
+* **graph:** precompute analytics and add global view plus path UI ([746212d](https://github.com/Santisoutoo/LexFlow/commit/746212df516a949670a022d54697b8480916f497))
+* resolve [#106](https://github.com/Santisoutoo/LexFlow/issues/106) — [data-fidelity] S2.1 — feat(core): Disposicion model + extraction of adicional/transitoria/derogatoria/final headings ([4975eb7](https://github.com/Santisoutoo/LexFlow/commit/4975eb76b164509f183faafb1b3c5d7d1295a8fd))
+* resolve [#14](https://github.com/Santisoutoo/LexFlow/issues/14) — [desktop] Diálogo in-app de "nueva versión disponible" + actualización en un clic ([3017b36](https://github.com/Santisoutoo/LexFlow/commit/3017b3664d66254d8d7766a340430238dbd40561))
+* resolve [#15](https://github.com/Santisoutoo/LexFlow/issues/15) — chore(app): design-token & anti-pattern cleanup (baseline-ui) ([50941f8](https://github.com/Santisoutoo/LexFlow/commit/50941f8935daa4f1db34386e1b7d60126bec5efe))
+* resolve [#20](https://github.com/Santisoutoo/LexFlow/issues/20) — [graph] Sprint 2 — kind accuracy & coverage: strongest-kind merge + context-aware classification + preambles/disposiciones ([17ea5d2](https://github.com/Santisoutoo/LexFlow/commit/17ea5d21687339c1ea7a2500d5f63f0ed26980c0))
+* resolve [#23](https://github.com/Santisoutoo/LexFlow/issues/23) — [graph-viz] Sprint A — correctness + quick wins: typed edges, honest rail, deep-link seed, theme, drop xyflow ([2f72e2d](https://github.com/Santisoutoo/LexFlow/commit/2f72e2d5d4221c96ee6d903b076ecf61b0b4cca4))
+* resolve [#24](https://github.com/Santisoutoo/LexFlow/issues/24) — [graph-viz] Sprint B — design: community colouring, hover+arrows, wire the dead controls ([d32a210](https://github.com/Santisoutoo/LexFlow/commit/d32a2101db71f93f96815e95dc533f7ea3843f7d))
+* resolve [#25](https://github.com/Santisoutoo/LexFlow/issues/25) — [graph-viz] Sprint C — scale: precompute PageRank/communities, global view + LOD, path UI, tests ([aee6f01](https://github.com/Santisoutoo/LexFlow/commit/aee6f0154029bf63501c601c7f8b61d70266e832))
+* resolve [#27](https://github.com/Santisoutoo/LexFlow/issues/27) — [onboarding] Sprint 1 — make the wizard actually configure a working model ([05e04bc](https://github.com/Santisoutoo/LexFlow/commit/05e04bc66a354ecebc40675611dbc3b7ebdc8762))
+* resolve [#77](https://github.com/Santisoutoo/LexFlow/issues/77) — [backend-perf] Sprint 1 — event-loop & concurrency hygiene (chat off the event loop) ([ff08651](https://github.com/Santisoutoo/LexFlow/commit/ff0865117ad941ce69524b55babb4b9fd533df9e))
+
+
+### Bug Fixes
+
+* accept OPENCODE_AUTH_JSON secret as base64 or raw JSON ([be61815](https://github.com/Santisoutoo/LexFlow/commit/be6181516259bede8d2e7b35946d25ef210fbbd7))
+* **agent-loop:** add intra-run quota fallback to Composer/Grok ([50d98a1](https://github.com/Santisoutoo/LexFlow/commit/50d98a1a141a8c811b604fcefa20ae3ed895e6d2))
+* **agent-loop:** auto-escalate model tier and cross-run engine failover ([9bace82](https://github.com/Santisoutoo/LexFlow/commit/9bace82d81c013fa7cd9c18cda96155ab82190ee))
+* **agent-loop:** auto-escalate model tier and cross-run engine failover ([3d16ac1](https://github.com/Santisoutoo/LexFlow/commit/3d16ac1b6702a12a168d721fe603ef59039efcfa))
+* **agent-loop:** eligibility guard step failing under bash -e for normal-sized PRs ([7f0724c](https://github.com/Santisoutoo/LexFlow/commit/7f0724caa0c0c22121423f4f0347afaa11f58554))
+* **agent-loop:** idle-timeout was killing real work, drop unsupported --sandbox ([a2d5ab2](https://github.com/Santisoutoo/LexFlow/commit/a2d5ab2c6f70f8be53b6cec59a91d6e5dad1bf81))
+* **agent-loop:** idle-timeout was killing real work, drop unsupported --sandbox ([a798f64](https://github.com/Santisoutoo/LexFlow/commit/a798f640b3d6e2ff2d92cd88610ac03c0b1d887c))
+* **agent-loop:** intra-run quota fallback to Composer/Grok ([4edcedd](https://github.com/Santisoutoo/LexFlow/commit/4edcedd9394f273907df0a8ed9e9861c9660251c))
+* bound engine calls with a per-call timeout in run-engine.sh ([cc64389](https://github.com/Santisoutoo/LexFlow/commit/cc643890436b470734ed852bf12297fd48db1506))
+* bound engine calls with a per-call timeout in run-engine.sh ([1410e0c](https://github.com/Santisoutoo/LexFlow/commit/1410e0c0cb12cd9a4404ccf96e580f9739f469e9))
+* bump pinned opencode to 1.18.21 ([b6fbde7](https://github.com/Santisoutoo/LexFlow/commit/b6fbde74255ac74f0eead7cc67eb0d32cb9fb37a))
+* bump pinned opencode to 1.18.21 ([b51c0dd](https://github.com/Santisoutoo/LexFlow/commit/b51c0ddf0d1af3d1212e90b5ff67947aec69f1d2))
+* **chat:** off-load tool dispatch off event loop, document single-user invariant ([7612bc7](https://github.com/Santisoutoo/LexFlow/commit/7612bc763b67f69be480ba9789f9515b04e3c132))
+* **chat:** use anyio.to_thread.run_sync for event-loop offload ([#77](https://github.com/Santisoutoo/LexFlow/issues/77)) ([f4bdeac](https://github.com/Santisoutoo/LexFlow/commit/f4bdeac5a3f24c832c6bd8ef63f31d4c23c1c707))
+* **ci:** keep picker's tee copy on stderr, not stdout ([6f3b94c](https://github.com/Santisoutoo/LexFlow/commit/6f3b94cfe22690cf419a271a163afa2241f81b55))
+* **ci:** keep picker's tee copy on stderr, not stdout ([314c3ae](https://github.com/Santisoutoo/LexFlow/commit/314c3aef292f9a0c474a2d8b9bb5a5fc9f68f8f4))
+* **ci:** set GH_REPO in orca-supervisor to fix gh CLI repo detection ([bed3c0b](https://github.com/Santisoutoo/LexFlow/commit/bed3c0b27b22dc77ba14d5773fdb51d1f21f9f25))
+* **ci:** set GH_REPO in orca-supervisor to fix gh CLI repo detection ([f2bb02f](https://github.com/Santisoutoo/LexFlow/commit/f2bb02f22c950c9028074fb88d5546bf11cea650))
+* **ci:** stop agent-loop commits linking to an unrelated real GitHub account ([96637c6](https://github.com/Santisoutoo/LexFlow/commit/96637c68d2482f465d3544876dc5a1b784b52a95))
+* **ci:** stop agent-loop commits linking to an unrelated real GitHub account ([5c2e2d4](https://github.com/Santisoutoo/LexFlow/commit/5c2e2d4c44f3c66d03d8747f6e3b84208a39e513))
+* **core:** article completeness — phantoms, ranges, zero-article, duplicates ([3aec0e9](https://github.com/Santisoutoo/LexFlow/commit/3aec0e966e4bd5993927aaa1a1869a7e27126c32))
+* **core:** attribute references inside disposiciones to the disposición ([44c36c8](https://github.com/Santisoutoo/LexFlow/commit/44c36c8d4176c1845df1b2eb73fee901b52356a6))
+* **core:** keep repeal lead-in context for list-form derogations ([d388943](https://github.com/Santisoutoo/LexFlow/commit/d38894350d598c71bda589ab4300d974959b2eb0))
+* **core:** read full frontmatter block in parse_metadata_only ([02777e6](https://github.com/Santisoutoo/LexFlow/commit/02777e6fb4a5ef94f539058d9fb2abf64c7a9b55))
+* **core:** split Article.number and Article.title in _ARTICLE_RE ([187b8dc](https://github.com/Santisoutoo/LexFlow/commit/187b8dc210d1e64bc09d72afed1047fce5b5f1dc)), closes [#112](https://github.com/Santisoutoo/LexFlow/issues/112)
+* **core:** stop article text at level-5/6 non-article headings ([95f1717](https://github.com/Santisoutoo/LexFlow/commit/95f1717faf9a7bc7179a4936d46445271aa760c0)), closes [#107](https://github.com/Santisoutoo/LexFlow/issues/107)
+* correct drift zero-article undercount and stale search cache ([2596573](https://github.com/Santisoutoo/LexFlow/commit/259657394ca94bfb1b65ed08d5590a477d5ce86f))
+* default the cursor engine to composer-2.5 ([eb54baa](https://github.com/Santisoutoo/LexFlow/commit/eb54baa125ef63790b88fc1114557c5b78724215))
+* default the cursor engine to composer-2.5 ([f0f401e](https://github.com/Santisoutoo/LexFlow/commit/f0f401ea50a5c14512774de8e17f7306a95947c5))
+* **frontend:** branch updater retry on error phase and guard poll ([c8cc56f](https://github.com/Santisoutoo/LexFlow/commit/c8cc56f27546ae086413e9908a9c1a2cfb2939c3))
+* **frontend:** wire wizard model setup to chat and settings ([1447504](https://github.com/Santisoutoo/LexFlow/commit/1447504d0b979f0071c22bbf5cbc38089c56dbf4))
+* **graph:** Sprint A correctness — typed edges, honest rail, deep-link, theme ([1a39333](https://github.com/Santisoutoo/LexFlow/commit/1a39333997012ae94184dcd46fa7549144f7cd15))
+* **graph:** strongest-kind merge and context-aware reference classification ([4a75733](https://github.com/Santisoutoo/LexFlow/commit/4a75733dea25cc45840fa34da1b87e9d90f801b1))
+* idle-timeout for agent-loop engine calls, infra-failure escalation ([bc4052d](https://github.com/Santisoutoo/LexFlow/commit/bc4052d2e9c21b5449a419e49130fba7fa801355))
+* pass --head explicitly to gh pr create and clean orphan branches ([4c6f1ec](https://github.com/Santisoutoo/LexFlow/commit/4c6f1eca136f556cfe801587be5c92b4c2fb4997))
+* pass --head explicitly to gh pr create and clean orphan branches ([a8d3ba3](https://github.com/Santisoutoo/LexFlow/commit/a8d3ba365ba527b75dffbc035759754e5e74b557))
+* replace agent-loop's flat call timeout with an idle-timeout, add infra-failure escalation ([d888bd5](https://github.com/Santisoutoo/LexFlow/commit/d888bd568b4872c88869d292e1cc3faa3572449a))
+* resolve [#107](https://github.com/Santisoutoo/LexFlow/issues/107) — [data-fidelity] S2.2 — fix(core): stop article text at level-5/6 non-article headings ([9eb13af](https://github.com/Santisoutoo/LexFlow/commit/9eb13af93676cffd97cccbc31d14e2390e726b73))
+* resolve [#108](https://github.com/Santisoutoo/LexFlow/issues/108) — [data-fidelity] S2.3 — fix(core): attribute references inside disposiciones to the disposición, not the last article ([ad7a5a5](https://github.com/Santisoutoo/LexFlow/commit/ad7a5a557d12ca4d79de0cb8934972118e56b7f6))
+* resolve [#109](https://github.com/Santisoutoo/LexFlow/issues/109) — [data-fidelity] S2.4 — fix(core): classify list-form derogations as repeals across a)/b) items ([278f7ce](https://github.com/Santisoutoo/LexFlow/commit/278f7ce70528590532df0c6dfd192099c2758b4e))
+* resolve [#111](https://github.com/Santisoutoo/LexFlow/issues/111) — [data-fidelity] S1.2 — fix(core): read the full frontmatter block in parse_metadata_only (drop the 4KB cap) ([10782ba](https://github.com/Santisoutoo/LexFlow/commit/10782ba71feee239ef32526efbbeb98d9a365e0c))
+* resolve [#112](https://github.com/Santisoutoo/LexFlow/issues/112) — [data-fidelity] S1.3 — fix(core): split Article.number and Article.title in _ARTICLE_RE ([106c2d8](https://github.com/Santisoutoo/LexFlow/commit/106c2d868ef6af29ab46c9b66a129cf8698739bc))
+* resolve [#54](https://github.com/Santisoutoo/LexFlow/issues/54) — [data-fidelity] Sprint 3 — article completeness: phantoms, ranges, zero-article, duplicates ([a4d8497](https://github.com/Santisoutoo/LexFlow/commit/a4d84971c2d58888e266b44e9709ca7a8e027668))
+* resolve [#55](https://github.com/Santisoutoo/LexFlow/issues/55) — [data-fidelity] Sprint 4 — serve preámbulo/anexos + drift guardrails + golden suite ([08225a5](https://github.com/Santisoutoo/LexFlow/commit/08225a5f1ed06c93e071271c0b33efb56d7d2f16))
+* resolve [#87](https://github.com/Santisoutoo/LexFlow/issues/87) — [red-team] Sprint 1 — MCP exec & CSRF boundary (P0: consent-before-spawn, Origin allow-list) ([1b020a7](https://github.com/Santisoutoo/LexFlow/commit/1b020a7f3d3818b6e2fcb8aa10f7e84d386ab974))
+* resolve [#88](https://github.com/Santisoutoo/LexFlow/issues/88) — [red-team] Sprint 2 — trust-boundary input validation (git arg injection, provider probe, noopener) ([8f3ee36](https://github.com/Santisoutoo/LexFlow/commit/8f3ee36bef7e28015577060985761246979acbec))
+* resolve [#90](https://github.com/Santisoutoo/LexFlow/issues/90) — [red-team] Sprint 4 — availability & multi-tenant posture (off-loop dispatch, user scoping) ([c506593](https://github.com/Santisoutoo/LexFlow/commit/c506593b8098d34a8155c4f697fadb825994405a))
+* robust AGENT_RESULT/VERDICT parsing (explicit alternation, not greedy class) ([df2b9a4](https://github.com/Santisoutoo/LexFlow/commit/df2b9a4f2fecf7a1e0c19519d1a2b39468ffad74))
+* robust AGENT_RESULT/VERDICT parsing (explicit alternation) ([1bc798b](https://github.com/Santisoutoo/LexFlow/commit/1bc798b680cf1928bd92f01aa5e0e7577d7f47a1))
+* satisfy new ruff rules and bump 4 CVE-flagged dependencies ([409eec5](https://github.com/Santisoutoo/LexFlow/commit/409eec5a8050491707ffe54dbd97bbcb62d0b56a))
+* satisfy new ruff rules and bump 4 CVE-flagged dependencies ([fbc0697](https://github.com/Santisoutoo/LexFlow/commit/fbc069762b49aea492950af0359f106aa40a254d))
+* stop referencing secrets directly in a step if: condition ([c4a0369](https://github.com/Santisoutoo/LexFlow/commit/c4a03696737f4bad542b3b74187ea8344b8d377c))
+* stop referencing secrets directly in a step if: condition ([0673073](https://github.com/Santisoutoo/LexFlow/commit/06730736bba1d3458d85041ee8d3ed71cd3eeb01))
+* sync useModels cache when ModelWizard finish sets defaultModel ([86d9441](https://github.com/Santisoutoo/LexFlow/commit/86d9441c4e8d4c908b659779a6203d8b111f69d2))
+
+
+### Performance
+
+* **chat,registry,search:** fix event-loop & concurrency hygiene (Sprint 1, [#77](https://github.com/Santisoutoo/LexFlow/issues/77)) ([0a14d97](https://github.com/Santisoutoo/LexFlow/commit/0a14d97571916a01da2f0ae69a90a0e9baf9823e))
+
+
+### Documentation
+
+* **agent-loop:** document model auto-escalation, circuit breaker, and orca-supervisor ([a7e9294](https://github.com/Santisoutoo/LexFlow/commit/a7e92940b6d482ee907d0b5dca8cdbdea57131fa))
+* **agent-loop:** document model auto-escalation, circuit breaker, and orca-supervisor ([ce818fd](https://github.com/Santisoutoo/LexFlow/commit/ce818fd2dab0be55b5bdfae8d9611e4fb7a9887b))
+* backfill CLAUDE.md lessons for PR [#102](https://github.com/Santisoutoo/LexFlow/issues/102)/[#103](https://github.com/Santisoutoo/LexFlow/issues/103) ([253abec](https://github.com/Santisoutoo/LexFlow/commit/253abecb279b91e2956414ee1771e0e580056ed8))
+* backfill CLAUDE.md lessons learned for PR [#102](https://github.com/Santisoutoo/LexFlow/issues/102) and [#103](https://github.com/Santisoutoo/LexFlow/issues/103) ([b83e976](https://github.com/Santisoutoo/LexFlow/commit/b83e9762464dc079318642aecda05adf91e4b6c9))
+* reroute agent-loop models by task and document the tier matrix ([bfb3238](https://github.com/Santisoutoo/LexFlow/commit/bfb3238d23595c269b4b4e038420a1e98761cbba))
+* reroute agent-loop models by task, add frontier-first reviewer cascade ([fcec85d](https://github.com/Santisoutoo/LexFlow/commit/fcec85d372f9ebaafb53581a30d803ca50108357))
+
 ## [0.75.0](https://github.com/VforVitorio/LexFlow/compare/v0.74.0...v0.75.0) (2026-07-05)
 
 
