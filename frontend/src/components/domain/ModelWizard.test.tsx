@@ -1,11 +1,13 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ModelWizard } from './ModelWizard';
 import { api } from '@/lib/api';
-import type { SystemProfile } from '@/lib/types';
+import { qk } from '@/lib/queries';
+import type { Model, SystemProfile } from '@/lib/types';
 import { useUi } from '@/lib/store';
 
 const profileFixture: SystemProfile = {
@@ -24,10 +26,15 @@ const profileFixture: SystemProfile = {
 
 const useSystemProfileMock = vi.fn();
 const useModelsMock = vi.fn();
+const invalidateModelsMock = vi.fn();
 
 vi.mock('@/lib/queries', () => ({
+  qk: {
+    models: () => ['models'],
+  },
   useSystemProfile: () => useSystemProfileMock(),
   useModels: () => useModelsMock(),
+  useInvalidateModels: () => invalidateModelsMock,
 }));
 
 vi.mock('@/lib/api/secrets', () => ({
@@ -36,12 +43,18 @@ vi.mock('@/lib/api/secrets', () => ({
   },
 }));
 
-function renderWizard() {
-  return render(
-    <MemoryRouter>
-      <ModelWizard onComplete={vi.fn()} onSkip={vi.fn()} onLater={vi.fn()} />
-    </MemoryRouter>,
-  );
+function renderWizard(onComplete = vi.fn()) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return {
+    queryClient,
+    ...render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <ModelWizard onComplete={onComplete} onSkip={vi.fn()} onLater={vi.fn()} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    ),
+  };
 }
 
 async function goToStep3Small() {
@@ -52,6 +65,7 @@ async function goToStep3Small() {
 
 describe('ModelWizard finish gate', () => {
   beforeEach(() => {
+    invalidateModelsMock.mockReset();
     useSystemProfileMock.mockReturnValue({
       data: profileFixture,
       isLoading: false,
@@ -91,17 +105,19 @@ describe('ModelWizard finish gate', () => {
       yield { type: 'done', model: 'llama3.2:3b' };
     });
     const onComplete = vi.fn();
+    const freshModels: Model[] = [
+      { id: 'ollama:llama3.2:3b', available: true, label: 'llama3.2:3b', vendor: 'ollama', kind: 'local' },
+    ];
+    vi.spyOn(api.models, 'list').mockResolvedValue(freshModels);
 
-    render(
-      <MemoryRouter>
-        <ModelWizard onComplete={onComplete} onSkip={vi.fn()} onLater={vi.fn()} />
-      </MemoryRouter>,
-    );
+    const { queryClient } = renderWizard(onComplete);
     await goToStep3Small();
     await userEvent.click(screen.getByRole('button', { name: /instalar/i }));
     await userEvent.click(screen.getByRole('button', { name: /usar free local/i }));
 
     expect(useUi.getState().defaultModel).toBe('ollama:llama3.2:3b');
+    expect(queryClient.getQueryData(qk.models())).toEqual(freshModels);
+    expect(invalidateModelsMock).toHaveBeenCalled();
     expect(onComplete).toHaveBeenCalledWith('small');
   });
 });

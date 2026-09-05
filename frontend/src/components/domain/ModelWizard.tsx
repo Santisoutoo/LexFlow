@@ -28,6 +28,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import {
@@ -57,7 +58,7 @@ import {
   type ModelTier,
   type TierKey,
 } from '@/lib/model-tiering';
-import { useModels, useSystemProfile } from '@/lib/queries';
+import { qk, useInvalidateModels, useModels, useSystemProfile } from '@/lib/queries';
 import { useUi } from '@/lib/store';
 import { toast } from '@/lib/toast';
 import type { SystemProfile } from '@/lib/types';
@@ -127,8 +128,10 @@ export function ModelWizard({
   onLater: () => void;
 }) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const profileQuery = useSystemProfile();
   const { data: models = [] } = useModels();
+  const invalidateModels = useInvalidateModels();
   const setDefaultModel = useUi((s) => s.setDefaultModel);
   const [step, setStep] = useState<Step>(1);
   const [selectedKey, setSelectedKey] = useState<TierKey | null>(null);
@@ -186,6 +189,8 @@ export function ModelWizard({
       return;
     }
 
+    queryClient.setQueryData(qk.models(), freshModels);
+    invalidateModels();
     setDefaultModel(id);
     toast({ tone: 'success', title: t('wizard.readyToChat'), message: selectedTier.model });
     onComplete(selectedTier.key);
