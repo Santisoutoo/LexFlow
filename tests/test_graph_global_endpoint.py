@@ -43,6 +43,9 @@ class TestGlobalGraphShape:
         assert "nodes" in body
         assert "edges" in body
         assert "total_available" in body
+        assert "truncated" in body
+        assert "returned_count" in body
+        assert "limit_applied" in body
         assert isinstance(body["nodes"], list)
         assert isinstance(body["edges"], list)
 
@@ -115,6 +118,28 @@ class TestGlobalGraphLimit:
         assert len(body["nodes"]) == 1
         # total_available reflects the unfiltered/untruncated count.
         assert body["total_available"] == graph_from_fixture.node_count()
+        assert body["returned_count"] == 1
+        assert body["truncated"] is True
+        assert body["limit_applied"] == 1
+        expected = max(
+            graph_from_fixture.graph.nodes,
+            key=lambda nid: float(graph_from_fixture.graph.nodes[nid].get("pagerank", 0.0)),
+        )
+        assert body["nodes"][0]["id"] == expected
+
+    def test_limit_does_not_recompute_pagerank(
+        self,
+        client: TestClient,
+        graph_from_fixture: LegalGraph,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        def _boom(*_args: object, **_kwargs: object) -> dict[str, float]:
+            raise AssertionError("nx.pagerank must not run when node attrs are present")
+
+        monkeypatch.setattr("lexflow.api.routers.graph.nx.pagerank", _boom)
+        body = client.get("/api/v1/graph", params={"limit": 1}).json()
+        assert len(body["nodes"]) == 1
+        del graph_from_fixture
 
     def test_limit_above_node_count_is_a_noop(
         self,
@@ -123,6 +148,9 @@ class TestGlobalGraphLimit:
     ) -> None:
         body = client.get("/api/v1/graph", params={"limit": 999}).json()
         assert len(body["nodes"]) == graph_from_fixture.node_count()
+        assert body["truncated"] is False
+        assert body["returned_count"] == graph_from_fixture.node_count()
+        assert body["limit_applied"] == 999
 
 
 class TestGlobalGraphEdges:

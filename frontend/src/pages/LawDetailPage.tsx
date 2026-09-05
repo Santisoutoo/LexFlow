@@ -146,7 +146,7 @@ export function LawDetailPage() {
           <LawDetailGraphTab
             lawId={lawId}
             graph={graph}
-            onOpenGlobalGraph={() => navigate(`/graph?law=${encodeURIComponent(lawId)}`)}
+            onOpenGlobalGraph={() => navigate(`/graph?view=global&law=${encodeURIComponent(lawId)}`)}
           />
         )}
         {tab === 'refs' && (

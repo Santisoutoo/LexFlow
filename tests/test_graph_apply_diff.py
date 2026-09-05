@@ -128,6 +128,21 @@ def test_remove_law_preserves_incoming_edge_kind() -> None:
     assert graph.dangling["B"][0]["kind"] == ReferenceKind.REPEALS.value
 
 
+def test_apply_diff_rewrites_analytics_attrs() -> None:
+    reg = FakeRegistry({"A": ("Ley A", ["B"]), "B": ("Ley B", [])})
+    graph = build_graph(reg)  # type: ignore[arg-type]
+    assert "pagerank" in graph.graph.nodes["A"]
+
+    reg.set_law("C", "Ley C", ["A"])
+    apply_diff_to_graph(graph, reg, CorpusDiff(added=["C"], modified=[], removed=[]))  # type: ignore[arg-type]
+
+    assert "pagerank" in graph.graph.nodes["C"]
+    assert "community" in graph.graph.nodes["C"]
+    for _, attrs in graph.graph.nodes(data=True):
+        assert "pagerank" in attrs
+        assert "community" in attrs
+
+
 def test_upsert_merges_duplicate_target_kinds() -> None:
     reg = FakeRegistry({"A": ("Ley A", ["B"]), "B": ("Ley B", [])})
     graph = build_graph(reg)  # type: ignore[arg-type]

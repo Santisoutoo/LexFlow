@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/domain/EmptyState';
 import { ErrorState } from '@/components/domain/ErrorState';
 import { SkeletonCanvas } from '@/components/domain/Skeleton';
 import { RightRail } from '@/components/shell/RightRail';
-import { useGraph, useGraphTop, useWarmup } from '@/lib/queries';
+import { useGraph, useGlobalGraph, useGraphPath, useGraphTop, useWarmup } from '@/lib/queries';
 import {
   EDGE_KIND_LABELS,
   GRAPH_EDGE_STROKE,
@@ -28,6 +28,10 @@ import {
 } from './graph/GraphFilterPopover';
 import { intersectMatchSets, resolveAdvancedFilterMatches } from './graph/graph-filter-utils';
 import { GraphNodeRail } from './graph/GraphNodeRail';
+import { DEFAULT_GLOBAL_NODE_BUDGET, GLOBAL_NODE_BUDGET_PRESETS, type GraphViewMode } from './graph/graph-constants';
+import { toGlobalQueryFilters } from './graph/graph-global-filters';
+import { GraphPathPanel } from './graph/GraphPathPanel';
+import { pathEdgeKeys, pathNodesOutsideView } from './graph/graph-path-utils';
 
 const ALL_KINDS: GraphNodeKind[] = ['law', 'article', 'reference', 'amendment', 'repealed'];
 
@@ -37,7 +41,18 @@ const ALL_KINDS: GraphNodeKind[] = ['law', 'article', 'reference', 'amendment', 
 // to be in any legalize-es checkout.
 const FALLBACK_SEED_LAW_ID = 'BOE-A-1978-31229';
 
-const EMPTY_ADVANCED_FILTERS: GraphAdvancedFilters = { status: new Set(), rank: new Set() };
+const EMPTY_ADVANCED_FILTERS: GraphAdvancedFilters = {
+  status: new Set(),
+  rank: new Set(),
+  scope: new Set(),
+  jurisdiction: new Set(),
+};
+
+function parseNodeBudget(raw: string | null): number {
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 1) return DEFAULT_GLOBAL_NODE_BUDGET;
+  return Math.min(Math.floor(parsed), 50_000);
+}
 
 export function GraphPage() {
   const navigate = useNavigate();
@@ -53,22 +68,51 @@ export function GraphPage() {
   const { data: topLaws } = useGraphTop({ limit: 10 });
   const [manualSeed, setManualSeed] = useState<string | null>(null);
   const urlLaw = searchParams.get('law');
+  const view: GraphViewMode = searchParams.get('view') === 'global' ? 'global' : 'local';
+  const isGlobal = view === 'global';
+  const nodeBudget = parseNodeBudget(searchParams.get('limit'));
+  const urlFrom = searchParams.get('from') ?? '';
+  const urlTo = searchParams.get('to') ?? '';
   const seedLawId = manualSeed ?? urlLaw ?? topLaws?.[0]?.lawId ?? FALLBACK_SEED_LAW_ID;
+  const [selected, setSelected] = useState<string | null>(null);
 
-  const pickSeed = useCallback(
-    (lawId: string) => {
-      setManualSeed(lawId);
+  const patchParams = useCallback(
+    (patch: Record<string, string | null>) => {
       const next = new URLSearchParams(searchParams);
-      next.set('law', lawId);
+      for (const [key, value] of Object.entries(patch)) {
+        if (value == null || value === '') next.delete(key);
+        else next.set(key, value);
+      }
       setSearchParams(next, { replace: true });
     },
     [searchParams, setSearchParams],
   );
-  const [selected, setSelected] = useState<string | null>(null);
+
+  const pickSeed = useCallback(
+    (lawId: string) => {
+      setManualSeed(lawId);
+      setSelected(lawId);
+      patchParams({ law: lawId });
+      graphRef.current?.centerAt(lawId);
+    },
+    [patchParams],
+  );
   useEffect(() => {
     if (selected === null && seedLawId) setSelected(seedLawId);
   }, [seedLawId, selected]);
-  const { data: graph, error, refetch, isLoading } = useGraph(seedLawId);
+
+  const globalFilters = useMemo(
+    () => toGlobalQueryFilters(advancedFilters, nodeBudget),
+    [advancedFilters, nodeBudget],
+  );
+  const localQuery = useGraph(isGlobal ? undefined : seedLawId);
+  const globalQuery = useGlobalGraph(globalFilters, { enabled: isGlobal });
+  const pathQuery = useGraphPath(urlFrom || undefined, urlTo || undefined);
+
+  const graph = isGlobal ? globalQuery.data : localQuery.data;
+  const error = isGlobal ? globalQuery.error : localQuery.error;
+  const refetch = isGlobal ? globalQuery.refetch : localQuery.refetch;
+  const isLoading = isGlobal ? globalQuery.isLoading : localQuery.isLoading;
 
   const toggle = useCallback((kind: GraphNodeKind) => {
     setFilters((prev) => {
@@ -108,6 +152,29 @@ export function GraphPage() {
     [searchMatches, advancedMatches],
   );
 
+  const pathHops = pathQuery.data;
+  const highlightNodeIds = useMemo(
+    () => (pathHops && pathHops.length > 0 ? new Set(pathHops) : null),
+    [pathHops],
+  );
+  const highlightEdgeKeys = useMemo(
+    () => (pathHops && pathHops.length > 1 ? pathEdgeKeys(pathHops) : null),
+    [pathHops],
+  );
+  const pathOutsideView = useMemo(() => {
+    if (!pathHops || !graph) return false;
+    return pathNodesOutsideView(pathHops, graph.nodes.map((n) => n.id)).length > 0;
+  }, [pathHops, graph]);
+
+  useEffect(() => {
+    if (!pathHops?.length || isGlobal || !graph) return;
+    if (pathNodesOutsideView(pathHops, graph.nodes.map((n) => n.id)).length === 0) return;
+    patchParams({
+      view: 'global',
+      limit: String(Math.max(nodeBudget, pathHops.length)),
+    });
+  }, [pathHops, isGlobal, graph, nodeBudget, patchParams]);
+
   const legendCommunities = useMemo(() => (graph ? deriveLegendCommunities(graph) : []), [graph]);
   const legendEdgeKinds = useMemo(() => (graph ? deriveLegendEdgeKinds(graph) : []), [graph]);
   const legendNodeKinds = useMemo(() => (graph ? deriveLegendNodeKinds(graph) : []), [graph]);
@@ -127,7 +194,7 @@ export function GraphPage() {
 
   if (error) {
     const suggestions = topLaws ?? [];
-    if (suggestions.length === 0) {
+    if (isGlobal || suggestions.length === 0) {
       return (
         <div className="p-10">
           <ErrorState onRetry={() => refetch()} description={String(error)} />
@@ -173,11 +240,26 @@ export function GraphPage() {
 
   const communityId = typeof node?.meta?.community === 'number' ? node.meta.community : 0;
   const badgeFill = resolveCommunityFill(communityId);
+  const showTruncationBanner =
+    isGlobal &&
+    globalQuery.data != null &&
+    (globalQuery.data.truncated || globalQuery.data.totalAvailable > globalQuery.data.nodes.length);
 
   return (
     <div className="flex h-full min-h-0">
       <div className="relative flex min-w-0 flex-1 flex-col">
         <div className="flex items-center gap-2.5 overflow-x-auto border-b border-border bg-bg px-4 py-2.5 md:flex-wrap md:overflow-visible">
+          <div className="flex shrink-0 gap-1">
+            <Chip active={!isGlobal} onClick={() => patchParams({ view: null })}>
+              {t('graph.view.local')}
+            </Chip>
+            <Chip
+              active={isGlobal}
+              onClick={() => patchParams({ view: 'global', limit: String(nodeBudget) })}
+            >
+              {t('graph.view.global')}
+            </Chip>
+          </div>
           <Input
             icon={<Search className="size-3.5" />}
             placeholder={t('graph.searchPlaceholder')}
@@ -218,7 +300,42 @@ export function GraphPage() {
             </div>
           )}
           <p className="hidden w-full text-[11px] text-muted md:block">{t('graph.filterDimHint')}</p>
+          {isGlobal && (
+            <div className="flex w-full flex-wrap items-center gap-1.5">
+              <span className="label-caps text-[10px]">{t('graph.budget.label')}</span>
+              {GLOBAL_NODE_BUDGET_PRESETS.map((preset) => (
+                <Chip
+                  key={preset}
+                  active={nodeBudget === preset}
+                  onClick={() => patchParams({ limit: String(preset) })}
+                >
+                  {preset}
+                </Chip>
+              ))}
+            </div>
+          )}
+          {showTruncationBanner && globalQuery.data && (
+            <p className="w-full text-[12px] text-muted" data-testid="graph-truncation-banner">
+              {t('graph.showingNofM', {
+                n: globalQuery.data.nodes.length,
+                m: globalQuery.data.totalAvailable,
+              })}
+            </p>
+          )}
           <span className="relative ml-auto hidden gap-2 md:flex">
+            <GraphPathPanel
+              from={urlFrom}
+              to={urlTo}
+              path={pathHops}
+              isLoading={pathQuery.isFetching}
+              isError={pathQuery.isError}
+              outsideView={pathOutsideView}
+              onSubmit={(from, to) => patchParams({ from, to })}
+              onSelectHop={(lawId) => {
+                setSelected(lawId);
+                graphRef.current?.centerAt(lawId);
+              }}
+            />
             <Button
               size="sm"
               variant={filtersOpen ? 'secondary' : 'ghost'}
@@ -232,6 +349,7 @@ export function GraphPage() {
               filters={advancedFilters}
               onChange={setAdvancedFilters}
               onClose={() => setFiltersOpen(false)}
+              mode={view}
             />
             <Button
               size="sm"
@@ -252,6 +370,9 @@ export function GraphPage() {
             selected={selected}
             onSelect={setSelected}
             matchNodeIds={matchNodeIds}
+            highlightNodeIds={highlightNodeIds}
+            highlightEdgeKeys={highlightEdgeKeys}
+            lodProfile={isGlobal ? 'global' : 'local'}
           />
 
           <div className="absolute bottom-4 left-4 max-w-[220px]">

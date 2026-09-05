@@ -22,7 +22,9 @@ logger = logging.getLogger(__name__)
 # caches held the sparse edge set (3,779 edges), so a hub's depth-2 ego-graph
 # came back with ~4 nodes instead of the resolved graph (#664). Follow-up:
 # key the cache on a builder-logic hash so this can't silently regress again.
-CACHE_VERSION = "4"
+# v5 persists PageRank + community on nodes at build time (#25 Sprint C)
+# so request handlers stop recomputing nx.pagerank / greedy_modularity.
+CACHE_VERSION = "5"
 
 
 def save_graph(graph: LegalGraph, cache_path: Path, data_hash: str) -> None:
@@ -31,7 +33,7 @@ def save_graph(graph: LegalGraph, cache_path: Path, data_hash: str) -> None:
         "hash": data_hash,
         "graph": nx.node_link_data(graph.graph),
     }
-    cache_path.write_text(json.dumps(data))
+    cache_path.write_text(json.dumps(data), encoding="utf-8")
     logger.info("Graph cache saved to %s", cache_path)
 
 
@@ -39,7 +41,7 @@ def load_graph(cache_path: Path) -> tuple[LegalGraph, str] | None:
     if not cache_path.exists():
         return None
     try:
-        data = json.loads(cache_path.read_text())
+        data = json.loads(cache_path.read_text(encoding="utf-8"))
         if data.get("version") != CACHE_VERSION:
             return None
         g = nx.node_link_graph(data["graph"], directed=True)

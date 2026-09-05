@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { BackendGraphEdge, BackendGraphNode } from '../../api';
 
-import { normalizeEdgeKind, projectEdge, projectNode } from './graph';
+import { normalizeEdgeKind, projectEdge, projectGlobalResult, projectNode } from './graph';
 
 describe('normalizeEdgeKind', () => {
   it('forwards known kinds', () => {
@@ -33,6 +33,47 @@ describe('projectEdge', () => {
   it('falls back to cites when kind is missing', () => {
     const raw: BackendGraphEdge = { source: 'A', target: 'B' };
     expect(projectEdge(raw, 2).kind).toBe('cites');
+  });
+});
+
+describe('projectGlobalResult', () => {
+  it('projects truncation metadata', () => {
+    const raw = {
+      nodes: [
+        {
+          id: 'LAW-1',
+          title: 'Test law',
+          status: 'in_force',
+          rank: 'ley',
+          community: 1,
+          pagerank: 0.5,
+        },
+      ],
+      edges: [] as BackendGraphEdge[],
+      total_available: 12,
+      truncated: true,
+      limit_applied: 1,
+      returned_count: 1,
+    };
+    expect(projectGlobalResult(raw, 1)).toMatchObject({
+      totalAvailable: 12,
+      truncated: true,
+      limitApplied: 1,
+      returnedCount: 1,
+    });
+    expect(projectGlobalResult(raw, 1).nodes).toHaveLength(1);
+  });
+
+  it('derives truncated when the wire omits the flag', () => {
+    const raw = {
+      nodes: [{ id: 'LAW-1' }],
+      edges: [] as BackendGraphEdge[],
+      total_available: 9,
+    };
+    const result = projectGlobalResult(raw, 1);
+    expect(result.truncated).toBe(true);
+    expect(result.returnedCount).toBe(1);
+    expect(result.limitApplied).toBe(1);
   });
 });
 

@@ -258,12 +258,13 @@ class GraphNeighborsResponse(BaseModel):
 
 
 class GraphNodeData(BaseModel):
-    """Node representation for subgraph responses.
+    """Node representation for graph responses.
 
-    ``community`` and ``pagerank`` (issue #143) are computed over the
-    returned subgraph — not the global graph — so they stay meaningful
-    as the seed/depth change. The frontend uses ``community`` to colour
-    clusters and ``pagerank`` to size nodes.
+    ``community`` and ``pagerank`` (issue #143) on the *subgraph* endpoint
+    are computed over the returned neighbourhood — PageRank sums to ~1
+    within the visible set. The *global* endpoint (#25) reads corpus-wide
+    scores persisted at graph build time so truncation, sizing and colour
+    stay consistent across the full corpus.
     """
 
     id: str
@@ -298,14 +299,19 @@ class GraphSubgraphResponse(BaseModel):
 class GraphGlobalResponse(BaseModel):
     """Response for the global graph endpoint (#146).
 
-    Same shape as ``GraphSubgraphResponse`` plus ``total_available``,
-    which carries the number of nodes that matched the filters BEFORE
-    ``limit`` truncated. Lets the SPA show "showing N of M laws".
+    Same shape as ``GraphSubgraphResponse`` plus truncation metadata:
+    ``total_available`` is the number of nodes that matched the filters
+    BEFORE ``limit`` truncated; ``truncated`` / ``limit_applied`` /
+    ``returned_count`` let the SPA show "showing N of M laws" without
+    re-deriving the flags client-side.
     """
 
     nodes: list[GraphNodeData]
     edges: list[GraphEdgeData]
     total_available: int
+    truncated: bool = False
+    limit_applied: int | None = None
+    returned_count: int = 0
 
 
 class GraphStatsResponse(BaseModel):

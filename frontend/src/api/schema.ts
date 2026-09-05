@@ -1258,9 +1258,11 @@ export interface components {
          * GraphGlobalResponse
          * @description Response for the global graph endpoint (#146).
          *
-         *     Same shape as ``GraphSubgraphResponse`` plus ``total_available``,
-         *     which carries the number of nodes that matched the filters BEFORE
-         *     ``limit`` truncated. Lets the SPA show "showing N of M laws".
+         *     Same shape as ``GraphSubgraphResponse`` plus truncation metadata:
+         *     ``total_available`` is the number of nodes that matched the filters
+         *     BEFORE ``limit`` truncated; ``truncated`` / ``limit_applied`` /
+         *     ``returned_count`` let the SPA show "showing N of M laws" without
+         *     re-deriving the flags client-side.
          */
         GraphGlobalResponse: {
             /** Nodes */
@@ -1269,6 +1271,12 @@ export interface components {
             edges: components["schemas"]["GraphEdgeData"][];
             /** Total Available */
             total_available: number;
+            /** Truncated */
+            truncated?: boolean;
+            /** Limit Applied */
+            limit_applied?: number | null;
+            /** Returned Count */
+            returned_count?: number;
         };
         /**
          * GraphNeighborsResponse

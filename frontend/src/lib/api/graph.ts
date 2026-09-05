@@ -70,6 +70,22 @@ export function projectEdge(e: BackendGraphEdge, index: number): GraphData['edge
   };
 }
 
+export function projectGlobalResult(
+  raw: BackendGraphGlobal,
+  requestedLimit?: number,
+): GraphGlobalResult {
+  const returnedCount = raw.returned_count ?? raw.nodes.length;
+  const totalAvailable = raw.total_available;
+  return {
+    nodes: raw.nodes.map(projectNode),
+    edges: raw.edges.map(projectEdge),
+    totalAvailable,
+    truncated: raw.truncated ?? returnedCount < totalAvailable,
+    limitApplied: raw.limit_applied ?? requestedLimit ?? null,
+    returnedCount,
+  };
+}
+
 export const liveGraphApi: ApiClient['graph'] = {
   forLaw: async (id, depth = 2) => {
     const raw = await http<BackendGraphSubgraph>(
@@ -85,12 +101,7 @@ export const liveGraphApi: ApiClient['graph'] = {
     // bag. `total_available` carries the pre-truncation node count so
     // the SPA can render "showing N of M laws".
     const raw = await http<BackendGraphGlobal>(`/graph${qs({ ...filters })}`);
-    const result: GraphGlobalResult = {
-      nodes: raw.nodes.map(projectNode),
-      edges: raw.edges.map(projectEdge),
-      totalAvailable: raw.total_available,
-    };
-    return result;
+    return projectGlobalResult(raw, filters.limit);
   },
   neighbors: async (id) => {
     // Backend returns `{law_id, neighbors, count}`; consumers only need the

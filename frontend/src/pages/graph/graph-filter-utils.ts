@@ -10,7 +10,9 @@ export function resolveAdvancedFilterMatches(
   nodes: { id: string; meta?: Record<string, string | number> }[],
   filters: GraphAdvancedFilters,
 ): Set<string> | null {
-  if (filters.status.size === 0 && filters.rank.size === 0) return null;
+  if (filters.status.size === 0 && filters.rank.size === 0 && filters.scope.size === 0 && filters.jurisdiction.size === 0) {
+    return null;
+  }
 
   const ids = new Set<string>();
   for (const node of nodes) {

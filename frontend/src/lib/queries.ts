@@ -10,6 +10,7 @@
 import { useQuery, useMutation, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
 import { api } from './api';
 import { liveTelemetryApi, type TelemetryStatus } from './api/telemetry';
+import { ApiError } from './api/http';
 import type {
   Law, LawDetail, Article, LawVersion, DiffResult, GraphData, ChatThread,
   ChatMessage, Model, InstalledModel, SyncStatus, DashboardData, ListLawsParams,
@@ -201,11 +202,33 @@ export function useGraphTop(opts: { limit?: number } = {}) {
  * in the query cache (typical UX: user toggles filters, expects the
  * unfiltered view to still be there if they reset).
  */
-export function useGlobalGraph(filters: GraphGlobalFilters = {}) {
+export function useGlobalGraph(filters: GraphGlobalFilters = {}, options?: { enabled?: boolean }) {
   return useQuery<GraphGlobalResult>({
     queryKey: ['graph', 'global', filters] as const,
     queryFn: () => api.graph.global(filters),
     staleTime: 5 * 60_000,
+    enabled: options?.enabled ?? true,
+  });
+}
+
+/**
+ * Shortest directed path between two law ids (`GET /api/v1/graph/path`).
+ *
+ * 404 (no path / unknown node) surfaces as a query error — callers branch
+ * on `ApiError.status === 404` for the empty state. Disabled until both
+ * endpoints are non-empty so a half-filled form does not fire.
+ */
+export function useGraphPath(from: string | undefined, to: string | undefined) {
+  const fromId = from?.trim() ?? '';
+  const toId = to?.trim() ?? '';
+  return useQuery<string[]>({
+    queryKey: ['graph', 'path', fromId, toId] as const,
+    queryFn: () => api.graph.path(fromId, toId),
+    enabled: fromId.length > 0 && toId.length > 0,
+    retry: (count, error) => {
+      if (error instanceof ApiError && error.status === 404) return false;
+      return count < 2;
+    },
   });
 }
 
