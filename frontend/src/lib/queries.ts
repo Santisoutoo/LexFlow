@@ -349,6 +349,12 @@ export function useModels() {
   return useQuery<Model[]>({ queryKey: qk.models(), queryFn: () => api.models.list(), staleTime: 5 * 60_000 });
 }
 
+/** Bust the /models probe cache after secrets or installs change (#27). */
+export function useInvalidateModels() {
+  const queryClient = useQueryClient();
+  return () => queryClient.invalidateQueries({ queryKey: qk.models() });
+}
+
 /** Installed Ollama models for the Settings management card (#597). */
 export function useInstalledModels() {
   return useQuery<InstalledModel[]>({

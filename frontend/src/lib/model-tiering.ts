@@ -20,7 +20,10 @@
  * Localised labels                  → FIT_LABELS.
  */
 
-import type { SystemProfile } from './types';
+import type { Model, SystemProfile } from './types';
+
+/** Cloud tier always maps to Anthropic in the wizard catalog. */
+const CLOUD_PROVIDER = 'anthropic';
 
 // ─── Catalog ─────────────────────────────────────────────────────────────
 
@@ -75,7 +78,7 @@ export const TIER_CATALOG: readonly ModelTier[] = [
   {
     key: 'cloud',
     title: 'Best cloud — pay-per-use',
-    model: 'anthropic/claude-sonnet-4-6',
+    model: 'claude-sonnet-4-6',
     sizeGb: 0,
     blurb: 'Mejor calidad disponible, sin requisitos de hardware. Requiere una API key tuya.',
     cloud: true,
@@ -190,4 +193,19 @@ export function recommendTier(profile: SystemProfile): TierKey {
     }
   }
   return 'cloud';
+}
+
+/**
+ * Map a wizard tier to the backend ``provider:model`` id when that model
+ * is available in the live ``/models`` list.
+ */
+export function resolveModelIdForTier(tier: ModelTier, models: Pick<Model, 'id' | 'available'>[]): string | null {
+  const targetId = tier.cloud
+    ? tier.model.includes('/')
+      ? tier.model.replace('/', ':')
+      : `${CLOUD_PROVIDER}:${tier.model}`
+    : `ollama:${tier.model}`;
+
+  const match = models.find((m) => m.id === targetId && m.available);
+  return match?.id ?? null;
 }

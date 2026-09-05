@@ -23,8 +23,9 @@ import { Avatar, Badge, Button, Card, Tabs, useConfirm } from '@/components/ui';
 import { McpServersSection } from '@/components/domain/McpServersSection';
 import { ModelWizard } from '@/components/domain/ModelWizard';
 import { useTutorialRelaunch } from '@/components/domain/use-tutorial-relaunch';
-import { useHealth, useModels, useInstalledModels, useSemanticStatus, useSyncStatus, useRunSync, useTelemetryStatus, useWhatsNew } from '@/lib/queries';
+import { useHealth, useModels, useInstalledModels, useInvalidateModels, useSemanticStatus, useSyncStatus, useRunSync, useTelemetryStatus, useWhatsNew } from '@/lib/queries';
 import type { InstalledModel } from '@/lib/types';
+import { cloudProviderStatus } from '@/lib/model-status';
 import { Skeleton } from '@/components/domain/Skeleton';
 import { useUi } from '@/lib/store';
 import { cn, timeAgo } from '@/lib/utils';
@@ -251,10 +252,41 @@ function readStoredUserName(): string | null {
 function ModelsSection() {
   const { t } = useTranslation();
   const { data: models = [] } = useModels();
+  const invalidateModels = useInvalidateModels();
   const defaultModel = useUi((s) => s.defaultModel);
   const setDefaultModel = useUi((s) => s.setDefaultModel);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [secrets, setSecrets] = useState<SecretStatusItem[]>([]);
   const m = models.find((x) => x.id === defaultModel) ?? models[0];
+
+  const refreshSecrets = useCallback(async () => {
+    try {
+      setSecrets(await liveSecretsApi.list());
+    } catch {
+      setSecrets([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshSecrets();
+  }, [refreshSecrets]);
+
+  const secretConfiguredFor = (vendor: string) =>
+    secrets.find((item) => item.provider === vendor)?.configured ?? false;
+
+  const cloudStatusText = (provider: typeof models[number]) => {
+    const status = cloudProviderStatus(provider.error, secretConfiguredFor(provider.vendor));
+    if (status.statusKey === 'keyRejected') return t('settings.models.keyRejected');
+    if (status.statusKey === 'probeError') return status.detail ?? t('settings.models.probeError');
+    return t('settings.models.noKey');
+  };
+
+  const cloudBadgeText = (provider: typeof models[number]) => {
+    const status = cloudProviderStatus(provider.error, secretConfiguredFor(provider.vendor));
+    if (status.statusKey === 'keyRejected') return t('settings.models.keyRejectedShort');
+    if (status.statusKey === 'probeError') return t('settings.models.probeErrorShort');
+    return t('settings.models.missingKey');
+  };
 
   return (
     <>
@@ -311,8 +343,11 @@ function ModelsSection() {
                 ? t('settings.models.connected')
                 : p.kind === 'local'
                   ? t('settings.models.notDetected')
-                  : t('settings.models.noKey')}
+                  : cloudStatusText(p)}
             </div>
+            {!p.available && p.kind === 'cloud' && p.error && secretConfiguredFor(p.vendor) && (
+              <div className="mt-0.5 text-[11px] text-muted">{p.error}</div>
+            )}
           </div>
           <Badge
             tone={p.available ? 'success' : p.kind === 'local' ? 'amber' : 'danger'}
@@ -322,14 +357,14 @@ function ModelsSection() {
               ? t('settings.models.active')
               : p.kind === 'local'
                 ? t('settings.models.notRunning')
-                : t('settings.models.missingKey')}
+                : cloudBadgeText(p)}
           </Badge>
           <Button size="sm" variant="ghost" onClick={() => setDefaultModel(p.id)} icon={<Cog className="size-3.5" />} />
         </div>
       ))}
 
       <InstalledModelsCard />
-      <ApiKeysCard />
+      <ApiKeysCard onSecretsChange={refreshSecrets} onModelsChange={invalidateModels} />
       <SemanticSearchCard />
     </>
   );
@@ -694,7 +729,13 @@ function SemanticExplainDialog({ onCancel, onConfirm }: { onCancel: () => void; 
  * input to paste it into. The card uses the OS keyring via
  * `liveSecretsApi`; the SPA never sees the raw bytes after a save.
  */
-function ApiKeysCard() {
+function ApiKeysCard({
+  onSecretsChange,
+  onModelsChange,
+}: {
+  onSecretsChange?: () => Promise<void>;
+  onModelsChange?: () => void;
+}) {
   const { t } = useTranslation();
   const [status, setStatus] = useState<SecretStatusItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -703,6 +744,7 @@ function ApiKeysCard() {
     setLoading(true);
     try {
       setStatus(await liveSecretsApi.list());
+      await onSecretsChange?.();
     } catch (exc) {
       toast({
         tone: 'danger',
@@ -712,7 +754,7 @@ function ApiKeysCard() {
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, [onSecretsChange, t]);
 
   useEffect(() => {
     void refresh();
@@ -728,7 +770,7 @@ function ApiKeysCard() {
         ) : (
           <div className="flex flex-col gap-3">
             {status.map((row) => (
-              <ApiKeyRow key={row.provider} row={row} onChange={refresh} />
+              <ApiKeyRow key={row.provider} row={row} onChange={refresh} onModelsChange={onModelsChange} />
             ))}
           </div>
         )}
@@ -737,7 +779,15 @@ function ApiKeysCard() {
   );
 }
 
-function ApiKeyRow({ row, onChange }: { row: SecretStatusItem; onChange: () => Promise<void> }) {
+function ApiKeyRow({
+  row,
+  onChange,
+  onModelsChange,
+}: {
+  row: SecretStatusItem;
+  onChange: () => Promise<void>;
+  onModelsChange?: () => void;
+}) {
   const { t } = useTranslation();
   const confirm = useConfirm();
   const [draft, setDraft] = useState('');
@@ -751,6 +801,18 @@ function ApiKeyRow({ row, onChange }: { row: SecretStatusItem; onChange: () => P
       await liveSecretsApi.set(row.provider, draft.trim());
       setDraft('');
       await onChange();
+      onModelsChange?.();
+      const fresh = await api.models.list({ refresh: true });
+      const providerRow = fresh.find((m) => m.vendor === row.provider && !m.available);
+      const probe = cloudProviderStatus(providerRow?.error, true);
+      if (probe.statusKey === 'keyRejected' || probe.statusKey === 'probeError') {
+        toast({
+          tone: 'warning',
+          title: t('settings.models.apiKeySavedButRejected', { provider: row.provider }),
+          message: probe.detail ?? '',
+        });
+        return;
+      }
       toast({ tone: 'success', title: t('settings.models.apiKeySaved', { provider: row.provider }), message: '' });
     } catch (exc) {
       toast({
@@ -775,6 +837,7 @@ function ApiKeyRow({ row, onChange }: { row: SecretStatusItem; onChange: () => P
     try {
       await liveSecretsApi.remove(row.provider);
       await onChange();
+      onModelsChange?.();
       toast({ tone: 'info', title: t('settings.models.apiKeyRemoved', { provider: row.provider }), message: '' });
     } catch (exc) {
       toast({

@@ -13,6 +13,7 @@ import {
   fitForModel,
   getTier,
   recommendTier,
+  resolveModelIdForTier,
 } from './model-tiering';
 import type { SystemProfile } from './types';
 
@@ -166,5 +167,36 @@ describe('FIT_LABELS', () => {
     expect(FIT_LABELS.decent).toBe('Va decente');
     expect(FIT_LABELS.tight).toBe('Justo justo');
     expect(FIT_LABELS['too-heavy']).toBe('Demasiado pesado');
+  });
+});
+
+// ─── resolveModelIdForTier ──────────────────────────────────────────────
+
+describe('resolveModelIdForTier', () => {
+  const models = [
+    { id: 'ollama:llama3.2:3b', available: true },
+    { id: 'anthropic:claude-sonnet-4-6', available: true },
+  ];
+
+  it('maps local tiers to ollama: tags', () => {
+    expect(resolveModelIdForTier(getTier('small'), models)).toBe('ollama:llama3.2:3b');
+  });
+
+  it('maps cloud tiers to anthropic: model names', () => {
+    expect(resolveModelIdForTier(getTier('cloud'), models)).toBe('anthropic:claude-sonnet-4-6');
+  });
+
+  it('accepts legacy slash-form cloud catalog entries', () => {
+    const legacyTier = { ...getTier('cloud'), model: 'anthropic/claude-sonnet-4-6' };
+    expect(resolveModelIdForTier(legacyTier, models)).toBe('anthropic:claude-sonnet-4-6');
+  });
+
+  it('returns null when the target model is unavailable', () => {
+    const unavailableOnly = [{ id: 'ollama:llama3.2:3b', available: false }];
+    expect(resolveModelIdForTier(getTier('small'), unavailableOnly)).toBeNull();
+  });
+
+  it('returns null when no model row matches', () => {
+    expect(resolveModelIdForTier(getTier('balanced'), models)).toBeNull();
   });
 });

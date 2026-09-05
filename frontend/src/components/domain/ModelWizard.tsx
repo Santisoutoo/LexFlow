@@ -28,6 +28,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import {
@@ -52,17 +53,18 @@ import {
   TIER_CATALOG,
   fitForModel,
   recommendTier,
+  resolveModelIdForTier,
   type FitStatus,
   type ModelTier,
   type TierKey,
 } from '@/lib/model-tiering';
-import { useSystemProfile } from '@/lib/queries';
+import { qk, useInvalidateModels, useModels, useSystemProfile } from '@/lib/queries';
+import { useUi } from '@/lib/store';
 import { toast } from '@/lib/toast';
 import type { SystemProfile } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 export const WIZARD_COMPLETED_STORAGE_KEY = 'lexflow.wizard-completed';
-export const PREFERRED_MODEL_STORAGE_KEY = 'lexflow.preferred-model';
 
 type Step = 1 | 2 | 3;
 
@@ -126,11 +128,17 @@ export function ModelWizard({
   onLater: () => void;
 }) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const profileQuery = useSystemProfile();
+  const { data: models = [] } = useModels();
+  const invalidateModels = useInvalidateModels();
+  const setDefaultModel = useUi((s) => s.setDefaultModel);
   const [step, setStep] = useState<Step>(1);
   const [selectedKey, setSelectedKey] = useState<TierKey | null>(null);
   // #672 — for cloud tiers: true only once the Anthropic key is confirmed present.
   const [cloudKeyReady, setCloudKeyReady] = useState(false);
+  // #27 — local tiers: true once Ollama reports the model installed.
+  const [localInstallReady, setLocalInstallReady] = useState(false);
 
   // Once the profile loads, pre-select the recommended tier. Re-runs
   // when refetch returns new data, but only if the user hasn't picked
@@ -141,6 +149,11 @@ export function ModelWizard({
     }
   }, [profileQuery.data, selectedKey]);
 
+  useEffect(() => {
+    setLocalInstallReady(false);
+    setCloudKeyReady(false);
+  }, [selectedKey]);
+
   const profile = profileQuery.data ?? null;
   const selectedTier =
     TIER_CATALOG.find((t) => t.key === selectedKey) ?? TIER_CATALOG[0];
@@ -149,17 +162,37 @@ export function ModelWizard({
   const goBack = () => setStep((s) => Math.max(1, s - 1) as Step);
   const goNext = () => setStep((s) => Math.min(stepCount, s + 1) as Step);
 
-  const finish = () => {
-    // #672 — cloud tiers are only usable once the API key is in place.
-    // Guard: if the user somehow reaches finish on a cloud tier without a
-    // key (shouldn't happen with the disabled button, but belt-and-braces),
-    // skip the "configured" toast and don't persist the model choice.
-    if (selectedTier.cloud && !cloudKeyReady) {
-      onComplete(selectedTier.key);
+  const finish = async () => {
+    const finishBlocked =
+      (selectedTier.cloud && !cloudKeyReady) || (!selectedTier.cloud && !localInstallReady);
+    if (finishBlocked) return;
+
+    let freshModels = models;
+    try {
+      freshModels = await api.models.list({ refresh: true });
+    } catch {
+      toast({
+        tone: 'danger',
+        title: t('wizard.modelNotReady'),
+        message: t('wizard.modelNotReadyHint'),
+      });
       return;
     }
-    persistPreferredModel(selectedTier);
-    toast({ tone: 'success', title: t('wizard.configuredToast'), message: selectedTier.model });
+
+    const id = resolveModelIdForTier(selectedTier, freshModels);
+    if (!id) {
+      toast({
+        tone: 'danger',
+        title: t('wizard.modelNotReady'),
+        message: t('wizard.modelNotReadyHint'),
+      });
+      return;
+    }
+
+    queryClient.setQueryData(qk.models(), freshModels);
+    invalidateModels();
+    setDefaultModel(id);
+    toast({ tone: 'success', title: t('wizard.readyToChat'), message: selectedTier.model });
     onComplete(selectedTier.key);
   };
 
@@ -185,6 +218,7 @@ export function ModelWizard({
             profile={profile}
             onRefetchProfile={profileQuery.refetch}
             onCloudKeyChange={setCloudKeyReady}
+            onLocalInstallReadyChange={setLocalInstallReady}
           />
         )}
 
@@ -193,9 +227,10 @@ export function ModelWizard({
           tier={selectedTier}
           profileReady={!!profile}
           cloudKeyReady={cloudKeyReady}
+          localInstallReady={localInstallReady}
           onBack={goBack}
           onNext={goNext}
-          onFinish={finish}
+          onFinish={() => void finish()}
           onLater={onLater}
         />
       </div>
@@ -234,6 +269,7 @@ function WizardFooter({
   tier,
   profileReady,
   cloudKeyReady,
+  localInstallReady,
   onBack,
   onNext,
   onFinish,
@@ -244,6 +280,8 @@ function WizardFooter({
   profileReady: boolean;
   /** #672 — true once the Anthropic key is confirmed present (cloud tiers only). */
   cloudKeyReady: boolean;
+  /** #27 — true once the local model is installed and ready. */
+  localInstallReady: boolean;
   onBack: () => void;
   onNext: () => void;
   onFinish: () => void;
@@ -253,10 +291,8 @@ function WizardFooter({
   const { t } = useTranslation();
   const isLast = step === 3;
 
-  // #672: the primary "Usar" button on the final cloud step is disabled
-  // until the API key is confirmed — prevents the false "Modelo configurado"
-  // success state from firing on bare selection.
-  const finishDisabled = isLast && tier.cloud && !cloudKeyReady;
+  const finishDisabled =
+    isLast && ((tier.cloud && !cloudKeyReady) || (!tier.cloud && !localInstallReady));
 
   return (
     <div className="mt-6 flex items-center justify-between gap-3">
@@ -268,22 +304,24 @@ function WizardFooter({
         ) : (
           <span />
         )}
-        {/* #673 — "Lo haré más tarde": permanently completes the wizard
-            without configuring a model. Shown from step 2 onwards so the
-            user always has an escape that doesn't trap them in the flow. */}
         {step >= 2 && (
           <Button variant="ghost" onClick={onLater} className="text-muted text-[13px]">
             {t('wizard.skipLater')}
           </Button>
         )}
       </div>
-      <Button
-        variant="primary"
-        onClick={isLast ? onFinish : onNext}
-        disabled={(step === 1 && !profileReady) || finishDisabled}
-      >
-        {isLast ? t('wizard.use', { tier: tier.title.split(' — ')[0].toLowerCase() }) : t('wizard.continue')}
-      </Button>
+      <div className="flex flex-col items-end gap-1">
+        {finishDisabled && (
+          <span className="text-[11.5px] text-muted">{t('wizard.finishDisabledHint')}</span>
+        )}
+        <Button
+          variant="primary"
+          onClick={isLast ? onFinish : onNext}
+          disabled={(step === 1 && !profileReady) || finishDisabled}
+        >
+          {isLast ? t('wizard.use', { tier: tier.title.split(' — ')[0].toLowerCase() }) : t('wizard.continue')}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -472,12 +510,15 @@ function StepConfirm({
   profile,
   onRefetchProfile,
   onCloudKeyChange,
+  onLocalInstallReadyChange,
 }: {
   tier: ModelTier;
   profile: SystemProfile | null;
   onRefetchProfile: () => void;
   /** #672 — called whenever the Anthropic key status is (re-)checked. */
   onCloudKeyChange: (ready: boolean) => void;
+  /** #27 — called when local install readiness changes. */
+  onLocalInstallReadyChange: (ready: boolean) => void;
 }) {
   if (tier.cloud) {
     return <CloudKeyConfirm tier={tier} onKeyStatusChange={onCloudKeyChange} />;
@@ -490,6 +531,7 @@ function StepConfirm({
       isInstalled={isInstalled}
       ollamaRunning={profile?.ollamaRunning ?? false}
       onRefetchProfile={onRefetchProfile}
+      onReadyChange={onLocalInstallReadyChange}
     />
   );
 }
@@ -606,11 +648,13 @@ function OllamaInstall({
   isInstalled,
   ollamaRunning,
   onRefetchProfile,
+  onReadyChange,
 }: {
   tier: ModelTier;
   isInstalled: boolean;
   ollamaRunning: boolean;
   onRefetchProfile: () => void;
+  onReadyChange: (ready: boolean) => void;
 }) {
   const { t } = useTranslation();
   type PullState =
@@ -620,6 +664,10 @@ function OllamaInstall({
     | { phase: 'error'; code: string; message: string };
 
   const [state, setState] = useState<PullState>(isInstalled ? { phase: 'done' } : { phase: 'idle' });
+
+  useEffect(() => {
+    onReadyChange(state.phase === 'done');
+  }, [state.phase, onReadyChange]);
 
   const startPull = async () => {
     setState({ phase: 'pulling', status: t('wizard.connecting'), completed: null, total: null });
@@ -753,14 +801,6 @@ function markWizardSkipped(): void {
   // discoverability lever for the model setup we have today).
   try {
     sessionStorage.setItem(WIZARD_SKIPPED_SESSION_KEY, 'true');
-  } catch {
-    /* ignore */
-  }
-}
-
-function persistPreferredModel(tier: ModelTier): void {
-  try {
-    localStorage.setItem(PREFERRED_MODEL_STORAGE_KEY, tier.model);
   } catch {
     /* ignore */
   }
