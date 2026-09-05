@@ -19,8 +19,9 @@ interface BackendInstalledModel {
 }
 
 export const liveModelsApi: ApiClient['models'] = {
-  list: async () => {
-    const raw = await http<BackendModelInfo[]>('/models');
+  list: async (options) => {
+    const query = options?.refresh ? '?refresh=true' : '';
+    const raw = await http<BackendModelInfo[]>(`/models${query}`);
     return raw.map<Model>((m) => ({
       id: m.id,
       // Placeholder rows have no model name — fall back to the provider key
@@ -29,6 +30,7 @@ export const liveModelsApi: ApiClient['models'] = {
       vendor: m.provider,
       kind: m.local ? 'local' : 'cloud',
       available: m.configured,
+      error: m.error ?? null,
     }));
   },
   installed: async () => {

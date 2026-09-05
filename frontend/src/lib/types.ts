@@ -356,6 +356,8 @@ export interface Model {
   kind: ModelKind;
   /** Whether a credential is configured locally. */
   available: boolean;
+  /** Probe error when ``available`` is false (cloud providers). */
+  error?: string | null;
 }
 
 /**
@@ -734,7 +736,7 @@ export interface ApiClient {
     ): AsyncIterable<ChatChunk>;
   };
   models: {
-    list(): Promise<Model[]>;
+    list(options?: { refresh?: boolean }): Promise<Model[]>;
     /** Installed Ollama models with size + loaded state (#597). */
     installed(): Promise<InstalledModel[]>;
     /** Delete an installed Ollama model (``ollama rm``) (#597). */

@@ -478,7 +478,7 @@ export const mockApi: ApiClient = {
     },
   },
   models: {
-    async list() {
+    async list(_options?: { refresh?: boolean }) {
       await delay(60);
       return MODELS;
     },
