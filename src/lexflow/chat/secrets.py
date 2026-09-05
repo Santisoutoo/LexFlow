@@ -128,6 +128,25 @@ def delete_api_key(provider: str) -> bool:
     return True
 
 
+def key_source(provider: str) -> str | None:
+    """Return ``"env"`` / ``"keyring"`` / ``None`` for ``provider``.
+
+    Env var wins, matching :func:`get_api_key`. Used by the wizard to
+    explain that an environment key cannot be overwritten from the UI.
+    """
+    _require_known(provider)
+    env_value = os.environ.get(_PROVIDER_ENV[provider])
+    if env_value:
+        return "env"
+    try:
+        stored = keyring.get_password(_SERVICE_NAME, provider)
+    except KeyringError:
+        return None
+    if stored:
+        return "keyring"
+    return None
+
+
 def configured_providers() -> dict[str, bool]:
     """Map every supported provider to whether a key is currently set.
 

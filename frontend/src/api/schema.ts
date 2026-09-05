@@ -889,6 +889,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/secrets/{provider}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Probe whether a cloud-provider API key is valid.
+         * @description Validate ``body.api_key`` or the stored key for ``provider``.
+         *
+         *     Returns ``valid: false`` with a static ``code`` on auth failure or
+         *     timeout — never a 401 — so the wizard can show inline copy without
+         *     treating a bad key as a transport error.
+         */
+        post: operations["test_secret_api_v1_secrets__provider__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/telemetry/status": {
         parameters: {
             query?: never;
@@ -1956,6 +1980,8 @@ export interface components {
             provider: string;
             /** Configured */
             configured: boolean;
+            /** Source */
+            source?: ("env" | "keyring") | null;
         };
         /**
          * SecretStatusResponse
@@ -1964,6 +1990,32 @@ export interface components {
         SecretStatusResponse: {
             /** Items */
             items: components["schemas"]["SecretStatusItem"][];
+        };
+        /**
+         * SecretTestRequest
+         * @description Optional body for ``POST /secrets/{provider}/test``.
+         *
+         *     When ``api_key`` is omitted the stored key (env var or keyring) is
+         *     probed instead. The value is never echoed back and never logged.
+         */
+        SecretTestRequest: {
+            /**
+             * Api Key
+             * @description Key to probe without storing. Omit to test the stored key.
+             */
+            api_key?: string | null;
+        };
+        /**
+         * SecretTestResponse
+         * @description Outcome of a key probe. Static messages only — never the key.
+         */
+        SecretTestResponse: {
+            /** Valid */
+            valid: boolean;
+            /** Code */
+            code?: string | null;
+            /** Message */
+            message?: string | null;
         };
         /**
          * Section
@@ -3526,6 +3578,48 @@ export interface operations {
                 content?: never;
             };
             /** @description Unknown provider. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_secret_api_v1_secrets__provider__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["SecretTestRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Probe finished (valid or invalid). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecretTestResponse"];
+                };
+            };
+            /** @description Unknown provider or no key to probe. */
             400: {
                 headers: {
                     [name: string]: unknown;

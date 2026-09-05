@@ -1,11 +1,13 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ModelWizard } from './ModelWizard';
+import { ConfirmProvider } from '@/components/ui';
 import { api } from '@/lib/api';
+import { liveSecretsApi } from '@/lib/api/secrets';
 import { qk } from '@/lib/queries';
 import type { Model, SystemProfile } from '@/lib/types';
 import { useUi } from '@/lib/store';
@@ -40,6 +42,9 @@ vi.mock('@/lib/queries', () => ({
 vi.mock('@/lib/api/secrets', () => ({
   liveSecretsApi: {
     list: vi.fn(),
+    set: vi.fn(),
+    test: vi.fn(),
+    remove: vi.fn(),
   },
 }));
 
@@ -50,7 +55,9 @@ function renderWizard(onComplete = vi.fn()) {
     ...render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
-          <ModelWizard onComplete={onComplete} onSkip={vi.fn()} onLater={vi.fn()} />
+          <ConfirmProvider>
+            <ModelWizard onComplete={onComplete} onSkip={vi.fn()} onLater={vi.fn()} />
+          </ConfirmProvider>
         </MemoryRouter>
       </QueryClientProvider>,
     ),
@@ -69,7 +76,7 @@ describe('ModelWizard finish gate', () => {
     useSystemProfileMock.mockReturnValue({
       data: profileFixture,
       isLoading: false,
-      refetch: vi.fn(),
+      refetch: vi.fn().mockResolvedValue({ data: profileFixture }),
     });
     useModelsMock.mockReturnValue({
       data: [{ id: 'ollama:llama3.2:3b', available: true, label: 'llama3.2:3b', vendor: 'ollama', kind: 'local' }],
@@ -78,6 +85,13 @@ describe('ModelWizard finish gate', () => {
     vi.spyOn(api.models, 'list').mockResolvedValue([
       { id: 'ollama:llama3.2:3b', available: true, label: 'llama3.2:3b', vendor: 'ollama', kind: 'local' },
     ]);
+    vi.mocked(liveSecretsApi.list).mockReset().mockResolvedValue([
+      { provider: 'anthropic', configured: false },
+      { provider: 'openai', configured: false },
+      { provider: 'google', configured: false },
+    ]);
+    vi.mocked(liveSecretsApi.set).mockReset().mockResolvedValue(undefined);
+    vi.mocked(liveSecretsApi.test).mockReset().mockResolvedValue({ valid: false });
   });
 
   it('disables finish on step 3 before local install completes', async () => {
@@ -119,5 +133,125 @@ describe('ModelWizard finish gate', () => {
     expect(queryClient.getQueryData(qk.models())).toEqual(freshModels);
     expect(invalidateModelsMock).toHaveBeenCalled();
     expect(onComplete).toHaveBeenCalledWith('small');
+  });
+});
+
+async function goToStep3Cloud() {
+  await userEvent.click(screen.getByRole('button', { name: /continuar/i }));
+  await userEvent.click(screen.getByRole('button', { name: /best cloud — pay-per-use/i }));
+  await userEvent.click(screen.getByRole('button', { name: /continuar/i }));
+}
+
+describe('ModelWizard cloud key gate', () => {
+  beforeEach(() => {
+    invalidateModelsMock.mockReset();
+    useSystemProfileMock.mockReturnValue({
+      data: profileFixture,
+      isLoading: false,
+      refetch: vi.fn().mockResolvedValue({ data: profileFixture }),
+    });
+    useModelsMock.mockReturnValue({
+      data: [{ id: 'anthropic:claude-sonnet-4-6', available: true, label: 'claude-sonnet-4-6', vendor: 'anthropic', kind: 'cloud' }],
+    });
+    useUi.setState({ defaultModel: '' });
+    vi.mocked(liveSecretsApi.list).mockReset().mockResolvedValue([
+      { provider: 'anthropic', configured: false },
+      { provider: 'openai', configured: false },
+      { provider: 'google', configured: false },
+    ]);
+    vi.mocked(liveSecretsApi.set).mockReset().mockResolvedValue(undefined);
+    vi.mocked(liveSecretsApi.test).mockReset();
+  });
+
+  it('disables Usar until the key probe returns valid', async () => {
+    vi.mocked(liveSecretsApi.test).mockResolvedValue({ valid: false, code: 'invalid_api_key' });
+    renderWizard();
+    await goToStep3Cloud();
+
+    expect(screen.getByRole('button', { name: /usar best cloud/i })).toBeDisabled();
+    expect(screen.getByText(/pega y valida tu clave api/i)).toBeInTheDocument();
+  });
+
+  it('enables Usar after mock test succeeds', async () => {
+    vi.mocked(liveSecretsApi.test).mockResolvedValue({ valid: true });
+    renderWizard();
+    await goToStep3Cloud();
+
+    await userEvent.type(screen.getByPlaceholderText(/pega tu api key/i), 'sk-good');
+    await userEvent.click(screen.getByRole('button', { name: /guardar/i }));
+
+    await waitFor(() => {
+      expect(liveSecretsApi.set).toHaveBeenCalledWith('anthropic', 'sk-good');
+      expect(liveSecretsApi.test).toHaveBeenCalledWith('anthropic');
+      expect(screen.getByRole('button', { name: /usar best cloud/i })).toBeEnabled();
+    });
+  });
+});
+
+describe('ModelWizard Ollama install guide', () => {
+  beforeEach(() => {
+    invalidateModelsMock.mockReset();
+    useModelsMock.mockReturnValue({
+      data: [{ id: 'ollama:llama3.2:3b', available: true, label: 'llama3.2:3b', vendor: 'ollama', kind: 'local' }],
+    });
+    useUi.setState({ defaultModel: '' });
+    vi.mocked(liveSecretsApi.list).mockResolvedValue([]);
+  });
+
+  it('shows download guide when ollama is not running', async () => {
+    const refetch = vi.fn().mockResolvedValue({
+      data: { ...profileFixture, ollamaRunning: false },
+    });
+    useSystemProfileMock.mockReturnValue({
+      data: { ...profileFixture, ollamaRunning: false },
+      isLoading: false,
+      refetch,
+    });
+    renderWizard();
+    await goToStep3Small();
+
+    expect(screen.getByText(/instalar ollama/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^instalar$/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /usar free local/i })).toBeDisabled();
+  });
+
+  it('enables Instalar after refetch reports ollamaRunning', async () => {
+    const refetch = vi.fn().mockResolvedValue({
+      data: { ...profileFixture, ollamaRunning: true },
+    });
+    useSystemProfileMock.mockReturnValue({
+      data: { ...profileFixture, ollamaRunning: false },
+      isLoading: false,
+      refetch,
+    });
+    renderWizard();
+    await goToStep3Small();
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^instalar$/i })).toBeEnabled();
+    });
+    expect(screen.getByText(/ollama detectado/i)).toBeInTheDocument();
+  });
+
+  it('enables Instalar after a later refetch reports ollamaRunning', async () => {
+    const refetch = vi
+      .fn()
+      .mockResolvedValueOnce({ data: { ...profileFixture, ollamaRunning: false } })
+      .mockResolvedValue({ data: { ...profileFixture, ollamaRunning: true } });
+    useSystemProfileMock.mockReturnValue({
+      data: { ...profileFixture, ollamaRunning: false },
+      isLoading: false,
+      refetch,
+    });
+    renderWizard();
+    await goToStep3Small();
+
+    expect(screen.getByText(/instalar ollama/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /re-detectar/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^instalar$/i })).toBeEnabled();
+    });
+    expect(refetch.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 });

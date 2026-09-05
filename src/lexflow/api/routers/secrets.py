@@ -1,10 +1,11 @@
 """``/api/v1/secrets`` — cloud-provider API key management (#120).
 
-Three endpoints, all of them never return the raw key bytes:
+Four endpoints, all of them never return the raw key bytes:
 
-* ``GET    /secrets``          — which providers are configured?
-* ``POST   /secrets``          — store a key for one provider.
-* ``DELETE /secrets/{provider}`` — remove a stored key (idempotent).
+* ``GET    /secrets``                    — which providers are configured?
+* ``POST   /secrets``                    — store a key for one provider.
+* ``DELETE /secrets/{provider}``         — remove a stored key (idempotent).
+* ``POST   /secrets/{provider}/test``    — probe whether a key is valid.
 
 Storage is the OS keyring (Windows Credential Manager / macOS Keychain
 / Linux Secret Service) via :mod:`lexflow.chat.secrets`. The provider
@@ -14,14 +15,12 @@ immediately picked up by the next call to ``stream_chat``.
 --- WHERE TO CHANGE IF X CHANGES ---
 * Add a new provider                → extend
                                        :data:`lexflow.chat.secrets.SUPPORTED_PROVIDERS`.
-* Add a "test connectivity" endpoint → see #120 follow-up
-                                       (``POST /api/v1/models/test``);
-                                       intentionally out of this PR.
+* Change how a key is probed        → :mod:`lexflow.chat.validate_key`.
 """
 
 from __future__ import annotations
 
-import logging
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
@@ -31,12 +30,15 @@ from lexflow.chat.secrets import (
     UnknownProviderError,
     configured_providers,
     delete_api_key,
+    get_api_key,
+    key_source,
     set_api_key,
 )
-
-logger = logging.getLogger(__name__)
+from lexflow.chat.validate_key import test_api_key
 
 router = APIRouter(prefix="/secrets", tags=["Secrets"])
+
+KeySource = Literal["env", "keyring"]
 
 
 class SecretStatusItem(BaseModel):
@@ -45,11 +47,13 @@ class SecretStatusItem(BaseModel):
     ``provider`` is the canonical key name (``openai`` / ``anthropic``
     / ``google``). ``configured`` collapses both env vars and keyring
     presence into a single boolean — the UI shows the same green dot
-    regardless of source.
+    regardless of source. ``source`` tells the wizard when the key
+    comes from the environment (and therefore cannot be overwritten).
     """
 
     provider: str
     configured: bool
+    source: KeySource | None = None
 
 
 class SecretStatusResponse(BaseModel):
@@ -69,6 +73,38 @@ class SecretCreateRequest(BaseModel):
     api_key: str = Field(..., min_length=1, description="The API key bytes to store.")
 
 
+class SecretTestRequest(BaseModel):
+    """Optional body for ``POST /secrets/{provider}/test``.
+
+    When ``api_key`` is omitted the stored key (env var or keyring) is
+    probed instead. The value is never echoed back and never logged.
+    """
+
+    api_key: str | None = Field(
+        default=None,
+        description="Key to probe without storing. Omit to test the stored key.",
+    )
+
+
+class SecretTestResponse(BaseModel):
+    """Outcome of a key probe. Static messages only — never the key."""
+
+    valid: bool
+    code: str | None = None
+    message: str | None = None
+
+
+def _unknown_provider_http(exc: UnknownProviderError) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail={
+            "code": "unknown_provider",
+            "message": str(exc),
+            "supported": sorted(SUPPORTED_PROVIDERS),
+        },
+    )
+
+
 @router.get(
     "",
     response_model=SecretStatusResponse,
@@ -77,7 +113,9 @@ class SecretCreateRequest(BaseModel):
 def list_secrets() -> SecretStatusResponse:
     """Report which providers are configured without exposing the keys."""
     snapshot = configured_providers()
-    items = [SecretStatusItem(provider=p, configured=v) for p, v in snapshot.items()]
+    items = [
+        SecretStatusItem(provider=p, configured=v, source=key_source(p) if v else None) for p, v in snapshot.items()
+    ]
     return SecretStatusResponse(items=items)
 
 
@@ -95,14 +133,7 @@ def create_secret(body: SecretCreateRequest) -> None:
     try:
         set_api_key(body.provider, body.api_key)
     except UnknownProviderError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "code": "unknown_provider",
-                "message": str(exc),
-                "supported": sorted(SUPPORTED_PROVIDERS),
-            },
-        ) from exc
+        raise _unknown_provider_http(exc) from exc
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -129,11 +160,37 @@ def delete_secret(provider: str) -> None:
     try:
         delete_api_key(provider)
     except UnknownProviderError as exc:
+        raise _unknown_provider_http(exc) from exc
+
+
+@router.post(
+    "/{provider}/test",
+    response_model=SecretTestResponse,
+    summary="Probe whether a cloud-provider API key is valid.",
+    responses={
+        200: {"description": "Probe finished (valid or invalid)."},
+        400: {"description": "Unknown provider or no key to probe."},
+    },
+)
+async def test_secret(provider: str, body: SecretTestRequest | None = None) -> SecretTestResponse:
+    """Validate ``body.api_key`` or the stored key for ``provider``.
+
+    Returns ``valid: false`` with a static ``code`` on auth failure or
+    timeout — never a 401 — so the wizard can show inline copy without
+    treating a bad key as a transport error.
+    """
+    try:
+        stored = get_api_key(provider)
+    except UnknownProviderError as exc:
+        raise _unknown_provider_http(exc) from exc
+
+    candidate = body.api_key.strip() if body and body.api_key else ""
+    resolved = candidate or stored
+    if not resolved:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "code": "unknown_provider",
-                "message": str(exc),
-                "supported": sorted(SUPPORTED_PROVIDERS),
-            },
-        ) from exc
+            detail={"code": "missing_api_key", "message": "No API key provided or stored."},
+        )
+
+    result = await test_api_key(provider, resolved)
+    return SecretTestResponse(valid=result.valid, code=result.code, message=result.message)

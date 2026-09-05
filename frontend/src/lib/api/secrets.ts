@@ -17,6 +17,13 @@ export type CloudProvider = 'openai' | 'anthropic' | 'google';
 export interface SecretStatusItem {
   provider: CloudProvider;
   configured: boolean;
+  source?: 'env' | 'keyring' | null;
+}
+
+export interface SecretTestResult {
+  valid: boolean;
+  code?: string | null;
+  message?: string | null;
 }
 
 interface SecretStatusResponse {
@@ -39,5 +46,12 @@ export const liveSecretsApi = {
   /** Remove a provider's key. Idempotent — deleting a key that wasn't set still returns 204. */
   remove: async (provider: CloudProvider): Promise<void> => {
     await http<void>(`/secrets/${encodeURIComponent(provider)}`, { method: 'DELETE' });
+  },
+  /** Probe a stored (or just-pasted) key against the provider. Never returns the key. */
+  test: async (provider: CloudProvider, apiKey?: string): Promise<SecretTestResult> => {
+    return http<SecretTestResult>(`/secrets/${encodeURIComponent(provider)}/test`, {
+      method: 'POST',
+      body: JSON.stringify(apiKey ? { api_key: apiKey } : {}),
+    });
   },
 };
