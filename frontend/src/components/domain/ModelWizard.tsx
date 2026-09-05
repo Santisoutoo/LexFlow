@@ -1,30 +1,19 @@
 /**
- * Model wizard — three-step onboarding flow (#118).
+ * Model wizard — three-step onboarding flow (#118 / #28).
  *
  * Shown right after WelcomeFlow on first launch (and re-launchable from
  * Settings → Modelos). Walks the user through:
  *
- *   1. Detect hardware via `useSystemProfile` (#117). 6-line summary
- *      with re-detect button.
- *   2. Pick one of the four tiers. Pre-selects the largest that fits
- *      comfortably; every card is annotated with a fit verdict in the
- *      shared 5-status vocabulary ("Va sobrado" / "Va bien" / "Va
- *      decente" / "Justo justo" / "Demasiado pesado").
- *   3. Confirm + install. For local tiers, show the exact `ollama pull`
- *      command to run in a terminal (with copy button + auto-verify
- *      against `ollama_models` once detection is re-run). For the
- *      cloud tier, point the user at Settings → Modelos to paste their
- *      API key.
- *
- * The wizard never installs models itself in this PR — that needs an
- * SSE pull endpoint (`POST /api/v1/models/pull`), which is tracked as a
- * follow-up because it touches Ollama-CLI semantics and deserves its
- * own PR.
+ *   1. Detect hardware via `useSystemProfile` (#117).
+ *   2. Pick one of the four tiers.
+ *   3. Confirm + install. Local tiers: guided Ollama install + in-app
+ *      `ollama pull`. Cloud tier: inline ApiKeyRow + real key probe.
  *
  * --- WHERE TO CHANGE IF X CHANGES ---
  * Tier catalog + thresholds → `lib/model-tiering.ts`.
  * SPA-wide first-launch order → `main.tsx` (gate stacking).
  * Re-launch entrypoint → `pages/SettingsPage.tsx → ModelsSection`.
+ * Key probe endpoint → `lib/api/secrets.ts` + `POST /secrets/{provider}/test`.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -34,6 +23,7 @@ import { Trans, useTranslation } from 'react-i18next';
 import {
   CheckCircle2,
   Cloud,
+  Copy,
   Cpu,
   Download,
   HardDrive,
@@ -44,9 +34,10 @@ import {
 } from 'lucide-react';
 
 import { Badge, Button } from '@/components/ui';
+import { ApiKeyRow, type ApiKeyValidationState } from '@/components/domain/ApiKeyRow';
 import { Skeleton } from '@/components/domain/Skeleton';
 import { api } from '@/lib/api';
-import { liveSecretsApi } from '@/lib/api/secrets';
+import { liveSecretsApi, type SecretStatusItem } from '@/lib/api/secrets';
 import {
   FIT_LABELS,
   FIT_TONES,
@@ -67,6 +58,19 @@ import { cn } from '@/lib/utils';
 export const WIZARD_COMPLETED_STORAGE_KEY = 'lexflow.wizard-completed';
 
 type Step = 1 | 2 | 3;
+
+const OLLAMA_POLL_INTERVAL_MS = 5_000;
+const OLLAMA_POLL_MAX_MS = 5 * 60 * 1_000;
+const LINUX_INSTALL_COMMAND = 'curl -fsSL https://ollama.com/install.sh | sh';
+const ANTHROPIC_KEYS_URL = 'https://console.anthropic.com/settings/keys';
+
+function ollamaDownloadUrl(platform: string): string {
+  if (platform === 'windows') return 'https://ollama.com/download/windows';
+  if (platform === 'darwin') return 'https://ollama.com/download/mac';
+  return 'https://ollama.com/download/linux';
+}
+
+type ProfileRefetch = () => Promise<{ data?: SystemProfile | null } | void> | void;
 
 // ─── Public API ──────────────────────────────────────────────────────────
 
@@ -135,8 +139,7 @@ export function ModelWizard({
   const setDefaultModel = useUi((s) => s.setDefaultModel);
   const [step, setStep] = useState<Step>(1);
   const [selectedKey, setSelectedKey] = useState<TierKey | null>(null);
-  // #672 — for cloud tiers: true only once the Anthropic key is confirmed present.
-  const [cloudKeyReady, setCloudKeyReady] = useState(false);
+  const [cloudKeyState, setCloudKeyState] = useState<ApiKeyValidationState>('idle');
   // #27 — local tiers: true once Ollama reports the model installed.
   const [localInstallReady, setLocalInstallReady] = useState(false);
 
@@ -151,7 +154,7 @@ export function ModelWizard({
 
   useEffect(() => {
     setLocalInstallReady(false);
-    setCloudKeyReady(false);
+    setCloudKeyState('idle');
   }, [selectedKey]);
 
   const profile = profileQuery.data ?? null;
@@ -163,6 +166,7 @@ export function ModelWizard({
   const goNext = () => setStep((s) => Math.min(stepCount, s + 1) as Step);
 
   const finish = async () => {
+    const cloudKeyReady = cloudKeyState === 'valid';
     const finishBlocked =
       (selectedTier.cloud && !cloudKeyReady) || (!selectedTier.cloud && !localInstallReady);
     if (finishBlocked) return;
@@ -217,7 +221,7 @@ export function ModelWizard({
             tier={selectedTier}
             profile={profile}
             onRefetchProfile={profileQuery.refetch}
-            onCloudKeyChange={setCloudKeyReady}
+            onCloudKeyChange={setCloudKeyState}
             onLocalInstallReadyChange={setLocalInstallReady}
           />
         )}
@@ -226,7 +230,7 @@ export function ModelWizard({
           step={step}
           tier={selectedTier}
           profileReady={!!profile}
-          cloudKeyReady={cloudKeyReady}
+          cloudKeyState={cloudKeyState}
           localInstallReady={localInstallReady}
           onBack={goBack}
           onNext={goNext}
@@ -268,7 +272,7 @@ function WizardFooter({
   step,
   tier,
   profileReady,
-  cloudKeyReady,
+  cloudKeyState,
   localInstallReady,
   onBack,
   onNext,
@@ -278,8 +282,7 @@ function WizardFooter({
   step: Step;
   tier: ModelTier;
   profileReady: boolean;
-  /** #672 — true once the Anthropic key is confirmed present (cloud tiers only). */
-  cloudKeyReady: boolean;
+  cloudKeyState: ApiKeyValidationState;
   /** #27 — true once the local model is installed and ready. */
   localInstallReady: boolean;
   onBack: () => void;
@@ -290,9 +293,16 @@ function WizardFooter({
 }) {
   const { t } = useTranslation();
   const isLast = step === 3;
+  const cloudKeyReady = cloudKeyState === 'valid';
 
   const finishDisabled =
     isLast && ((tier.cloud && !cloudKeyReady) || (!tier.cloud && !localInstallReady));
+
+  const finishHint = !tier.cloud
+    ? t('wizard.finishDisabledHint')
+    : cloudKeyState === 'invalid'
+      ? t('wizard.cloudKeyInvalid')
+      : t('wizard.finishDisabledCloudKey');
 
   return (
     <div className="mt-6 flex items-center justify-between gap-3">
@@ -312,7 +322,7 @@ function WizardFooter({
       </div>
       <div className="flex flex-col items-end gap-1">
         {finishDisabled && (
-          <span className="text-[11.5px] text-muted">{t('wizard.finishDisabledHint')}</span>
+          <span className="text-[11.5px] text-muted">{finishHint}</span>
         )}
         <Button
           variant="primary"
@@ -335,7 +345,7 @@ function StepDetect({
 }: {
   profile: SystemProfile | null;
   loading: boolean;
-  onRefetch: () => void;
+  onRefetch: ProfileRefetch;
 }) {
   const { t } = useTranslation();
   if (loading || !profile) {
@@ -388,7 +398,7 @@ function StepDetect({
           <span>
             {t('wizard.redetectHint')}
           </span>
-          <Button size="sm" variant="ghost" icon={<RefreshCw className="size-3.5" />} onClick={onRefetch}>
+          <Button size="sm" variant="ghost" icon={<RefreshCw className="size-3.5" />} onClick={() => void onRefetch()}>
             {t('wizard.redetect')}
           </Button>
         </div>
@@ -514,9 +524,8 @@ function StepConfirm({
 }: {
   tier: ModelTier;
   profile: SystemProfile | null;
-  onRefetchProfile: () => void;
-  /** #672 — called whenever the Anthropic key status is (re-)checked. */
-  onCloudKeyChange: (ready: boolean) => void;
+  onRefetchProfile: ProfileRefetch;
+  onCloudKeyChange: (state: ApiKeyValidationState) => void;
   /** #27 — called when local install readiness changes. */
   onLocalInstallReadyChange: (ready: boolean) => void;
 }) {
@@ -530,6 +539,7 @@ function StepConfirm({
       tier={tier}
       isInstalled={isInstalled}
       ollamaRunning={profile?.ollamaRunning ?? false}
+      platform={profile?.platform ?? 'linux'}
       onRefetchProfile={onRefetchProfile}
       onReadyChange={onLocalInstallReadyChange}
     />
@@ -537,123 +547,274 @@ function StepConfirm({
 }
 
 /**
- * Step 3 — cloud path (#672).
+ * Step 3 — cloud path (#28).
  *
- * Checks whether the Anthropic API key is already stored in the OS keyring
- * via `GET /api/v1/secrets`. Fires `onKeyStatusChange` whenever the status
- * is (re-)fetched so the parent can gate the "Usar" button accordingly.
- *
- * The user can open Settings → Modelos in a separate tab, paste the key,
- * then press "Comprobar de nuevo" here — the check re-fetches without
- * blocking the wizard or refreshing the page.
+ * Inline ApiKeyRow + real `POST /secrets/anthropic/test`. "Usar" is
+ * gated on a *valid* probe, not merely "key configured". Returning users
+ * with a stored key get an automatic probe on mount.
  *
  * --- WHERE TO CHANGE IF X CHANGES ---
  * Secrets endpoint shape → `lib/api/secrets.ts` + `api/routers/secrets.py`.
- * Cloud provider name → `liveSecretsApi.CloudProvider` union type.
+ * Cloud provider name → Anthropic (wizard catalog `CLOUD_PROVIDER`).
  */
 function CloudKeyConfirm({
   tier,
   onKeyStatusChange,
 }: {
   tier: ModelTier;
-  onKeyStatusChange: (ready: boolean) => void;
+  onKeyStatusChange: (state: ApiKeyValidationState) => void;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [keyConfigured, setKeyConfigured] = useState<boolean | null>(null);
+  const [row, setRow] = useState<SecretStatusItem>({ provider: 'anthropic', configured: false });
+  const [validation, setValidation] = useState<ApiKeyValidationState>('idle');
 
-  const checkKey = useCallback(async () => {
-    try {
-      const items = await liveSecretsApi.list();
-      const anthropic = items.find((item) => item.provider === 'anthropic');
-      const ready = anthropic?.configured ?? false;
-      setKeyConfigured(ready);
-      onKeyStatusChange(ready);
-    } catch {
-      // If the secrets endpoint is unreachable (e.g. backend down), we
-      // stay in the "not configured" state — safe fail, don't unblock.
-      setKeyConfigured(false);
-      onKeyStatusChange(false);
-    }
-  }, [onKeyStatusChange]);
+  const refreshRow = useCallback(async (): Promise<SecretStatusItem> => {
+    const items = await liveSecretsApi.list();
+    const anthropic = items.find((item) => item.provider === 'anthropic');
+    const next = anthropic ?? { provider: 'anthropic' as const, configured: false };
+    setRow(next);
+    return next;
+  }, []);
 
   useEffect(() => {
-    void checkKey();
-  }, [checkKey]);
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const current = await refreshRow();
+        if (cancelled) return;
+        if (!current.configured) {
+          setValidation('idle');
+          onKeyStatusChange('idle');
+          return;
+        }
+        setValidation('validating');
+        onKeyStatusChange('validating');
+        const result = await liveSecretsApi.test('anthropic');
+        if (cancelled) return;
+        const next: ApiKeyValidationState = result.valid ? 'valid' : 'invalid';
+        setValidation(next);
+        onKeyStatusChange(next);
+      } catch {
+        if (cancelled) return;
+        setValidation('idle');
+        onKeyStatusChange('idle');
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [onKeyStatusChange, refreshRow]);
+
+  const handleValidationChange = (state: ApiKeyValidationState) => {
+    setValidation(state);
+    onKeyStatusChange(state);
+  };
 
   return (
     <div className="flex flex-col gap-3 text-[13.5px]">
       <p>
-        {t('wizard.cloudChosen')} <strong>{tier.title}</strong>.{' '}
-        {/* Static translator copy with one <strong> — rendered via
-            <Trans> so the markup is code-owned, not raw HTML. */}
-        <Trans i18nKey="wizard.cloudKeyInstructions" components={{ strong: <strong /> }} />
+        {t('wizard.cloudChosen')} <strong>{tier.title}</strong>. {t('wizard.cloudKeyInstructions')}
       </p>
       <p className="text-muted">
-        {t('wizard.cloudCreateKey')}
+        <Trans
+          i18nKey="wizard.cloudCreateKey"
+          components={{
+            link: (
+              <a
+                href={ANTHROPIC_KEYS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-indigo-600 underline underline-offset-2 dark:text-indigo-300"
+              />
+            ),
+          }}
+        />
       </p>
 
-      {/* Key status indicator — drives the parent's "Usar" button gate. */}
-      {keyConfigured === null && (
+      {validation === 'validating' && (
         <div className="flex items-center gap-2 rounded-md border border-border bg-surface p-3 text-[12.5px] text-muted">
           <RefreshCw className="size-3.5 animate-spin" />
           <span>{t('wizard.cloudKeyRefresh')}…</span>
         </div>
       )}
-      {keyConfigured === true && (
+      {validation === 'valid' && (
         <div className="flex items-center gap-2 rounded-md border border-success/30 bg-success-soft p-3">
           <CheckCircle2 className="size-4 text-success" />
           <span className="text-success font-medium">{t('wizard.cloudKeyReady')}</span>
         </div>
       )}
-      {keyConfigured === false && (
-        <div className="flex items-center justify-between gap-3 rounded-md border border-amber-300/60 bg-amber-soft p-3 text-[12.5px] text-amber-700 dark:text-amber-300">
-          <span>{t('wizard.cloudKeyNotSet')}</span>
-          <Button size="sm" variant="ghost" icon={<RefreshCw className="size-3.5" />} onClick={() => void checkKey()}>
-            {t('wizard.cloudKeyRefresh')}
-          </Button>
+      {validation === 'invalid' && (
+        <div className="rounded-md border border-amber-300/60 bg-amber-soft p-3 text-[12.5px] text-amber-700 dark:text-amber-300">
+          {t('wizard.cloudKeyInvalid')}
         </div>
       )}
+      {validation === 'idle' && (
+        <p className="text-[12.5px] text-muted">{t('wizard.cloudKeyNotSet')}</p>
+      )}
 
-      <Button
-        size="sm"
-        variant="secondary"
+      <ApiKeyRow
+        row={row}
+        onChange={async () => {
+          await refreshRow();
+        }}
+        onValidationChange={handleValidationChange}
+        validateOnSave
+        compact
+        showProviderLabel={false}
+      />
+
+      <button
+        type="button"
         onClick={() => navigate('/settings')}
-        className="self-start"
+        className="self-start text-[12px] text-muted underline underline-offset-2 hover:text-fg"
       >
         {t('wizard.openSettings')}
+      </button>
+    </div>
+  );
+}
+
+function ollamaRunningFromRefetch(result: unknown): boolean | undefined {
+  if (!result || typeof result !== 'object') return undefined;
+  if ('data' in result) {
+    const data = (result as { data?: { ollamaRunning?: boolean } }).data;
+    if (data && typeof data.ollamaRunning === 'boolean') return data.ollamaRunning;
+  }
+  if ('ollamaRunning' in result && typeof (result as { ollamaRunning?: unknown }).ollamaRunning === 'boolean') {
+    return (result as { ollamaRunning: boolean }).ollamaRunning;
+  }
+  return undefined;
+}
+
+/**
+ * Guided Ollama install when the daemon is not running. Polls
+ * `GET /system/profile` locally (never via `useSystemProfile`'s timer)
+ * every 5 s for up to 5 min.
+ */
+function OllamaSetupGuide({
+  platform,
+  ollamaRunning,
+  onRefetchProfile,
+  onDetected,
+}: {
+  platform: string;
+  ollamaRunning: boolean;
+  onRefetchProfile: ProfileRefetch;
+  onDetected: () => void;
+}) {
+  const { t } = useTranslation();
+  const [timedOut, setTimedOut] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const isLinux = platform === 'linux';
+  const downloadUrl = ollamaDownloadUrl(platform);
+
+  useEffect(() => {
+    if (ollamaRunning) {
+      onDetected();
+      return;
+    }
+    let cancelled = false;
+    let intervalId = 0;
+    const started = Date.now();
+    const tick = async () => {
+      if (cancelled) return;
+      if (Date.now() - started >= OLLAMA_POLL_MAX_MS) {
+        setTimedOut(true);
+        window.clearInterval(intervalId);
+        return;
+      }
+      const result = await onRefetchProfile();
+      if (cancelled) return;
+      if (ollamaRunningFromRefetch(result)) onDetected();
+    };
+    void tick();
+    intervalId = window.setInterval(() => {
+      void tick();
+    }, OLLAMA_POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [ollamaRunning, onDetected, onRefetchProfile]);
+
+  const copyLinuxCommand = async () => {
+    try {
+      await navigator.clipboard.writeText(LINUX_INSTALL_COMMAND);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-3 text-[13.5px]">
+      <div className="rounded-md border border-amber-300/60 bg-amber-soft p-3 text-amber-700 dark:text-amber-300">
+        <div className="font-semibold">{t('wizard.ollamaInstallTitle')}</div>
+        <p className="mt-1">{t('wizard.ollamaInstallBody')}</p>
+      </div>
+      {isLinux ? (
+        <div className="rounded-md border border-border bg-surface p-3">
+          <p className="mb-2 text-[12.5px] text-muted">{t('wizard.ollamaLinuxHint')}</p>
+          <pre className="overflow-x-auto rounded bg-surface-2 px-2.5 py-2 font-mono text-[12px]">{LINUX_INSTALL_COMMAND}</pre>
+          <Button size="sm" variant="ghost" icon={<Copy className="size-3.5" />} onClick={() => void copyLinuxCommand()} className="mt-2">
+            {copied ? t('wizard.copied') : t('wizard.copyCommand')}
+          </Button>
+        </div>
+      ) : (
+        <Button
+          variant="secondary"
+          icon={<Download className="size-3.5" />}
+          onClick={() => window.open(downloadUrl, '_blank', 'noopener,noreferrer')}
+          className="self-start"
+        >
+          {t('wizard.ollamaDownload')}
+        </Button>
+      )}
+      {timedOut ? (
+        <p className="text-[12.5px] text-muted">{t('wizard.ollamaPollTimeout')}</p>
+      ) : (
+        <div className="flex items-center gap-2 text-[12.5px] text-muted">
+          <RefreshCw className="size-3.5 animate-spin" />
+          <span>{t('wizard.ollamaPolling')}</span>
+        </div>
+      )}
+      <Button
+        size="sm"
+        variant="ghost"
+        icon={<RefreshCw className="size-3.5" />}
+        onClick={async () => {
+          const result = await onRefetchProfile();
+          if (ollamaRunningFromRefetch(result)) onDetected();
+        }}
+        className="self-start"
+      >
+        {t('wizard.redetect')}
       </Button>
     </div>
   );
 }
 
 /**
- * Step 3 — in-app Ollama install (#119).
+ * Step 3 — in-app Ollama install (#119 / #28).
  *
- * Three local states:
- *   - `idle`: model not yet detected; "Instalar" button kicks the pull.
- *   - `pulling`: streaming progress from `api.models.pull(tier.model)`.
- *     Renders a real bar (completed / total bytes) so the user can see the
- *     download breathe instead of staring at a spinner.
- *   - `done` / `error`: terminal. `done` re-fetches the system profile so
- *     ``ollamaModels`` reflects the new tag. `error` shows the structured
- *     code+message and offers retry.
- *
- * Pre-installed shortcut: if the user already pulled the model (or installed
- * it elsewhere), the `isInstalled` prop is true on mount and we skip the
- * whole pull flow — they only need the "Listo" button at the bottom.
+ * When Ollama is not running, `OllamaSetupGuide` polls until it is.
+ * Then the existing pull flow (idle → pulling → done/error) takes over.
  */
 function OllamaInstall({
   tier,
   isInstalled,
   ollamaRunning,
+  platform,
   onRefetchProfile,
   onReadyChange,
 }: {
   tier: ModelTier;
   isInstalled: boolean;
   ollamaRunning: boolean;
-  onRefetchProfile: () => void;
+  platform: string;
+  onRefetchProfile: ProfileRefetch;
   onReadyChange: (ready: boolean) => void;
 }) {
   const { t } = useTranslation();
@@ -664,6 +825,12 @@ function OllamaInstall({
     | { phase: 'error'; code: string; message: string };
 
   const [state, setState] = useState<PullState>(isInstalled ? { phase: 'done' } : { phase: 'idle' });
+  const [detected, setDetected] = useState(ollamaRunning);
+  const markDetected = useCallback(() => setDetected(true), []);
+
+  useEffect(() => {
+    setDetected(ollamaRunning);
+  }, [ollamaRunning]);
 
   useEffect(() => {
     onReadyChange(state.phase === 'done');
@@ -682,7 +849,7 @@ function OllamaInstall({
           });
         } else if (event.type === 'done') {
           setState({ phase: 'done' });
-          onRefetchProfile();
+          void onRefetchProfile();
           toast({ tone: 'success', title: t('wizard.installedToast'), message: tier.model });
           return;
         } else {
@@ -748,27 +915,35 @@ function OllamaInstall({
     );
   }
 
-  // idle
+  if (!detected) {
+    return (
+      <OllamaSetupGuide
+        platform={platform}
+        ollamaRunning={ollamaRunning}
+        onRefetchProfile={onRefetchProfile}
+        onDetected={markDetected}
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col gap-3 text-[13.5px]">
+      <div className="flex items-center gap-2 rounded-md border border-success/30 bg-success-soft p-3">
+        <CheckCircle2 className="size-4 text-success" />
+        <span className="text-success font-medium">{t('wizard.ollamaDetected')}</span>
+      </div>
       <p>
         {t('wizard.downloadIntroPre')} <strong>{tier.model}</strong> {t('wizard.downloadIntroPost', { size: tier.sizeGb })}
       </p>
-      {!ollamaRunning && (
-        <div className="rounded-md border border-amber-300/60 bg-amber-soft p-3 text-amber-700 dark:text-amber-300">
-          {t('wizard.ollamaNotRunning')}
-        </div>
-      )}
       <div className="flex items-center gap-2.5">
         <Button
           variant="primary"
           icon={<Download className="size-3.5" />}
           onClick={() => void startPull()}
-          disabled={!ollamaRunning}
         >
           {t('wizard.install')}
         </Button>
-        <Button size="sm" variant="ghost" icon={<RefreshCw className="size-3.5" />} onClick={onRefetchProfile}>
+        <Button size="sm" variant="ghost" icon={<RefreshCw className="size-3.5" />} onClick={() => void onRefetchProfile()}>
           {t('wizard.redetect')}
         </Button>
       </div>
