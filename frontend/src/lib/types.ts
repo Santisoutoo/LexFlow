@@ -279,11 +279,13 @@ export interface GraphGlobalFilters {
 
 /**
  * Global-graph payload — same shape as the subgraph response plus
- * `totalAvailable`, the number of nodes that matched the filters
- * BEFORE the limit truncated. Useful for "showing N of M laws".
+ * truncation metadata so the SPA can render "showing N of M laws".
  */
 export interface GraphGlobalResult extends GraphData {
   totalAvailable: number;
+  truncated: boolean;
+  limitApplied: number | null;
+  returnedCount: number;
 }
 export type GraphTopMetric = 'pagerank';
 

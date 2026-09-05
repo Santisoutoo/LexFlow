@@ -100,6 +100,19 @@ def test_get_subgraph_caps_hub_neighbourhood() -> None:
     assert sub.number_of_nodes() == 5  # seed + 4 neighbours, capped
 
 
+def test_get_subgraph_cap_prefers_pagerank() -> None:
+    graph = LegalGraph()
+    for nid, title in [("SEED", "Ley 1/2000"), ("HI_PR", "Ley 2/2000"), ("HI_DEG", "Ley 3/2000")]:
+        _law(graph, nid, title)
+    graph.add_reference("SEED", "HI_PR")
+    graph.add_reference("SEED", "HI_DEG")
+    graph.add_reference("HI_DEG", "SEED")  # extra degree for HI_DEG
+    graph.graph.nodes["HI_PR"]["pagerank"] = 0.9
+    graph.graph.nodes["HI_DEG"]["pagerank"] = 0.1
+    sub = graph.get_subgraph("SEED", depth=1, max_nodes=2)
+    assert set(sub.nodes) == {"SEED", "HI_PR"}
+
+
 def test_get_subgraph_cap_keeps_highest_degree() -> None:
     graph = LegalGraph()
     for nid, title in [("SEED", "Ley 1/2000"), ("HI", "Ley 2/2000"), ("LO", "Ley 3/2000"), ("X", "Ley 4/2000")]:

@@ -104,6 +104,19 @@ class TestPath:
         )
         assert response.status_code == 404
 
+    def test_returns_shortest_path_between_connected_laws(
+        self,
+        client: TestClient,
+        graph_from_fixture: LegalGraph,
+    ) -> None:
+        ids = list(graph_from_fixture.graph.nodes)
+        assert len(ids) >= 2
+        source, target = ids[0], ids[1]
+        graph_from_fixture.add_reference(source, target)
+        response = client.get("/api/v1/graph/path", params={"from": source, "to": target})
+        assert response.status_code == 200
+        assert response.json()["path"] == [source, target]
+
 
 class TestStats:
     def test_returns_node_edge_density(self, client: TestClient, graph_from_fixture: LegalGraph) -> None:

@@ -20,6 +20,7 @@ from lexflow.core.models import Law
 # leading citation are matched by the exact same rule (no drift, #569).
 from lexflow.core.parser import _LAW_REF_RE
 from lexflow.core.registry import LawRegistry
+from lexflow.graph.algorithms import enrich_graph_analytics
 from lexflow.graph.model import LegalGraph
 
 logger = logging.getLogger(__name__)
@@ -82,6 +83,7 @@ def build_graph(registry: LawRegistry) -> LegalGraph:
             added_edges += _add_law_edges(graph, law_id, law, citation_index)
         except (OSError, ValueError, LexFlowError):
             logger.warning("Could not process references for %s", law_id, exc_info=True)
+    enrich_graph_analytics(graph)
     logger.info("Graph built: %d nodes, %d edges", graph.node_count(), added_edges)
     return graph
 
@@ -102,6 +104,9 @@ def apply_diff_to_graph(graph: LegalGraph, registry: LawRegistry, diff: CorpusDi
     for law_id in diff.added:
         _upsert_law(graph, registry, law_id, citation_index)
         _resolve_incoming(graph, law_id)
+    # Full recompute is cheaper than partial invalidation at ~12k nodes
+    # and keeps disk-cache attrs consistent with the patched topology.
+    enrich_graph_analytics(graph)
 
 
 def _add_law_edges(graph: LegalGraph, law_id: str, law: Law, citation_index: dict[str, str]) -> int:

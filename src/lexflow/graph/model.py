@@ -173,11 +173,11 @@ class LegalGraph:
     def get_subgraph(self, law_id: str, depth: int = 1, max_nodes: int = MAX_SUBGRAPH_NODES) -> nx.DiGraph:
         """Return ego-subgraph around law_id within depth hops, capped at max_nodes.
 
-        When a hop would exceed *max_nodes*, only the highest-degree candidates
-        are kept (the connected backbone), so a hub law yields a renderable,
-        most-relevant neighbourhood instead of a hairball. Expansion continues
-        only from the kept nodes. ``ponytail: degree-ranked; switch to PageRank
-        if/when it's persisted on nodes (it's computed per-request today).``
+        When a hop would exceed *max_nodes*, only the highest-PageRank
+        candidates are kept (degree as tiebreaker), so a hub law yields a
+        renderable, most-relevant neighbourhood instead of a hairball.
+        Expansion continues only from the kept nodes. Missing ``pagerank``
+        attrs (pre-v5 cache) sort as 0.0 and fall through to degree.
         """
         nodes = {law_id}
         frontier = {law_id}
@@ -191,11 +191,20 @@ class LegalGraph:
                 candidates.update(self._g.predecessors(node))
             candidates -= nodes
             if len(candidates) > room:
-                ranked = sorted(candidates, key=self._g.degree, reverse=True)
+                ranked = sorted(candidates, key=self._ponytail_rank, reverse=True)
                 candidates = set(ranked[:room])
             nodes.update(candidates)
             frontier = candidates
         return self._g.subgraph(nodes).copy()
+
+    def _ponytail_rank(self, node_id: str) -> tuple[float, int]:
+        """PageRank first, degree second — used when ego-expansion overflows."""
+        raw = self._g.nodes[node_id].get("pagerank", 0.0)
+        try:
+            score = float(raw)
+        except (TypeError, ValueError):
+            score = 0.0
+        return (score, int(self._g.degree(node_id)))
 
     def node_count(self) -> int:
         return int(self._g.number_of_nodes())

@@ -211,14 +211,25 @@ export const mockApi: ApiClient = {
     },
     async global(filters = {}) {
       await delay(180);
-      // Mock has no real metadata to filter on; we honour `limit`
-      // and report the canned graph's node count as `totalAvailable`
-      // so the SPA can exercise the "showing N of M" rendering path.
+      // Mock has no real metadata to filter on; honour `limit` and pretend
+      // the canned neighbourhood is a slice of a 12k-law corpus so the
+      // truncation banner has something to show in mock / e2e.
       const limit = filters.limit;
       const nodes = limit != null ? GRAPH.nodes.slice(0, limit) : GRAPH.nodes;
       const keep = new Set(nodes.map((n) => n.id));
       const edges = GRAPH.edges.filter((e) => keep.has(e.source) && keep.has(e.target));
-      return { nodes, edges, totalAvailable: GRAPH.nodes.length };
+      // Pretend the canned neighbourhood is a slice of a 12k-law corpus so
+      // the truncation banner has something to show in mock / e2e.
+      const totalAvailable = 12_000;
+      const returnedCount = nodes.length;
+      return {
+        nodes,
+        edges,
+        totalAvailable,
+        truncated: returnedCount < totalAvailable,
+        limitApplied: limit ?? null,
+        returnedCount,
+      };
     },
     async neighbors(id) {
       await delay(120);

@@ -50,6 +50,12 @@ export interface GraphCanvasProps {
   onSelect: (id: string) => void;
   /** When set, nodes outside this set are dimmed (search / advanced filters). */
   matchNodeIds?: Set<string> | null;
+  /** Path overlay — node ids to keep bright. */
+  highlightNodeIds?: ReadonlySet<string> | null;
+  /** Path overlay — directed `source\\ttarget` keys from `edgeKey()`. */
+  highlightEdgeKeys?: ReadonlySet<string> | null;
+  /** Level-of-detail profile; global hides labels/edges until zoomed in. */
+  lodProfile?: 'local' | 'global';
   className?: string;
 }
 
@@ -91,6 +97,10 @@ const BASE_RADIUS: Record<GraphNodeKind, number> = {
 };
 
 const LABEL_ZOOM = 1.3;
+const LABEL_ZOOM_GLOBAL = 2.4;
+const EDGE_ZOOM_GLOBAL = 0.8;
+const EDGE_DIM_GLOBAL_ALPHA = 0.15;
+const LINK_LABEL_EDGE_CAP = 400;
 const DIM_ALPHA = 0.18;
 const HIGHLIGHT_DIM_ALPHA = 0.12;
 
@@ -119,8 +129,27 @@ function resolveCanvasBackground(): string {
   return value ? `hsl(${value})` : '#0f1117';
 }
 
+/** Directed edge key — keep in sync with `pages/graph/graph-path-utils.edgeKey`. */
+function directedEdgeKey(source: string, target: string): string {
+  return `${source}\t${target}`;
+}
+
+function endpointId(end: string | FGNode): string {
+  return typeof end === 'object' ? end.id : end;
+}
+
 export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(function GraphCanvas(
-  { data, visibleKinds, selected, onSelect, matchNodeIds, className },
+  {
+    data,
+    visibleKinds,
+    selected,
+    onSelect,
+    matchNodeIds,
+    highlightNodeIds,
+    highlightEdgeKeys,
+    lodProfile = 'local',
+    className,
+  },
   ref,
 ) {
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -306,12 +335,14 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
     (node: FGNode): number => {
       let alpha = isVisible(node.kind) ? 1 : DIM_ALPHA;
       if (matchNodeIds && !matchNodeIds.has(node.id)) alpha = Math.min(alpha, DIM_ALPHA);
-      if (highlightNeighbourhood && !highlightNeighbourhood.has(node.id)) {
+      if (highlightNodeIds && highlightNodeIds.size > 0) {
+        alpha = highlightNodeIds.has(node.id) ? Math.max(alpha, 1) : Math.min(alpha, HIGHLIGHT_DIM_ALPHA);
+      } else if (highlightNeighbourhood && !highlightNeighbourhood.has(node.id)) {
         alpha = Math.min(alpha, HIGHLIGHT_DIM_ALPHA);
       }
       return alpha;
     },
-    [isVisible, matchNodeIds, highlightNeighbourhood],
+    [isVisible, matchNodeIds, highlightNeighbourhood, highlightNodeIds],
   );
 
   const nodeLabel = useCallback((n: FGNode) => {
@@ -323,6 +354,7 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
 
   const linkLabel = useCallback(
     (l: FGLink) => {
+      if (lodProfile === 'global' && graphData.links.length > LINK_LABEL_EDGE_CAP) return '';
       const link = l as FGLink;
       const source = typeof link.source === 'object' ? link.source : graphData.byId.get(link.source);
       const target = typeof link.target === 'object' ? link.target : graphData.byId.get(link.target);
@@ -330,11 +362,11 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
       if (!source || !target) return kind;
       return `${kind}\n${source.label} → ${target.label}`;
     },
-    [graphData.byId],
+    [graphData.byId, graphData.links.length, lodProfile],
   );
 
   return (
-    <div ref={wrapperRef} className={cn('size-full', className)}>
+    <div ref={wrapperRef} className={cn('size-full', className)} data-testid="graph-canvas">
       {size.w > 0 && size.h > 0 && (
         <ForceGraph2D
           key={theme}
@@ -343,8 +375,8 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
           height={size.h}
           graphData={graphData}
           backgroundColor="rgba(0,0,0,0)"
-          warmupTicks={reduced ? 150 : 0}
-          cooldownTicks={reduced ? 0 : 200}
+          warmupTicks={reduced ? 150 : lodProfile === 'global' ? 40 : 0}
+          cooldownTicks={reduced ? 0 : lodProfile === 'global' ? 80 : 200}
           d3AlphaMin={0.02}
           onEngineStop={() => {
             if (!userZoomedRef.current) fitView(400);
@@ -353,7 +385,7 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
             if (!suppressZoomRef.current && hasFitRef.current) userZoomedRef.current = true;
           }}
           enableNodeDrag={false}
-          minZoom={0.4}
+          minZoom={lodProfile === 'global' ? 0.15 : 0.4}
           maxZoom={6}
           nodeRelSize={1}
           onNodeClick={(n) => onSelect((n as FGNode).id)}
@@ -376,26 +408,44 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
               (s != null && !isVisible(s.kind)) ||
               (t != null && !isVisible(t.kind)) ||
               (matchNodeIds != null && s != null && t != null && (!matchNodeIds.has(s.id) || !matchNodeIds.has(t.id)));
+            const onPath =
+              highlightEdgeKeys != null &&
+              highlightEdgeKeys.size > 0 &&
+              highlightEdgeKeys.has(directedEdgeKey(endpointId(link.source), endpointId(link.target)));
             const inHighlight =
+              !onPath &&
+              highlightEdgeKeys == null &&
               highlightNeighbourhood != null &&
               s != null &&
               t != null &&
               highlightNeighbourhood.has(s.id) &&
               highlightNeighbourhood.has(t.id);
             const base = link.kind ? GRAPH_EDGE_STROKE[link.kind] : 'hsl(220 9% 50%)';
+            if (onPath) return withAlpha(base, 0.95);
             if (inHighlight) return withAlpha(base, 0.85);
+            const scale = fgRef.current?.zoom() ?? 1;
+            if (lodProfile === 'global' && scale < EDGE_ZOOM_GLOBAL) {
+              return withAlpha(base, EDGE_DIM_GLOBAL_ALPHA);
+            }
             return withAlpha(base, dim ? 0.06 : 0.5);
           }}
           linkWidth={(l) => {
             const link = l as FGLink;
             const s = resolve(link.source);
             const t = resolve(link.target);
+            const onPath =
+              highlightEdgeKeys != null &&
+              highlightEdgeKeys.size > 0 &&
+              highlightEdgeKeys.has(directedEdgeKey(endpointId(link.source), endpointId(link.target)));
             const inHighlight =
+              !onPath &&
+              highlightEdgeKeys == null &&
               highlightNeighbourhood != null &&
               s != null &&
               t != null &&
               highlightNeighbourhood.has(s.id) &&
               highlightNeighbourhood.has(t.id);
+            if (onPath) return 2.5;
             return inHighlight ? 2 : 1;
           }}
           nodeCanvasObjectMode={() => 'replace'}
@@ -412,7 +462,11 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
 
             paintNode(ctx, { x, y, radius: r, kind: node.kind, fill, scale, selected: isSel });
 
-            if (isVisible(node.kind) && (isSel || scale > LABEL_ZOOM)) {
+            const labelZoom = lodProfile === 'global' ? LABEL_ZOOM_GLOBAL : LABEL_ZOOM;
+            const showLabel =
+              isVisible(node.kind) &&
+              (isSel || node.id === hoveredId || (highlightNodeIds?.has(node.id) ?? false) || scale > labelZoom);
+            if (showLabel) {
               const fontSize = 12 / scale;
               ctx.font = `${fontSize}px Inter, system-ui, sans-serif`;
               ctx.textAlign = 'center';

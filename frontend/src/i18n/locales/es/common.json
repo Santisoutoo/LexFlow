@@ -651,13 +651,35 @@
       "trySuggestions": "Prueba con una de las más conectadas del corpus:"
     },
     "filterDimHint": "Los tipos desactivados se atenúan en el canvas; no se ocultan.",
+    "showingNofM": "Mostrando {{n}} de {{m}} normas",
+    "view": {
+      "local": "Local",
+      "global": "Global"
+    },
+    "budget": {
+      "label": "Nodos"
+    },
+    "path": {
+      "title": "Camino",
+      "from": "Origen",
+      "to": "Destino",
+      "fromPlaceholder": "BOE-A-… origen",
+      "toPlaceholder": "BOE-A-… destino",
+      "find": "Buscar camino",
+      "searching": "Buscando…",
+      "notFound": "No hay camino dirigido entre esas normas.",
+      "outsideView": "El camino incluye normas fuera de la vista actual. Cambia a global o sube el presupuesto."
+    },
     "legend": {
       "clusters": "Grupos",
       "cluster": "Grupo {{id}}",
       "nodeKinds": "Tipos de nodo"
     },
     "filters": {
-      "subgraphHint": "Filtros locales sobre el subgrafo actual. Ámbito y jurisdicción requieren la vista global."
+      "subgraphHint": "Filtros locales sobre el subgrafo actual. Ámbito y jurisdicción requieren la vista global.",
+      "globalHint": "Filtros enviados al corpus. Un valor por dimensión llega al servidor; varios se aplican en el cliente.",
+      "scope": "Ámbito",
+      "jurisdiction": "Jurisdicción"
     },
     "rail": {
       "rank": "Rango",
