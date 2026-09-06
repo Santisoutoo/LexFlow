@@ -27,7 +27,7 @@ from lexflow.core.enums import (
     Scope,
 )
 from lexflow.core.exceptions import ParserError
-from lexflow.core.models import Article, Disposicion, Law, LawMetadata, Reference, Section
+from lexflow.core.models import Article, ArticleBodyBlock, Disposicion, Law, LawMetadata, Reference, Section
 
 logger = logging.getLogger(__name__)
 
@@ -443,12 +443,96 @@ def _extract_article_text(raw: str) -> str:
     return "\n".join(lines).strip()
 
 
+# Audit #409 perf + #31: hoisted line-start markers for ``split_article_blocks``.
+# Only line-initial matches — inline refs like ``artículo 2.1.b)`` must not split.
+_APARTADO_LINE_RE = re.compile(r"^(\d+)\.\s")
+_LETRA_LINE_RE = re.compile(r"^([a-z])\)\s")
+_SUBITEM_LINE_RE = re.compile(r"^(\d+)\)\s")
+
+
+def split_article_blocks(text: str) -> list[ArticleBodyBlock]:
+    """Split article body text into apartados, letras and paragraphs (#31).
+
+    Returns a flat ordered list with ``depth`` — not a nested tree. When no
+    structural markers are found, falls back to blank-line paragraph splits.
+    """
+    stripped = text.strip()
+    if not stripped:
+        return []
+
+    blocks: list[ArticleBodyBlock] = []
+    current_lines: list[str] = []
+    current_marker: str | None = None
+    current_depth = 0
+    has_structural_marker = False
+
+    def flush() -> None:
+        nonlocal current_lines, current_marker, current_depth
+        body = "\n".join(current_lines).strip()
+        if body:
+            blocks.append(ArticleBodyBlock(marker=current_marker, depth=current_depth, text=body))
+        current_lines = []
+        current_marker = None
+        current_depth = 0
+
+    for line in text.split("\n"):
+        if line.strip().startswith("|") and (current_lines or blocks):
+            current_lines.append(line)
+            continue
+
+        apartado = _APARTADO_LINE_RE.match(line)
+        letra = _LETRA_LINE_RE.match(line)
+        subitem = _SUBITEM_LINE_RE.match(line)
+
+        if apartado:
+            has_structural_marker = True
+            flush()
+            current_marker = apartado.group(1)
+            current_depth = 0
+            remainder = line[apartado.end() :].strip()
+            if remainder:
+                current_lines.append(remainder)
+        elif letra:
+            has_structural_marker = True
+            flush()
+            current_marker = letra.group(1)
+            current_depth = 1
+            remainder = line[letra.end() :].strip()
+            if remainder:
+                current_lines.append(remainder)
+        elif subitem:
+            has_structural_marker = True
+            flush()
+            current_marker = subitem.group(1)
+            current_depth = 2
+            remainder = line[subitem.end() :].strip()
+            if remainder:
+                current_lines.append(remainder)
+        elif not line.strip():
+            if current_lines and current_lines[-1] != "":
+                current_lines.append("")
+        else:
+            current_lines.append(line)
+
+    flush()
+
+    if not has_structural_marker:
+        paragraphs = [p.strip() for p in re.split(r"\n\s*\n", stripped) if p.strip()]
+        if len(paragraphs) > 1:
+            return [ArticleBodyBlock(marker=None, depth=0, text=p) for p in paragraphs]
+        return [ArticleBodyBlock(marker=None, depth=0, text=stripped)]
+
+    return blocks
+
+
 def _build_article(number: str, title: str | None, text: str, references: list[Reference]) -> Article:
     """Construct an :class:`Article` instance from parsed components."""
+    blocks = split_article_blocks(text)
     return Article(
         number=number,
         title=title,
         text=text,
+        blocks=blocks,
         references=references,
     )
 
@@ -634,12 +718,14 @@ def _build_disposicion(
     references: list[Reference],
 ) -> Disposicion:
     """Construct a :class:`Disposicion` instance from parsed components."""
+    blocks = split_article_blocks(text)
     return Disposicion(
         heading=heading,
         kind=DisposicionKind(kind),
         number=number,
         title=title,
         text=text,
+        blocks=blocks,
         references=references,
     )
 

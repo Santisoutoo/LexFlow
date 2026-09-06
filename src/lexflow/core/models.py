@@ -54,6 +54,31 @@ class Reference(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class ArticleBodyBlock(BaseModel):
+    """One legally meaningful block within an article body (#31).
+
+    Flat ordered list with ``depth`` — not a nested tree. ``marker`` holds
+    the raw label (``"1"``, ``"a"``); the UI adds punctuation (``.`` / ``)``).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    marker: str | None = Field(
+        None,
+        description='Block label without punctuation ("1", "a"); None for plain paragraphs.',
+    )
+    depth: int = Field(
+        0,
+        ge=0,
+        le=2,
+        description="0 = apartado/paragraph, 1 = letra, 2 = parenthesised sub-item.",
+    )
+    text: str = Field(
+        ...,
+        description="Prose for this block only; may still contain inline Markdown.",
+    )
+
+
 # Audit #409 perf: pre-lower the prefixes once at module scope so
 # ``Article.normalize_number`` doesn't call ``.lower()`` per article.
 _ARTICLE_PREFIXES_LOWER: tuple[tuple[str, str], ...] = (
@@ -78,6 +103,10 @@ class Article(BaseModel):
     text: str = Field(
         ...,
         description="Full text content of the article.",
+    )
+    blocks: list[ArticleBodyBlock] = Field(
+        default_factory=list,
+        description="Structured view of the body (apartados / letras / párrafos).",
     )
     references: list[Reference] = Field(
         default_factory=list,
@@ -178,6 +207,10 @@ class Disposicion(BaseModel):
     text: str = Field(
         ...,
         description="Full text content of the disposition.",
+    )
+    blocks: list[ArticleBodyBlock] = Field(
+        default_factory=list,
+        description="Structured view of the body (same splitter as articles).",
     )
     references: list[Reference] = Field(
         default_factory=list,

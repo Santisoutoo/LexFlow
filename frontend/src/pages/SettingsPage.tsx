@@ -779,6 +779,8 @@ function AppearanceSection() {
   const setDensity = useUi((s) => s.setDensity);
   const readingSize = useUi((s) => s.readingSize);
   const setReadingSize = useUi((s) => s.setReadingSize);
+  const readingSerif = useUi((s) => s.readingSerif);
+  const setReadingSerif = useUi((s) => s.setReadingSerif);
   return (
     <>
       <h1 className="font-display text-[22px] font-semibold">{t('settings.appearance.title')}</h1>
@@ -815,6 +817,15 @@ function AppearanceSection() {
         <input type="range" min={14} max={22} step={1} value={readingSize} onChange={(e) => setReadingSize(Number(e.target.value))} className="w-64" />
         <span className="font-mono text-[13px]">{readingSize}px</span>
       </div>
+
+      <label className="mt-4 flex items-center gap-2 text-[13.5px]">
+        <input
+          type="checkbox"
+          checked={readingSerif}
+          onChange={(e) => setReadingSerif(e.target.checked)}
+        />
+        {t('settings.appearance.readingSerifLabel')}
+      </label>
     </>
   );
 }

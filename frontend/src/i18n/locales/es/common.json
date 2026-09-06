@@ -307,7 +307,14 @@
     "selectCitation": "Selecciona una cita en el texto (superíndices) para ver la norma citada y su contexto.",
     "relatedRefs": "Referencias relacionadas",
     "refsHeading": "{{n}} referencias salientes",
-    "refsEmpty": "Esta norma no tiene referencias salientes registradas."
+    "refsEmpty": "Esta norma no tiene referencias salientes registradas.",
+    "disposiciones": "Disposiciones",
+    "reading": {
+      "decrease": "Reducir tamaño de lectura",
+      "increase": "Aumentar tamaño de lectura",
+      "serif": "Serif",
+      "serifToggle": "Alternar tipografía serif de lectura"
+    }
   },
   "diff": {
     "loading": "Cargando diff…",
@@ -523,7 +530,8 @@
       "densityCompact": "Compacto",
       "densityComfortable": "Cómodo",
       "densityCozy": "Amplio",
-      "readingSizeLabel": "Tamaño de lectura (página de norma)"
+      "readingSizeLabel": "Tamaño de lectura (página de norma)",
+      "readingSerifLabel": "Tipografía serif de lectura (página de norma)"
     },
     "data": {
       "title": "Datos",

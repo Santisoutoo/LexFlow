@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Plus, X, GitCompareArrows, ExternalLink } from 'lucide-react';
+import { Plus, X, GitCompareArrows, ExternalLink, Minus, Type } from 'lucide-react';
 import { LawHeader } from '@/components/domain/LawHeader';
 import { ArticleBlock } from '@/components/domain/ArticleBlock';
+import { DisposicionBlock } from '@/components/domain/DisposicionBlock';
 import { GraphCanvasLazy } from '@/components/domain/GraphCanvasLazy';
 import { VersionTimeline } from '@/components/domain/VersionTimeline';
 import { ErrorState } from '@/components/domain/ErrorState';
@@ -30,6 +31,9 @@ export function LawDetailPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const readingSize = useUi((s) => s.readingSize);
+  const setReadingSize = useUi((s) => s.setReadingSize);
+  const readingSerif = useUi((s) => s.readingSerif);
+  const setReadingSerif = useUi((s) => s.setReadingSerif);
   const [tab, setTab] = useState<Tab>('texto');
   const [selectedRef, setSelectedRef] = useState<ArticleRef | null>(null);
 
@@ -59,6 +63,8 @@ export function LawDetailPage() {
   // `useLaw` resolves. Memoised so the dependent `lawRefs` memo only
   // recomputes when the underlying array actually changes.
   const articles = useMemo<Article[]>(() => law?.articles ?? [], [law]);
+  const disposiciones = useMemo(() => law?.disposiciones ?? [], [law]);
+  const handleRefClick = useCallback((ref: ArticleRef) => setSelectedRef(ref), []);
   // Audit #469 — refs/grafo tabs used to show "tab pending" stubs even
   // though the backend has exposed both surfaces for sprints. Flatten
   // every outgoing reference from the embedded articles for the refs
@@ -111,7 +117,18 @@ export function LawDetailPage() {
           />
         </div>
 
-        {tab === 'texto' && <TextoTab articles={articles} readingSize={readingSize} onRefClick={setSelectedRef} />}
+        {tab === 'texto' && (
+          <TextoTab
+            articles={articles}
+            disposiciones={disposiciones}
+            readingSize={readingSize}
+            readingSerif={readingSerif}
+            onDecreaseSize={() => setReadingSize(readingSize - 1)}
+            onIncreaseSize={() => setReadingSize(readingSize + 1)}
+            onToggleSerif={() => setReadingSerif(!readingSerif)}
+            onRefClick={handleRefClick}
+          />
+        )}
         {tab === 'versiones' && (
           <div className="flex-1 overflow-auto p-8 scrollbar-thin">
             <VersionTimeline versions={versions} current={versions[versions.length - 1]?.tag} />
@@ -248,7 +265,26 @@ function LawDetailGraphTab({
   );
 }
 
-function TextoTab({ articles, readingSize, onRefClick }: { articles: Article[]; readingSize: number; onRefClick: (r: ArticleRef) => void }) {
+function TextoTab({
+  articles,
+  disposiciones,
+  readingSize,
+  readingSerif,
+  onDecreaseSize,
+  onIncreaseSize,
+  onToggleSerif,
+  onRefClick,
+}: {
+  articles: Article[];
+  disposiciones: LawDetail['disposiciones'];
+  readingSize: number;
+  readingSerif: boolean;
+  onDecreaseSize: () => void;
+  onIncreaseSize: () => void;
+  onToggleSerif: () => void;
+  onRefClick: (r: ArticleRef) => void;
+}) {
+  const { t } = useTranslation();
   // Audit #409: the page used to render a hardcoded "Modificada por LO
   // 3/2018" callout AND a hardcoded "Título I · Capítulo II" heading
   // for every law. Both were copy from the CE-1978 mock and lied for
@@ -259,9 +295,65 @@ function TextoTab({ articles, readingSize, onRefClick }: { articles: Article[]; 
   return (
     <div className="flex-1 overflow-auto scrollbar-thin">
       <div className="reading-col px-5 md:px-8 py-9">
-        {articles.map((a) => (
-          <ArticleBlock key={a.id} article={a} size={readingSize} onCitationClick={onRefClick} />
-        ))}
+        <div className="mb-6 flex items-center justify-end gap-2 max-w-measure">
+          <button
+            type="button"
+            onClick={onDecreaseSize}
+            disabled={readingSize <= 14}
+            className="inline-flex size-8 items-center justify-center rounded-md border border-border text-muted hover:bg-surface-2 disabled:opacity-40"
+            aria-label={t('lawDetail.reading.decrease')}
+          >
+            <Minus className="size-3.5" />
+          </button>
+          <span className="font-mono text-[12px] text-muted" aria-hidden="true">A</span>
+          <button
+            type="button"
+            onClick={onIncreaseSize}
+            disabled={readingSize >= 22}
+            className="inline-flex size-8 items-center justify-center rounded-md border border-border text-muted hover:bg-surface-2 disabled:opacity-40"
+            aria-label={t('lawDetail.reading.increase')}
+          >
+            <Plus className="size-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onToggleSerif}
+            className={cn(
+              'inline-flex h-8 items-center gap-1 rounded-md border px-2 text-[12px]',
+              readingSerif ? 'border-indigo-400 bg-primary-soft text-indigo-700' : 'border-border text-muted hover:bg-surface-2',
+            )}
+            aria-pressed={readingSerif}
+            aria-label={t('lawDetail.reading.serifToggle')}
+          >
+            <Type className="size-3.5" />
+            {t('lawDetail.reading.serif')}
+          </button>
+        </div>
+        <div className="max-w-measure">
+          {articles.map((a) => (
+            <ArticleBlock
+              key={a.id}
+              article={a}
+              size={readingSize}
+              serif={readingSerif}
+              onCitationClick={onRefClick}
+            />
+          ))}
+          {disposiciones.length > 0 && (
+            <section className="mt-12 border-t border-border pt-8">
+              <h2 className="mb-6 font-display text-lg font-semibold">{t('lawDetail.disposiciones')}</h2>
+              {disposiciones.map((d, i) => (
+                <DisposicionBlock
+                  key={`${d.kind}-${d.number ?? i}`}
+                  disposicion={d}
+                  size={readingSize}
+                  serif={readingSerif}
+                  onCitationClick={onRefClick}
+                />
+              ))}
+            </section>
+          )}
+        </div>
       </div>
     </div>
   );

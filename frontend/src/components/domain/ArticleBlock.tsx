@@ -1,14 +1,31 @@
 import { memo } from 'react';
 import { cn } from '@/lib/utils';
 import { LawMarkdown } from '@/components/domain/LawMarkdown';
-import type { Article, ArticleRef } from '@/lib/types';
+import type { Article, ArticleClause, ArticleRef } from '@/lib/types';
 
 export interface ArticleBlockProps {
   article: Article;
   /** Override the reading font-size from a parent (sync'd to the Tweaks slider). */
   size?: number;
+  /** Optional serif reading face. */
+  serif?: boolean;
   /** Called when a footnote reference is clicked. */
   onCitationClick?: (ref: ArticleRef) => void;
+}
+
+function clauseIndent(depth: number | undefined): string {
+  if (depth === 1) return 'ml-6';
+  if (depth === 2) return 'ml-10';
+  return 'ml-0';
+}
+
+function formatMarker(marker: string, depth: number | undefined): string {
+  if ((depth ?? 0) >= 1) return `${marker})`;
+  return `${marker}.`;
+}
+
+function clauseKey(clause: ArticleClause, index: number): string {
+  return `${clause.marker ?? 'p'}-${clause.depth ?? 0}-${index}`;
 }
 
 /**
@@ -21,7 +38,7 @@ export interface ArticleBlockProps {
  * stable ``onCitationClick`` (e.g. ``useCallback``) to preserve the
  * memoisation across renders.
  */
-function ArticleBlockImpl({ article, size = 16, onCitationClick }: ArticleBlockProps) {
+function ArticleBlockImpl({ article, size = 16, serif = false, onCitationClick }: ArticleBlockProps) {
   return (
     <article id={`art-${article.num}`} className="relative mb-9">
       <div className="absolute left-[-80px] top-1 hidden w-[4.5rem] pl-1 text-right md:block">
@@ -29,17 +46,25 @@ function ArticleBlockImpl({ article, size = 16, onCitationClick }: ArticleBlockP
           Art. {article.num}
         </div>
       </div>
-      <h3 className="mb-2.5 font-display text-[17px] font-semibold">{article.titulo}</h3>
+      {article.titulo ? (
+        <h3 className="mb-2.5 font-display text-[17px] font-semibold">{article.titulo}</h3>
+      ) : null}
       {article.body.map((clause, i) => (
         // <div> (not <p>): clause.text is Markdown that may render block
         // elements (headings, GFM tables) which are invalid inside <p> (#591).
         <div
-          key={i}
-          className="mb-3 text-pretty leading-relaxed"
+          key={clauseKey(clause, i)}
+          className={cn(
+            'mb-3 text-pretty leading-relaxed',
+            clauseIndent(clause.depth),
+            serif && 'font-serif',
+          )}
           style={{ fontSize: size, lineHeight: 1.7 }}
         >
-          {clause.marker && <span className="font-semibold mr-1">{clause.marker}.</span>}
-          <LawMarkdown>{clause.text}</LawMarkdown>{' '}
+          {clause.marker ? (
+            <span className="font-semibold mr-1">{formatMarker(clause.marker, clause.depth)}</span>
+          ) : null}
+          <LawMarkdown>{clause.text}</LawMarkdown>
           {clause.citations.map((c, ci) => (
             <CitationSup key={ci} index={ci + 1} ref_={c} onClick={() => onCitationClick?.(c)} />
           ))}

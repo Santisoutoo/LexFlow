@@ -7,11 +7,8 @@
  * `react-markdown` + `remark-gfm` with a theme-token component map so the
  * text reads like a document.
  *
- * Inline-flow note: the default `p` is mapped to a `<span>` so a clause's
- * marker + inline citation superscripts (rendered by `ArticleBlock` around
- * this) stay on the same line as the prose. Block constructs (headings,
- * tables, lists) still render as proper blocks — which is why the caller
- * must wrap this in a `<div>`, not a `<p>` (block-in-`<p>` is invalid HTML).
+ * Clause markers and citation superscripts are rendered by `ArticleBlock`
+ * outside this component, so paragraphs render as proper block `<p>` elements.
  *
  * --- WHERE TO CHANGE IF X CHANGES ---
  * * Element styling → the `COMPONENTS` map below (theme tokens only).
@@ -26,8 +23,7 @@ function Heading({ children }: { children?: ReactNode }) {
 }
 
 const COMPONENTS: Components = {
-  // Keep prose inline so the clause marker + citation sups flow with it.
-  p: ({ children }) => <span>{children}</span>,
+  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
   h1: Heading,
   h2: Heading,
   h3: Heading,
@@ -35,7 +31,9 @@ const COMPONENTS: Components = {
   h5: Heading,
   h6: Heading,
   ul: ({ children }) => <ul className="my-2 ml-5 list-disc space-y-1">{children}</ul>,
-  ol: ({ children }) => <ol className="my-2 ml-5 list-decimal space-y-1">{children}</ol>,
+  ol: ({ children, start }) => (
+    <ol start={start} className="my-2 ml-5 list-decimal space-y-1">{children}</ol>
+  ),
   li: ({ children }) => <li className="leading-relaxed">{children}</li>,
   blockquote: ({ children }) => (
     <blockquote className="my-2 border-l-2 border-border-strong pl-3 text-muted">{children}</blockquote>

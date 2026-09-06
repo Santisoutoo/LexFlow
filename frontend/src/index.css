@@ -130,7 +130,7 @@
 
   /* Reading column for law detail */
   .reading-col {
-    max-width: 1200px;
+    max-width: 70ch;
     margin: 0 auto;
   }
 

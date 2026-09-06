@@ -15,7 +15,9 @@
 
 import type {
   BackendArticle,
+  BackendArticleBodyBlock,
   BackendDiffStats,
+  BackendDisposicion,
   BackendLawDetail,
   BackendLawDiff,
   BackendLawSummary,
@@ -26,9 +28,11 @@ import type {
 import type {
   Ambito,
   Article,
+  ArticleClause,
   ArticleDiff,
   ArticleRef,
   DiffResult,
+  Disposicion,
   HierarchyNode,
   Law,
   LawDetail,
@@ -154,6 +158,7 @@ export function transformLawDetail(raw: BackendLawDetail): LawDetail {
   const m = raw.metadata;
   const hierarchy = (raw.sections ?? []).map((s, i) => sectionToHierarchy(s, `root-${i}`));
   const articles = (raw.articles ?? []).map((a) => transformArticle(m.identifier, a));
+  const disposiciones = (raw.disposiciones ?? []).map((d) => transformDisposicion(m.identifier, d));
   return {
     id: m.identifier,
     boe: m.identifier,
@@ -171,6 +176,7 @@ export function transformLawDetail(raw: BackendLawDetail): LawDetail {
     tags: m.tags ?? [],
     hierarchy,
     articles,
+    disposiciones,
   };
 }
 
@@ -182,17 +188,44 @@ export function transformReference(ref: BackendReference): ArticleRef {
   };
 }
 
+function transformBodyBlocks(
+  blocks: BackendArticleBodyBlock[] | undefined,
+  fallbackText: string,
+  refs: ArticleRef[],
+): ArticleClause[] {
+  if (blocks && blocks.length > 0) {
+    return blocks.map((block, index) => ({
+      marker: block.marker ?? null,
+      text: block.text,
+      depth: block.depth ?? 0,
+      // Per-clause citation handles are a follow-up; article-level refs on first clause.
+      citations: index === 0 ? refs : [],
+    }));
+  }
+  return [{ marker: null, text: fallbackText, depth: 0, citations: refs }];
+}
+
 export function transformArticle(lawId: string, raw: BackendArticle): Article {
-  // The backend returns articles as a single text blob. We render it as one
-  // unmarked clause for now — proper paragraph + (a) (b) (c) splitting and
-  // inline citation handles are tracked separately (see follow-up issue).
   const refs = (raw.references ?? []).map(transformReference);
   return {
     id: `${lawId}::${raw.number}`,
     lawId,
     num: raw.number,
     titulo: raw.title ?? '',
-    body: [{ marker: null, text: raw.text, citations: refs }],
+    body: transformBodyBlocks(raw.blocks, raw.text, refs),
+    refs,
+  };
+}
+
+export function transformDisposicion(lawId: string, raw: BackendDisposicion): Disposicion {
+  const refs = (raw.references ?? []).map(transformReference);
+  return {
+    heading: raw.heading,
+    kind: raw.kind,
+    number: raw.number ?? null,
+    title: raw.title ?? null,
+    text: raw.text,
+    body: transformBodyBlocks(raw.blocks, raw.text, refs),
     refs,
   };
 }

@@ -124,6 +124,8 @@ export interface LawDetail extends Law {
    * articles can read this directly instead of issuing an extra request.
    */
   articles: Article[];
+  /** Closing disposiciones (adicional / transitoria / derogatoria / final). */
+  disposiciones: Disposicion[];
 }
 
 export interface HierarchyNode {
@@ -152,11 +154,23 @@ export interface Article {
 }
 
 export interface ArticleClause {
-  /** "1", "2", "a)", null if the article has no internal numbering. */
+  /** "1", "2", "a", null if the article has no internal numbering. */
   marker: string | null;
   text: string;
+  /** 0 = apartado/paragraph, 1 = letra, 2 = parenthesised sub-item. */
+  depth?: number;
   /** Inline citation handles — render as superscripts that open the right rail. */
   citations: ArticleRef[];
+}
+
+export interface Disposicion {
+  heading: string;
+  kind: 'adicional' | 'transitoria' | 'derogatoria' | 'final';
+  number: string | null;
+  title: string | null;
+  text: string;
+  body: ArticleClause[];
+  refs: ArticleRef[];
 }
 
 export interface ArticleRef {

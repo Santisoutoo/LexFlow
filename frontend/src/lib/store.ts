@@ -63,6 +63,10 @@ interface UiState {
   readingSize: number;
   setReadingSize(n: number): void;
 
+  /** Serif reading face on the Law detail page. */
+  readingSerif: boolean;
+  setReadingSerif(on: boolean): void;
+
   /** Command palette open. */
   paletteOpen: boolean;
   setPaletteOpen(open: boolean): void;
@@ -134,6 +138,9 @@ export const useUi = create<UiState>()(
       readingSize: 16,
       setReadingSize: (n) => set({ readingSize: Math.min(22, Math.max(14, n)) }),
 
+      readingSerif: false,
+      setReadingSerif: (on) => set({ readingSerif: on }),
+
       paletteOpen: false,
       setPaletteOpen: (open) => set({ paletteOpen: open }),
       togglePalette: () => set((s) => ({ paletteOpen: !s.paletteOpen })),
@@ -168,6 +175,7 @@ export const useUi = create<UiState>()(
         rightWidth: s.rightWidth,
         density: s.density,
         readingSize: s.readingSize,
+        readingSerif: s.readingSerif,
         defaultModel: s.defaultModel,
         telemetryConsent: s.telemetryConsent,
       }),

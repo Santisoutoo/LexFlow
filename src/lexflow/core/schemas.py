@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, computed_field
 
 from lexflow.core.corpus_drift import CorpusDriftReport
 from lexflow.core.enums import LawRank, LawStatus, Scope
-from lexflow.core.models import Article, LawMetadata, Reference, Section
+from lexflow.core.models import Article, Disposicion, LawMetadata, Reference, Section
 
 T = TypeVar("T")
 
@@ -87,6 +87,7 @@ class LawDetail(BaseModel):
     metadata: LawMetadata
     sections: list[Section]
     articles: list[Article]
+    disposiciones: list[Disposicion] = Field(default_factory=list)
     references: list[Reference]
     article_count: int
 

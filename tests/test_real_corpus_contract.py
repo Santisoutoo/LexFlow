@@ -162,6 +162,15 @@ class TestTitledArticleContract:
         assert article["number"] == "1"
         assert article["title"] == "Objeto de la Ley"
 
+    def test_article_4_has_multiple_blocks(self, real_registry: LawRegistry) -> None:
+        """#31 AC: apartados and nested letras split into structured blocks."""
+        law = real_registry.get_law(LPAC_ID)
+        article_4 = next(a for a in law.articles if a.number == "4")
+        assert len(article_4.blocks) > 1
+        markers = [b.marker for b in article_4.blocks if b.marker is not None]
+        assert "1" in markers
+        assert "a" in markers
+
 
 class TestLpacDisposicionesContract:
     """#106 regression: Ley 39/2015's 15 derogatoria refs were mis-attributed
@@ -172,6 +181,13 @@ class TestLpacDisposicionesContract:
     def test_disposiciones_parsed_non_empty(self, real_registry: LawRegistry) -> None:
         law = real_registry.get_law(LPAC_ID)
         assert len(law.disposiciones) == 22
+
+    def test_law_detail_exposes_disposiciones(self, real_client: TestClient) -> None:
+        """#31 AC: disposiciones surface on the law-detail API."""
+        response = real_client.get(f"/api/v1/laws/{LPAC_ID}")
+        assert response.status_code == 200
+        body = response.json()
+        assert len(body["disposiciones"]) == 22
 
     def test_last_article_body_has_no_disposicion_derived_references(self, real_registry: LawRegistry) -> None:
         law = real_registry.get_law(LPAC_ID)
