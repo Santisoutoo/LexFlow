@@ -26,13 +26,9 @@ function clauseKey(clause: ArticleClause, index: number): string {
 }
 
 function DisposicionBlockImpl({ disposicion, size = 16, serif = false, onCitationClick }: DisposicionBlockProps) {
-  const heading = disposicion.title
-    ? `${disposicion.heading} ${disposicion.title}`
-    : disposicion.heading;
-
   return (
     <article className="relative mb-9">
-      <h3 className="mb-2.5 font-display text-[17px] font-semibold">{heading}</h3>
+      <h3 className="mb-2.5 font-display text-[17px] font-semibold">{disposicion.heading}</h3>
       {disposicion.body.map((clause, i) => (
         <div
           key={clauseKey(clause, i)}
