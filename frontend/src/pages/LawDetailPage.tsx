@@ -1,10 +1,12 @@
-import { useCallback, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Plus, X, GitCompareArrows, ExternalLink, Minus, Type } from 'lucide-react';
 import { LawHeader } from '@/components/domain/LawHeader';
-import { ArticleBlock } from '@/components/domain/ArticleBlock';
-import { DisposicionBlock } from '@/components/domain/DisposicionBlock';
+import { EmptyState } from '@/components/domain/EmptyState';
+import { LawToc } from '@/components/domain/LawToc';
+import { ReadingItemRenderer } from '@/components/domain/ReadingItemRenderer';
 import { GraphCanvasLazy } from '@/components/domain/GraphCanvasLazy';
 import { VersionTimeline } from '@/components/domain/VersionTimeline';
 import { ErrorState } from '@/components/domain/ErrorState';
@@ -14,7 +16,13 @@ import { RightRail } from '@/components/shell/RightRail';
 import { useAddUserTag, useGraph, useLaw, useRemoveUserTag, useUserTags, useVersions } from '@/lib/queries';
 import { useUi } from '@/lib/store';
 import { formatDate, cn } from '@/lib/utils';
-import type { Article, ArticleRef, GraphData, GraphNodeKind, LawDetail } from '@/lib/types';
+import {
+  buildReadingItems,
+  flattenToc,
+  parseArticleHash,
+  VIRTUALIZE_THRESHOLD,
+} from '@/lib/law-reading';
+import type { Article, ArticleRef, GraphData, GraphNodeKind, HierarchyNode, LawDetail } from '@/lib/types';
 import { RelatedLaws } from './RelatedLaws';
 
 const VERSION_KIND_BADGE: Record<'publish' | 'default', string> = {
@@ -29,6 +37,7 @@ type Tab = 'texto' | 'versiones' | 'grafo' | 'refs' | 'disc';
 export function LawDetailPage() {
   const { lawId } = useParams<{ lawId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useTranslation();
   const readingSize = useUi((s) => s.readingSize);
   const setReadingSize = useUi((s) => s.setReadingSize);
@@ -36,6 +45,12 @@ export function LawDetailPage() {
   const setReadingSerif = useUi((s) => s.setReadingSerif);
   const [tab, setTab] = useState<Tab>('texto');
   const [selectedRef, setSelectedRef] = useState<ArticleRef | null>(null);
+
+  useEffect(() => {
+    if (parseArticleHash(location.hash)) {
+      setTab('texto');
+    }
+  }, [location.hash]);
 
   const { data: law, isLoading, error, refetch } = useLaw(lawId);
   const { data: versions = [] } = useVersions(lawId);
@@ -119,8 +134,11 @@ export function LawDetailPage() {
 
         {tab === 'texto' && (
           <TextoTab
+            hierarchy={law.hierarchy}
             articles={articles}
             disposiciones={disposiciones}
+            rawText={law.rawText}
+            sectionsOnly={law.articulos === 0 && articles.length === 0}
             readingSize={readingSize}
             readingSerif={readingSerif}
             onDecreaseSize={() => setReadingSize(readingSize - 1)}
@@ -266,8 +284,11 @@ function LawDetailGraphTab({
 }
 
 function TextoTab({
+  hierarchy,
   articles,
   disposiciones,
+  rawText,
+  sectionsOnly,
   readingSize,
   readingSerif,
   onDecreaseSize,
@@ -275,8 +296,11 @@ function TextoTab({
   onToggleSerif,
   onRefClick,
 }: {
+  hierarchy: HierarchyNode[];
   articles: Article[];
   disposiciones: LawDetail['disposiciones'];
+  rawText?: string;
+  sectionsOnly: boolean;
   readingSize: number;
   readingSerif: boolean;
   onDecreaseSize: () => void;
@@ -285,73 +309,196 @@ function TextoTab({
   onRefClick: (r: ArticleRef) => void;
 }) {
   const { t } = useTranslation();
-  // Audit #409: the page used to render a hardcoded "Modificada por LO
-  // 3/2018" callout AND a hardcoded "Título I · Capítulo II" heading
-  // for every law. Both were copy from the CE-1978 mock and lied for
-  // any other law. The real "modificada por" callout needs the diff
-  // metadata wired through (issue #427 follow-up); the hierarchy
-  // heading needs the section tree drilled in from ``law.sections``.
-  // Until those land, dropping the lies is the right call.
+  const location = useLocation();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [activeTocId, setActiveTocId] = useState<string | undefined>();
+  const [highlightedArticleNum, setHighlightedArticleNum] = useState<string | null>(null);
+
+  const readingItems = useMemo(
+    () => buildReadingItems({ hierarchy, articles, disposiciones, rawText }),
+    [hierarchy, articles, disposiciones, rawText],
+  );
+  const tocItems = useMemo(() => flattenToc(hierarchy), [hierarchy]);
+  const isVirtualized = readingItems.length > VIRTUALIZE_THRESHOLD;
+
+  const virtualizer = useVirtualizer({
+    count: readingItems.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 200,
+    overscan: 5,
+  });
+
+  const scrollToTarget = useCallback(
+    (targetId: string) => {
+      const scrollEl = scrollRef.current;
+      if (!scrollEl) return;
+
+      if (targetId.startsWith('art-')) {
+        const num = targetId.slice('art-'.length);
+        const index = readingItems.findIndex(
+          (item) => item.kind === 'article' && item.article.num === num,
+        );
+        if (index < 0) return;
+
+        if (isVirtualized) {
+          virtualizer.scrollToIndex(index, { align: 'start' });
+        } else {
+          scrollEl.querySelector<HTMLElement>(`#${CSS.escape(targetId)}`)?.scrollIntoView({ block: 'start' });
+        }
+        setHighlightedArticleNum(num);
+        return;
+      }
+
+      if (isVirtualized) {
+        const index = readingItems.findIndex(
+          (item) => item.kind === 'section' && item.targetId === targetId,
+        );
+        if (index >= 0) {
+          virtualizer.scrollToIndex(index, { align: 'start' });
+        }
+      } else {
+        scrollEl.querySelector<HTMLElement>(`#${CSS.escape(targetId)}`)?.scrollIntoView({ block: 'start' });
+      }
+      setActiveTocId(targetId);
+    },
+    [isVirtualized, readingItems, virtualizer],
+  );
+
+  useEffect(() => {
+    const articleNum = parseArticleHash(location.hash);
+    if (!articleNum) return;
+
+    const timer = window.setTimeout(() => {
+      scrollToTarget(`art-${articleNum}`);
+    }, 50);
+    return () => window.clearTimeout(timer);
+  }, [location.hash, readingItems, isVirtualized, scrollToTarget]);
+
+  useEffect(() => {
+    if (!highlightedArticleNum) return;
+    const timer = window.setTimeout(() => setHighlightedArticleNum(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [highlightedArticleNum]);
+
+  useEffect(() => {
+    const scrollEl = scrollRef.current;
+    if (!scrollEl || typeof IntersectionObserver === 'undefined') return;
+
+    const anchors = scrollEl.querySelectorAll<HTMLElement>('[id^="art-"], [id^="section-"]');
+    if (!anchors.length) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        const top = visible[0]?.target.id;
+        if (top) setActiveTocId(top);
+      },
+      { root: scrollEl, rootMargin: '-20% 0px -70% 0px', threshold: 0 },
+    );
+
+    anchors.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, [readingItems, isVirtualized]);
+
+  const renderItem = (index: number) => {
+    const item = readingItems[index];
+    if (!item) return null;
+    return (
+      <ReadingItemRenderer
+        item={item}
+        index={index}
+        readingSize={readingSize}
+        readingSerif={readingSerif}
+        highlightedArticleNum={highlightedArticleNum}
+        onRefClick={onRefClick}
+      />
+    );
+  };
+
   return (
-    <div className="flex-1 overflow-auto scrollbar-thin">
-      <div className="reading-col px-5 md:px-8 py-9">
-        <div className="mb-6 flex items-center justify-end gap-2 max-w-measure">
-          <button
-            type="button"
-            onClick={onDecreaseSize}
-            disabled={readingSize <= 14}
-            className="inline-flex size-8 items-center justify-center rounded-md border border-border text-muted hover:bg-surface-2 disabled:opacity-40"
-            aria-label={t('lawDetail.reading.decrease')}
-          >
-            <Minus className="size-3.5" />
-          </button>
-          <span className="font-mono text-[12px] text-muted" aria-hidden="true">A</span>
-          <button
-            type="button"
-            onClick={onIncreaseSize}
-            disabled={readingSize >= 22}
-            className="inline-flex size-8 items-center justify-center rounded-md border border-border text-muted hover:bg-surface-2 disabled:opacity-40"
-            aria-label={t('lawDetail.reading.increase')}
-          >
-            <Plus className="size-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={onToggleSerif}
-            className={cn(
-              'inline-flex h-8 items-center gap-1 rounded-md border px-2 text-[12px]',
-              readingSerif ? 'border-indigo-400 bg-primary-soft text-indigo-700' : 'border-border text-muted hover:bg-surface-2',
-            )}
-            aria-pressed={readingSerif}
-            aria-label={t('lawDetail.reading.serifToggle')}
-          >
-            <Type className="size-3.5" />
-            {t('lawDetail.reading.serif')}
-          </button>
-        </div>
-        <div className="max-w-measure">
-          {articles.map((a) => (
-            <ArticleBlock
-              key={a.id}
-              article={a}
-              size={readingSize}
-              serif={readingSerif}
-              onCitationClick={onRefClick}
+    <div className="flex min-h-0 flex-1">
+      <LawToc items={tocItems} activeId={activeTocId} onNavigate={scrollToTarget} />
+      <div ref={scrollRef} className="flex-1 overflow-auto scrollbar-thin">
+        <div className="reading-col px-5 md:px-8 py-9">
+          <div className="mb-6 flex items-center justify-end gap-2 max-w-measure">
+            <button
+              type="button"
+              onClick={onDecreaseSize}
+              disabled={readingSize <= 14}
+              className="inline-flex size-8 items-center justify-center rounded-md border border-border text-muted hover:bg-surface-2 disabled:opacity-40"
+              aria-label={t('lawDetail.reading.decrease')}
+            >
+              <Minus className="size-3.5" />
+            </button>
+            <span className="font-mono text-[12px] text-muted" aria-hidden="true">A</span>
+            <button
+              type="button"
+              onClick={onIncreaseSize}
+              disabled={readingSize >= 22}
+              className="inline-flex size-8 items-center justify-center rounded-md border border-border text-muted hover:bg-surface-2 disabled:opacity-40"
+              aria-label={t('lawDetail.reading.increase')}
+            >
+              <Plus className="size-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={onToggleSerif}
+              className={cn(
+                'inline-flex h-8 items-center gap-1 rounded-md border px-2 text-[12px]',
+                readingSerif ? 'border-indigo-400 bg-primary-soft text-indigo-700' : 'border-border text-muted hover:bg-surface-2',
+              )}
+              aria-pressed={readingSerif}
+              aria-label={t('lawDetail.reading.serifToggle')}
+            >
+              <Type className="size-3.5" />
+              {t('lawDetail.reading.serif')}
+            </button>
+          </div>
+
+          {sectionsOnly && readingItems.length > 0 && (
+            <p className="mb-4 max-w-measure text-[12px] text-muted">{t('lawDetail.empty.sectionsOnly')}</p>
+          )}
+
+          {readingItems.length === 0 ? (
+            <EmptyState
+              className="max-w-measure"
+              title={t('lawDetail.empty.noContent.title')}
+              description={t('lawDetail.empty.noContent.description')}
             />
-          ))}
-          {disposiciones.length > 0 && (
-            <section className="mt-12 border-t border-border pt-8">
-              <h2 className="mb-6 font-display text-lg font-semibold">{t('lawDetail.disposiciones')}</h2>
-              {disposiciones.map((d, i) => (
-                <DisposicionBlock
-                  key={`${d.kind}-${d.number ?? i}`}
-                  disposicion={d}
-                  size={readingSize}
-                  serif={readingSerif}
-                  onCitationClick={onRefClick}
-                />
-              ))}
-            </section>
+          ) : (
+            <div className="max-w-measure">
+              {isVirtualized ? (
+                <div style={{ height: virtualizer.getTotalSize(), position: 'relative', width: '100%' }}>
+                  {virtualizer.getVirtualItems().map((virtualRow) => (
+                    <div
+                      key={virtualRow.key}
+                      data-index={virtualRow.index}
+                      ref={virtualizer.measureElement}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                    >
+                      <ReadingItemRenderer
+                        item={readingItems[virtualRow.index]}
+                        index={virtualRow.index}
+                        readingSize={readingSize}
+                        readingSerif={readingSerif}
+                        highlightedArticleNum={highlightedArticleNum}
+                        onRefClick={onRefClick}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                readingItems.map((_, index) => renderItem(index))
+              )}
+            </div>
           )}
         </div>
       </div>

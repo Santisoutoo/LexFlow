@@ -314,6 +314,18 @@
       "increase": "Increase reading size",
       "serif": "Serif",
       "serifToggle": "Toggle serif reading face"
+    },
+    "toc": {
+      "label": "Table of contents",
+      "heading": "Contents",
+      "empty": "No hierarchy available for this law."
+    },
+    "empty": {
+      "noContent": {
+        "title": "No readable content yet",
+        "description": "This law has no parseable articles or sections in the corpus. It is not a loading error — the source may still be pending processing."
+      },
+      "sectionsOnly": "This law has no numbered articles; showing section text only."
     }
   },
   "diff": {

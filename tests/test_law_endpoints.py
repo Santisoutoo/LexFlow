@@ -70,3 +70,8 @@ class TestGetLaw:
         body = client.get("/api/v1/laws/BOE-A-2000-323").json()
         assert "disposiciones" in body
         assert isinstance(body["disposiciones"], list)
+
+    def test_includes_raw_text(self, client: TestClient, mock_registry: LawRegistry) -> None:
+        body = client.get("/api/v1/laws/BOE-A-2000-323").json()
+        assert "raw_text" in body
+        assert isinstance(body["raw_text"], str)

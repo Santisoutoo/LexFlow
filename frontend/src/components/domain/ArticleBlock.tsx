@@ -9,6 +9,8 @@ export interface ArticleBlockProps {
   size?: number;
   /** Optional serif reading face. */
   serif?: boolean;
+  /** Temporary highlight for deep-link navigation from search. */
+  highlighted?: boolean;
   /** Called when a footnote reference is clicked. */
   onCitationClick?: (ref: ArticleRef) => void;
 }
@@ -38,9 +40,15 @@ function clauseKey(clause: ArticleClause, index: number): string {
  * stable ``onCitationClick`` (e.g. ``useCallback``) to preserve the
  * memoisation across renders.
  */
-function ArticleBlockImpl({ article, size = 16, serif = false, onCitationClick }: ArticleBlockProps) {
+function ArticleBlockImpl({ article, size = 16, serif = false, highlighted = false, onCitationClick }: ArticleBlockProps) {
   return (
-    <article id={`art-${article.num}`} className="relative mb-9">
+    <article
+      id={`art-${article.num}`}
+      className={cn(
+        'relative mb-9 scroll-mt-6 rounded-lg transition-colors duration-300',
+        highlighted && 'ring-2 ring-amber-400/80 bg-amber-200/30 dark:bg-amber-400/15',
+      )}
+    >
       <div className="absolute left-[-80px] top-1 hidden w-[4.5rem] pl-1 text-right md:block">
         <div className="whitespace-nowrap font-mono text-[13px] font-semibold text-amber-700 dark:text-amber-400">
           Art. {article.num}

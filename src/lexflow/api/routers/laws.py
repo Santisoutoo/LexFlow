@@ -71,6 +71,7 @@ def get_law(
         disposiciones=law.disposiciones,
         references=law.references,
         article_count=law.article_count,
+        raw_text=law.raw_text,
     )
 
 

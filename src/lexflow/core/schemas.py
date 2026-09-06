@@ -90,6 +90,7 @@ class LawDetail(BaseModel):
     disposiciones: list[Disposicion] = Field(default_factory=list)
     references: list[Reference]
     article_count: int
+    raw_text: str = Field("", description="Full markdown body without frontmatter.")
 
 
 class LawReferencesResponse(BaseModel):

@@ -13,12 +13,13 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { BackendLawDiff, BackendLawSummary, BackendLawVersion } from '../../api';
+import type { BackendLawDiff, BackendLawDetail, BackendLawSummary, BackendLawVersion } from '../../api';
 import {
   listLawsQuery,
   transformArticle,
   transformDiff,
   transformLaw,
+  transformLawDetail,
   transformVersion,
 } from './transformers';
 
@@ -303,20 +304,43 @@ describe('transformArticle', () => {
   });
 });
 
-describe('transformArticle', () => {
-  it('maps backend blocks to multi-element body clauses', () => {
-    const article = transformArticle('BOE-A-2015-10565', {
-      number: '4',
-      title: 'Concepto de interesado',
-      text: '1. First.\n\na) Letter one.',
-      blocks: [
-        { marker: '1', depth: 0, text: 'First.' },
-        { marker: 'a', depth: 1, text: 'Letter one.' },
-      ],
-      references: [],
-    });
-    expect(article.body).toHaveLength(2);
-    expect(article.body[0]).toMatchObject({ marker: '1', depth: 0, text: 'First.' });
-    expect(article.body[1]).toMatchObject({ marker: 'a', depth: 1, text: 'Letter one.' });
+describe('transformLawDetail', () => {
+  const detailRaw: BackendLawDetail = {
+    metadata: {
+      identifier: 'BOE-A-1962-14073',
+      title: 'Anexo test',
+      status: 'in_force',
+      rank: 'ley',
+      scope: 'Estatal',
+      jurisdiction: null,
+      publication_date: '1962-01-01',
+      tags: [],
+      consolidation_status: 'unknown',
+      country: 'ES',
+    },
+    sections: [
+      {
+        level: 1,
+        heading: 'ANEXO',
+        text: 'Table prose here',
+        subsections: [],
+        articles: [],
+      },
+    ],
+    articles: [],
+    disposiciones: [],
+    references: [],
+    article_count: 0,
+    raw_text: 'Full raw fallback',
+  };
+
+  it('preserves section text in hierarchy nodes', () => {
+    const law = transformLawDetail(detailRaw);
+    expect(law.hierarchy[0].text).toBe('Table prose here');
+  });
+
+  it('maps raw_text to rawText', () => {
+    const law = transformLawDetail(detailRaw);
+    expect(law.rawText).toBe('Full raw fallback');
   });
 });
