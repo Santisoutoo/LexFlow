@@ -9,7 +9,6 @@ const page = await ctx.newPage();
 await page.addInitScript(() => {
   // Skip welcome/onboarding/tour but LEAVE the wizard so its gate shows it.
   localStorage.setItem('lexflow.welcomed', 'true');
-  localStorage.setItem('lexflow.onboarded', '1');
   localStorage.setItem('lexflow.tutorial-completed', 'true');
 });
 await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' });

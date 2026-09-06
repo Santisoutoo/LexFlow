@@ -7,7 +7,7 @@
  * tests then exercise the real navigation surface, not the onboarding.
  *
  * Bootstrap keys mirror the constants from
- * `src/components/domain/{WelcomeFlow,ModelWizard,TutorialTour}.tsx`.
+ * `src/components/domain/{WelcomeFlow,ModelWizard,TutorialTour,onboarding-storage}.tsx`.
  * Keep in sync if those modules rename their flags.
  */
 
@@ -22,7 +22,6 @@ async function seedOnboardingFlags(context: import('@playwright/test').BrowserCo
   await context.addInitScript(() => {
     try {
       localStorage.setItem('lexflow.welcomed', 'true');
-      localStorage.setItem('lexflow.onboarded', '1');
       localStorage.setItem('lexflow.wizard-completed', 'true');
       localStorage.setItem('lexflow.tutorial-completed', 'true');
     } catch {

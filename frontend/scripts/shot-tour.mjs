@@ -10,7 +10,6 @@ const page = await ctx.newPage();
 await page.addInitScript(() => {
   // Welcome + wizard done, but NOT the tutorial → the auto-launcher opens it.
   localStorage.setItem('lexflow.welcomed', 'true');
-  localStorage.setItem('lexflow.onboarded', '1');
   localStorage.setItem('lexflow.wizard-completed', 'true');
 });
 await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' });

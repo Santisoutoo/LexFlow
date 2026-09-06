@@ -176,7 +176,22 @@
     "cloudKeyNotSet": "Pega tu clave y pulsa Guardar para validarla.",
     "cloudKeyRefresh": "Comprobar de nuevo",
     "cloudKeyInvalid": "Valida tu clave API primero",
-    "cloudKeyFromEnv": "Ya hay una clave configurada en el entorno"
+    "cloudKeyFromEnv": "Ya hay una clave configurada en el entorno",
+    "themeTitle": "Elige tu tema",
+    "themeBody": "Puedes alternar entre claro y oscuro en cualquier momento con",
+    "themeLight": "Claro",
+    "themeDark": "Oscuro",
+    "themeLightDesc": "Recomendado para juzgados y proyectores",
+    "themeDarkDesc": "Recomendado para uso prolongado",
+    "telemetryTitle": "Telemetría",
+    "telemetryBody": "Opcional. Si la activas, enviaremos métricas anónimas de uso (sin texto de consultas) para mejorar el producto.",
+    "telemetryShare": "Compartir métricas anónimas",
+    "telemetryOptIn": "opt-in · desactivado por defecto",
+    "telemetryNotSentTitle": "Qué no se envía",
+    "telemetryNotSentBody": "Nunca enviamos el texto de tus búsquedas ni el contenido de tus chats. Sólo: cuáles pantallas usas, cuántos artículos abres por sesión, y errores.",
+    "startUsing": "Empezar a usar LexFlow",
+    "detectError": "No se pudo detectar tu equipo. Comprueba que el backend esté en marcha e inténtalo de nuevo.",
+    "retryDetect": "Reintentar"
   },
   "help": {
     "label": "Ayuda",
@@ -261,6 +276,8 @@
     "enterHint": "Enter envía · ⇧↵ línea",
     "noModelTitle": "No hay modelo configurado",
     "noModelBody": "Configura un modelo en Ajustes → Modelos (o arranca Ollama/LM Studio) antes de chatear.",
+    "setupAssistantTitle": "Configura tu asistente (2 min)",
+    "setupAssistantCta": "Configurar asistente",
     "send": "Enviar",
     "sources": "Fuentes",
     "renameAria": "Renombrar {{title}}",
@@ -330,39 +347,6 @@
     "semanticEmpty": {
       "title": "No encontramos artículos parecidos",
       "description": "Prueba con una pregunta más concreta o cambia a búsqueda por texto."
-    }
-  },
-  "onboarding": {
-    "welcome": "Bienvenida a LexFlow",
-    "back": "Atrás",
-    "skip": "Omitir",
-    "continue": "Continuar",
-    "start": "Empezar a usar LexFlow",
-    "theme": {
-      "light": "Claro",
-      "dark": "Oscuro",
-      "lightDesc": "Recomendado para juzgados y proyectores",
-      "darkDesc": "Recomendado para uso prolongado"
-    },
-    "modelKind": {
-      "local": "local",
-      "cloud": "nube"
-    },
-    "step1": {
-      "title": "Elige tu tema",
-      "body": "Puedes alternar entre claro y oscuro en cualquier momento con"
-    },
-    "step2": {
-      "title": "Modelo de chat",
-      "body": "Elige un modelo por defecto. Los <strong>locales</strong> funcionan sin Internet; los de <strong>nube</strong> requieren clave API."
-    },
-    "step3": {
-      "title": "Telemetría",
-      "body": "Opcional. Si la activas, enviaremos métricas anónimas de uso (sin texto de consultas) para mejorar el producto.",
-      "shareMetrics": "Compartir métricas anónimas",
-      "optIn": "opt-in · desactivado por defecto",
-      "notSentTitle": "Qué no se envía",
-      "notSentBody": "Nunca enviamos el texto de tus búsquedas ni el contenido de tus chats. Sólo: cuáles pantallas usas, cuántos artículos abres por sesión, y errores."
     }
   },
   "settings": {

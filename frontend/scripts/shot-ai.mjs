@@ -14,7 +14,6 @@ const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, d
 const page = await ctx.newPage();
 await page.addInitScript((t) => {
   localStorage.setItem('lexflow.welcomed', 'true');
-  localStorage.setItem('lexflow.onboarded', '1');
   localStorage.setItem('lexflow.wizard-completed', 'true');
   localStorage.setItem('lexflow.tutorial-completed', 'true');
   localStorage.setItem('lexflow.theme', t);

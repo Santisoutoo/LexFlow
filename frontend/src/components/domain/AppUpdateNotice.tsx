@@ -6,7 +6,6 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui';
@@ -21,7 +20,6 @@ function progressPercent(progress: { downloaded: number; total: number | null })
 
 export function AppUpdateNotice() {
   const { t } = useTranslation();
-  const location = useLocation();
   const panelRef = useRef<HTMLDivElement>(null);
   const {
     status,
@@ -47,7 +45,7 @@ export function AppUpdateNotice() {
     return () => document.removeEventListener('keydown', onKey);
   }, [status, remindLater]);
 
-  if (!hasService || location.pathname === '/onboarding' || status === 'idle') {
+  if (!hasService || status === 'idle') {
     return null;
   }
 

@@ -207,6 +207,20 @@ class TestLmStudioProbe:
         async with _client_with_handler(httpx.MockTransport(respond)) as client:
             assert await _probe_lmstudio(client) is False
 
+    async def test_returns_false_when_probe_hangs(self) -> None:
+        import asyncio
+        import time
+
+        async def slow_respond(request: httpx.Request) -> httpx.Response:
+            await asyncio.sleep(60)
+            return httpx.Response(200, json={"data": []})
+
+        async with _client_with_handler(httpx.MockTransport(slow_respond)) as client:
+            started = time.monotonic()
+            assert await _probe_lmstudio(client) is False
+            elapsed = time.monotonic() - started
+            assert elapsed < 3.0
+
 
 # ─── Endpoint integration ────────────────────────────────────────────────
 

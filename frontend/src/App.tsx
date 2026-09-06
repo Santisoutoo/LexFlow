@@ -1,82 +1,10 @@
 import { Suspense, lazy, useEffect } from 'react';
-import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppShell } from '@/components/shell/AppShell';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { Skeleton } from '@/components/domain/Skeleton';
 import { usePageViewTelemetry } from '@/lib/telemetry';
 import { useUi } from '@/lib/store';
-
-const ONBOARDED_STORAGE_KEY = 'lexflow.onboarded';
-
-/**
- * In-memory sentinel for environments where localStorage is entirely
- * unavailable (e.g. strict-privacy incognito modes that throw on any
- * storage access). Set to true the first time the gate dispatches a
- * redirect to /onboarding so that, if OnboardingPage.finish() cannot
- * persist the flag either (because setItem also throws), the gate does
- * not loop: we treat "user has already seen onboarding this session"
- * as sufficient even when we cannot durably record "user has completed
- * onboarding".
- *
- * WHY module-level rather than a ref: the hook lives inside the App
- * component; a ref would reset on every unmount/remount cycle, whereas a
- * module variable persists for the lifetime of the JS module (one page
- * load). That lifetime is exactly what we need.
- */
-let _onboardingRedirectDispatched = false;
-
-/**
- * Read the onboarding flag from the best available source.
- *
- * Returns true ONLY when:
- *   - localStorage[ONBOARDED_STORAGE_KEY] === '1' (durable, normal case), OR
- *   - the gate has already redirected the user to /onboarding this session
- *     (in-memory, covers blocked-storage environments to prevent a loop).
- *
- * An inaccessible OR empty localStorage is treated as "not yet onboarded"
- * — the safe default that always shows first-run onboarding.
- */
-function isOnboarded(): boolean {
-  if (_onboardingRedirectDispatched) return true;
-  try {
-    return localStorage.getItem(ONBOARDED_STORAGE_KEY) === '1';
-  } catch {
-    // localStorage is blocked (strict-privacy / sandboxed iframe).
-    // _onboardingRedirectDispatched is already false here (checked above),
-    // so return false → the gate will redirect and set the sentinel.
-    return false;
-  }
-}
-
-/**
- * Audit #471 — first-launch gate. The OnboardingPage was registered on
- * the router but unreachable: nothing redirected to it on a fresh
- * install. We now check ``localStorage[ONBOARDED_STORAGE_KEY]`` on
- * every navigation and push the user to ``/onboarding`` until they
- * complete it (which writes the flag in ``OnboardingPage.finish()``).
- * Subsequent loads short-circuit because the flag is set.
- *
- * Bug fix #674: the original catch block silently defaulted to
- * ``done = true`` when storage access threw, causing the gate to be
- * skipped in strict-privacy/incognito contexts where localStorage is
- * blocked. The correct unknown-state default is "not onboarded" (show
- * the gate). The ``_onboardingRedirectDispatched`` sentinel prevents the
- * redirect loop that would otherwise occur when OnboardingPage.finish()
- * cannot write the flag because storage is blocked: once we have sent the
- * user to /onboarding once this session, we consider the gate satisfied
- * for the rest of that session.
- */
-function useFirstLaunchGate(): void {
-  const location = useLocation();
-  const navigate = useNavigate();
-  useEffect(() => {
-    if (location.pathname === '/onboarding') return;
-    if (!isOnboarded()) {
-      _onboardingRedirectDispatched = true;
-      navigate('/onboarding', { replace: true });
-    }
-  }, [location.pathname, navigate]);
-}
 
 // Audit #409 / #712 perf: every page is lazy-loaded so the cold-start entry
 // bundle stays small (it previously dragged the chat stack, react-flow, the
@@ -94,7 +22,6 @@ const GraphPage = lazy(() => import('@/pages/GraphPage').then((m) => ({ default:
 const ChatPage = lazy(() => import('@/pages/ChatPage').then((m) => ({ default: m.ChatPage })));
 const DashboardPage = lazy(() => import('@/pages/DashboardPage').then((m) => ({ default: m.DashboardPage })));
 const SettingsPage = lazy(() => import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })));
-const OnboardingPage = lazy(() => import('@/pages/OnboardingPage').then((m) => ({ default: m.OnboardingPage })));
 // Milestone 14 — document editor (TipTap). Lazy-loaded because the TipTap
 // + ProseMirror bundle is non-trivial and the editor is an opt-in surface.
 const EditorPage = lazy(() => import('@/pages/EditorPage').then((m) => ({ default: m.EditorPage })));
@@ -118,9 +45,6 @@ export function App() {
   // user Zustand consent) are on. Lives inside ``BrowserRouter`` so
   // ``useLocation`` resolves.
   usePageViewTelemetry();
-  // Audit #471 — redirect first-launch users to ``/onboarding`` until
-  // they complete it.
-  useFirstLaunchGate();
   // #712 perf — prefetch the common Cmd-K destinations as soon as the palette
   // opens, so navigating to them from search is instant even though the routes
   // are now lazy. Same module specifiers as the lazy() calls → warms the chunk.
@@ -135,9 +59,6 @@ export function App() {
     <Suspense fallback={<PageFallback />}>
       <Routes>
         <Route path="/" element={<Navigate to="/home" replace />} />
-
-        {/* First-launch gate; nav to /onboarding from a host trigger when needed. */}
-        <Route path="/onboarding" element={<OnboardingPage />} />
 
         <Route element={<AppShell />}>
           <Route path="home" element={<HomePage />} />

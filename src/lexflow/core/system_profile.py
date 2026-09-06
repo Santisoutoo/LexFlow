@@ -31,10 +31,11 @@ logger = logging.getLogger(__name__)
 OLLAMA_TAGS_URL = "http://127.0.0.1:11434/api/tags"
 LMSTUDIO_MODELS_URL = "http://127.0.0.1:1234/v1/models"
 
-# 500 ms is the wizard-flow budget per probe. If a provider doesn't
-# respond within that window the wizard treats it as "not running" and
-# the user can launch it manually + rerun the detection step.
-PROBE_TIMEOUT_SECONDS = 0.5
+# Per-probe HTTP budget. ``asyncio.wait_for`` adds a hard ceiling so a
+# slow/half-open port cannot stall ``GET /system/profile``.
+PROBE_TIMEOUT_SECONDS = 2.0
+_PROBE_HTTP_TIMEOUT = httpx.Timeout(connect=0.3, read=0.5, write=0.5, pool=0.5)
+_PROFILE_BUILD_CEILING_SECONDS = 1.0
 
 
 @dataclass(frozen=True)
@@ -151,12 +152,16 @@ async def _probe_ollama(client: httpx.AsyncClient) -> tuple[bool, list[str]]:
     the user can start the server.
     """
     try:
-        response = await client.get(OLLAMA_TAGS_URL, timeout=PROBE_TIMEOUT_SECONDS)
+        response = await asyncio.wait_for(
+            client.get(OLLAMA_TAGS_URL, timeout=_PROBE_HTTP_TIMEOUT),
+            timeout=PROBE_TIMEOUT_SECONDS + 0.1,
+        )
         response.raise_for_status()
         payload = response.json()
         models = [m.get("name") for m in payload.get("models", []) if m.get("name")]
         return True, models
-    except (httpx.HTTPError, ValueError):
+    except Exception as exc:
+        logger.debug("Ollama probe failed (%s); reporting not running", exc)
         return False, []
 
 
@@ -169,23 +174,22 @@ async def _probe_lmstudio(client: httpx.AsyncClient) -> bool:
     provider.
     """
     try:
-        response = await client.get(LMSTUDIO_MODELS_URL, timeout=PROBE_TIMEOUT_SECONDS)
+        response = await asyncio.wait_for(
+            client.get(LMSTUDIO_MODELS_URL, timeout=_PROBE_HTTP_TIMEOUT),
+            timeout=PROBE_TIMEOUT_SECONDS + 0.1,
+        )
         response.raise_for_status()
         return True
-    except httpx.HTTPError:
+    except Exception as exc:
+        logger.debug("LM Studio probe failed (%s); reporting not running", exc)
         return False
 
 
 # ─── Orchestrator ────────────────────────────────────────────────────────
 
 
-async def build_system_profile() -> SystemProfile:
-    """Build a snapshot of host hardware + running local LLM providers.
-
-    Hardware probes are sub-millisecond synchronous calls; the LLM
-    provider probes run concurrently with a 500 ms cap each so the
-    endpoint stays under ~700 ms even when both servers are down.
-    """
+async def _build_system_profile_inner() -> SystemProfile:
+    """Collect hardware + provider probes (no outer timeout)."""
     total_ram_gb, available_ram_gb = _collect_memory_info()
     cpu_cores = _collect_cpu_cores()
     gpu = _collect_gpu_info()
@@ -211,3 +215,34 @@ async def build_system_profile() -> SystemProfile:
         ollama_models=ollama_models,
         lmstudio_running=lmstudio_running,
     )
+
+
+async def build_system_profile() -> SystemProfile:
+    """Build a snapshot of host hardware + running local LLM providers.
+
+    Hardware probes are sub-millisecond synchronous calls; the LLM
+    provider probes run concurrently with a tight cap each so the
+    endpoint stays under ~700 ms even when both servers are down.
+    """
+    try:
+        return await asyncio.wait_for(_build_system_profile_inner(), timeout=_PROFILE_BUILD_CEILING_SECONDS)
+    except TimeoutError:
+        logger.debug("build_system_profile hit hard ceiling (%.1fs)", _PROFILE_BUILD_CEILING_SECONDS)
+        total_ram_gb, available_ram_gb = _collect_memory_info()
+        cpu_cores = _collect_cpu_cores()
+        gpu = _collect_gpu_info()
+        is_apple_silicon = _detect_apple_silicon()
+        platform_label = _platform_label()
+        return SystemProfile(
+            total_ram_gb=total_ram_gb,
+            available_ram_gb=available_ram_gb,
+            cpu_cores=cpu_cores,
+            has_nvidia_gpu=gpu.present,
+            vram_gb=gpu.vram_gb,
+            gpu_name=gpu.name,
+            is_apple_silicon=is_apple_silicon,
+            platform=platform_label,
+            ollama_running=False,
+            ollama_models=[],
+            lmstudio_running=False,
+        )

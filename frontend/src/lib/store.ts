@@ -91,6 +91,15 @@ interface UiState {
   tourRequested: boolean;
   requestTour(): void;
   consumeTourRequest(): void;
+
+  /**
+   * One-shot request to open the model wizard overlay (#29). Set by Chat /
+   * Settings; consumed by `WizardOverlay` in `main.tsx`. Transient — not
+   * persisted.
+   */
+  wizardRequested: boolean;
+  requestWizard(): void;
+  consumeWizardRequest(): void;
 }
 
 export const useUi = create<UiState>()(
@@ -142,6 +151,10 @@ export const useUi = create<UiState>()(
       tourRequested: false,
       requestTour: () => set({ tourRequested: true }),
       consumeTourRequest: () => set({ tourRequested: false }),
+
+      wizardRequested: false,
+      requestWizard: () => set({ wizardRequested: true }),
+      consumeWizardRequest: () => set({ wizardRequested: false }),
     }),
     {
       name: 'lexflow.ui',
