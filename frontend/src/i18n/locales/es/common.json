@@ -314,6 +314,18 @@
       "increase": "Aumentar tamaño de lectura",
       "serif": "Serif",
       "serifToggle": "Alternar tipografía serif de lectura"
+    },
+    "toc": {
+      "label": "Tabla de contenidos",
+      "heading": "Contenido",
+      "empty": "No hay jerarquía disponible para esta norma."
+    },
+    "empty": {
+      "noContent": {
+        "title": "Sin contenido legible",
+        "description": "Esta norma no tiene artículos ni secciones parseables en el corpus. No es un error de carga: la fuente puede estar pendiente de procesamiento."
+      },
+      "sectionsOnly": "Esta norma no tiene artículos numerados; se muestra solo el texto de sección."
     }
   },
   "diff": {

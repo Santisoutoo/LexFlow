@@ -121,13 +121,17 @@ function sectionToHierarchy(section: BackendSection, path: string): HierarchyNod
       heading: a.title ?? undefined,
     })),
   ];
-  return {
+  const node: HierarchyNode = {
     id,
     kind: levelToKind(section.level),
     label: section.heading,
     heading: section.heading,
     children: children.length ? children : undefined,
   };
+  if (section.text) {
+    node.text = section.text;
+  }
+  return node;
 }
 
 // ─── Public transformers ─────────────────────────────────────────────────
@@ -177,6 +181,7 @@ export function transformLawDetail(raw: BackendLawDetail): LawDetail {
     hierarchy,
     articles,
     disposiciones,
+    rawText: raw.raw_text ?? '',
   };
 }
 

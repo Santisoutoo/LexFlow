@@ -126,6 +126,8 @@ export interface LawDetail extends Law {
   articles: Article[];
   /** Closing disposiciones (adicional / transitoria / derogatoria / final). */
   disposiciones: Disposicion[];
+  /** Full markdown body — fallback when no parseable articles exist. */
+  rawText?: string;
 }
 
 export interface HierarchyNode {
@@ -135,6 +137,8 @@ export interface HierarchyNode {
   label: string;
   /** Short heading, e.g. "De los derechos fundamentales y libertades públicas". */
   heading?: string;
+  /** Section prose (preámbulo, anexo tables) when not tied to an article. */
+  text?: string;
   children?: HierarchyNode[];
 }
 

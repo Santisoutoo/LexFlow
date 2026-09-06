@@ -1492,6 +1492,12 @@ export interface components {
             references: components["schemas"]["Reference"][];
             /** Article Count */
             article_count: number;
+            /**
+             * Raw Text
+             * @description Full markdown body without frontmatter.
+             * @default
+             */
+            raw_text?: string;
         };
         /**
          * LawDiff
