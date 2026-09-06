@@ -147,14 +147,15 @@ export function WizardOverlay() {
   return (
     <ModelWizard
       onComplete={() => {
+        completeWizardSession();
         consumeWizardRequest();
-        clearWizardPull();
         invalidateModels();
       }}
       onSkip={() => {
         consumeWizardRequest();
       }}
       onLater={() => {
+        completeWizardSession();
         consumeWizardRequest();
         invalidateModels();
       }}

@@ -35,7 +35,8 @@ LMSTUDIO_MODELS_URL = "http://127.0.0.1:1234/v1/models"
 # slow/half-open port cannot stall ``GET /system/profile``.
 PROBE_TIMEOUT_SECONDS = 2.0
 _PROBE_HTTP_TIMEOUT = httpx.Timeout(connect=0.3, read=0.5, write=0.5, pool=0.5)
-_PROFILE_BUILD_CEILING_SECONDS = 1.0
+# Probes run in parallel; outer budget must exceed each probe's wait_for ceiling.
+_PROFILE_BUILD_CEILING_SECONDS = PROBE_TIMEOUT_SECONDS + 0.5
 
 
 @dataclass(frozen=True)
@@ -222,7 +223,7 @@ async def build_system_profile() -> SystemProfile:
 
     Hardware probes are sub-millisecond synchronous calls; the LLM
     provider probes run concurrently with a tight cap each so the
-    endpoint stays under ~700 ms even when both servers are down.
+    endpoint stays under ~2.5 s even when both servers are down.
     """
     try:
         return await asyncio.wait_for(_build_system_profile_inner(), timeout=_PROFILE_BUILD_CEILING_SECONDS)
