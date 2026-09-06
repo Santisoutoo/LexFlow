@@ -33,6 +33,7 @@ import { TourProvider, useTour, type StepType } from '@reactour/tour';
 
 import { useUi } from '@/lib/store';
 import { TUTORIAL_COMPLETED_STORAGE_KEY } from './tutorial-storage';
+import { WIZARD_COMPLETED_STORAGE_KEY } from './onboarding-storage';
 
 // Spotlight padding around the target rect, and the dim wash colour (#575).
 const SPOTLIGHT_PAD = 8;
@@ -181,7 +182,7 @@ const TUTORIAL_STEPS: StepType[] = [
     selector: '[data-tour-id="left-rail"]',
     content: STEP_CONTENT(
       'Chat legal con tu modelo',
-      'El Chat conversa con un modelo local o en nube. Te llevamos ahí al cerrar este tour para que termines de configurar el modelo. Atajo: g c.',
+      'El Chat conversa con un modelo local o en nube una vez lo configuras en Ajustes. Te llevamos ahí al cerrar este tour. Atajo: g c.',
     ),
     position: 'right',
   },
@@ -330,7 +331,6 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
 // localStorage keys owned by sibling gates (mirrored here verbatim, see
 // WelcomeFlow.tsx and ModelWizard.tsx — keep in sync).
 const WELCOMED_KEY = 'lexflow.welcomed';
-const WIZARD_DONE_KEY = 'lexflow.wizard-completed';
 
 function _readGate(key: string): boolean {
   try {
@@ -360,7 +360,7 @@ export function TutorialAutoLauncher() {
 
   useEffect(() => {
     if (_readTutorialCompleted()) return;
-    if (!_readGate(WELCOMED_KEY) || !_readGate(WIZARD_DONE_KEY)) return;
+    if (!_readGate(WELCOMED_KEY) || !_readGate(WIZARD_COMPLETED_STORAGE_KEY)) return;
     // Tiny delay so the auto-open doesn't fight with the wizard's
     // close animation.
     const timer = window.setTimeout(() => setIsOpen(true), 350);

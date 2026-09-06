@@ -1,19 +1,22 @@
 /**
- * Model wizard — three-step onboarding flow (#118 / #28).
+ * Model wizard — five-step onboarding flow (#118 / #28 / #29).
  *
  * Shown right after WelcomeFlow on first launch (and re-launchable from
- * Settings → Modelos). Walks the user through:
+ * Settings → Modelos or Chat). Walks the user through:
  *
- *   1. Detect hardware via `useSystemProfile` (#117).
- *   2. Pick one of the four tiers.
- *   3. Confirm + install. Local tiers: guided Ollama install + in-app
+ *   1. Theme preference.
+ *   2. Detect hardware via `useSystemProfile` (#117).
+ *   3. Pick one of the four tiers.
+ *   4. Confirm + install. Local tiers: guided Ollama install + in-app
  *      `ollama pull`. Cloud tier: inline ApiKeyRow + real key probe.
+ *   5. Optional telemetry opt-in.
  *
  * --- WHERE TO CHANGE IF X CHANGES ---
  * Tier catalog + thresholds → `lib/model-tiering.ts`.
  * SPA-wide first-launch order → `main.tsx` (gate stacking).
- * Re-launch entrypoint → `pages/SettingsPage.tsx → ModelsSection`.
+ * Re-launch entrypoint → `requestWizard()` in `lib/store.ts`.
  * Key probe endpoint → `lib/api/secrets.ts` + `POST /secrets/{provider}/test`.
+ * Completion storage key → `onboarding-storage.ts`.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -33,7 +36,7 @@ import {
   XCircle,
 } from 'lucide-react';
 
-import { Badge, Button } from '@/components/ui';
+import { Badge, Button, Callout, Switch } from '@/components/ui';
 import { ApiKeyRow, type ApiKeyValidationState } from '@/components/domain/ApiKeyRow';
 import { Skeleton } from '@/components/domain/Skeleton';
 import { api } from '@/lib/api';
@@ -54,10 +57,19 @@ import { useUi } from '@/lib/store';
 import { toast } from '@/lib/toast';
 import type { SystemProfile } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import {
+  clearWizardPull,
+  markWizardCompleted,
+  readWizardCompleted,
+  readWizardPull,
+  writeWizardPull,
+  type WizardPullPhase,
+} from './onboarding-storage';
+import { TUTORIAL_COMPLETED_STORAGE_KEY } from './tutorial-storage';
 
-export const WIZARD_COMPLETED_STORAGE_KEY = 'lexflow.wizard-completed';
+export { WIZARD_COMPLETED_STORAGE_KEY } from './onboarding-storage';
 
-type Step = 1 | 2 | 3;
+type Step = 1 | 2 | 3 | 4 | 5;
 
 const OLLAMA_POLL_INTERVAL_MS = 5_000;
 const OLLAMA_POLL_MAX_MS = 5 * 60 * 1_000;
@@ -71,6 +83,22 @@ function ollamaDownloadUrl(platform: string): string {
 }
 
 type ProfileRefetch = () => Promise<{ data?: SystemProfile | null } | void> | void;
+
+function readTutorialCompleted(): boolean {
+  try {
+    return localStorage.getItem(TUTORIAL_COMPLETED_STORAGE_KEY) === 'true';
+  } catch {
+    return true;
+  }
+}
+
+function completeWizardSession(): void {
+  markWizardCompleted();
+  clearWizardPull();
+  if (!readTutorialCompleted()) {
+    useUi.getState().requestTour();
+  }
+}
 
 // ─── Public API ──────────────────────────────────────────────────────────
 
@@ -90,21 +118,14 @@ export function ModelWizardGate({ children }: { children: React.ReactNode }) {
       {children}
       <ModelWizard
         onComplete={() => {
-          markWizardCompleted();
+          completeWizardSession();
           setOpen(false);
         }}
         onSkip={() => {
-          // "Saltar" (X button) doesn't mark the wizard as completed — it
-          // stays available from Settings. We close the modal for this
-          // session via a separate storage key.
-          markWizardSkipped();
           setOpen(false);
         }}
         onLater={() => {
-          // "Lo haré más tarde" (footer button) permanently marks the wizard
-          // done without persisting a model choice — leaves the chat in
-          // "no model configured" state until the user visits Settings → Modelos.
-          markWizardCompleted();
+          completeWizardSession();
           setOpen(false);
         }}
       />
@@ -113,8 +134,37 @@ export function ModelWizardGate({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Standalone wizard (no gate). Used by the "Volver a lanzar wizard"
- * button in Settings → Modelos, where the parent owns the open state.
+ * Standalone wizard overlay driven by ``requestWizard()`` (#29). Settings
+ * and Chat open the same wizard without duplicating mount logic.
+ */
+export function WizardOverlay() {
+  const wizardRequested = useUi((s) => s.wizardRequested);
+  const consumeWizardRequest = useUi((s) => s.consumeWizardRequest);
+  const invalidateModels = useInvalidateModels();
+
+  if (!wizardRequested) return null;
+
+  return (
+    <ModelWizard
+      onComplete={() => {
+        completeWizardSession();
+        consumeWizardRequest();
+        invalidateModels();
+      }}
+      onSkip={() => {
+        consumeWizardRequest();
+      }}
+      onLater={() => {
+        completeWizardSession();
+        consumeWizardRequest();
+        invalidateModels();
+      }}
+    />
+  );
+}
+
+/**
+ * Standalone wizard (no gate). Used by the gate and ``WizardOverlay``.
  *
  * Props:
  *   onComplete   — model chosen + persisted; wizard is done.
@@ -137,9 +187,14 @@ export function ModelWizard({
   const { data: models = [] } = useModels();
   const invalidateModels = useInvalidateModels();
   const setDefaultModel = useUi((s) => s.setDefaultModel);
+  const theme = useUi((s) => s.theme);
+  const setTheme = useUi((s) => s.setTheme);
+  const telemetryConsent = useUi((s) => s.telemetryConsent);
+  const setTelemetryConsent = useUi((s) => s.setTelemetryConsent);
   const [step, setStep] = useState<Step>(1);
   const [selectedKey, setSelectedKey] = useState<TierKey | null>(null);
   const [cloudKeyState, setCloudKeyState] = useState<ApiKeyValidationState>('idle');
+  const [telemetry, setTelemetry] = useState(telemetryConsent);
   // #27 — local tiers: true once Ollama reports the model installed.
   const [localInstallReady, setLocalInstallReady] = useState(false);
 
@@ -161,11 +216,11 @@ export function ModelWizard({
   const selectedTier =
     TIER_CATALOG.find((t) => t.key === selectedKey) ?? TIER_CATALOG[0];
 
-  const stepCount = 3;
+  const stepCount = 5;
   const goBack = () => setStep((s) => Math.max(1, s - 1) as Step);
   const goNext = () => setStep((s) => Math.min(stepCount, s + 1) as Step);
 
-  const finish = async () => {
+  const finishModelSetup = async () => {
     const cloudKeyReady = cloudKeyState === 'valid';
     const finishBlocked =
       (selectedTier.cloud && !cloudKeyReady) || (!selectedTier.cloud && !localInstallReady);
@@ -197,6 +252,11 @@ export function ModelWizard({
     invalidateModels();
     setDefaultModel(id);
     toast({ tone: 'success', title: t('wizard.readyToChat'), message: selectedTier.model });
+    setStep(5);
+  };
+
+  const finishWizard = () => {
+    setTelemetryConsent(telemetry);
     onComplete(selectedTier.key);
   };
 
@@ -210,13 +270,19 @@ export function ModelWizard({
       <div className="air-glass-strong w-full max-w-2xl p-7 animate-in fade-in slide-in-from-bottom-2 duration-300">
         <WizardHeader step={step} stepCount={stepCount} onSkip={onSkip} />
 
-        {step === 1 && (
-          <StepDetect profile={profile} loading={profileQuery.isLoading} onRefetch={profileQuery.refetch} />
+        {step === 1 && <StepTheme theme={theme} onSelect={setTheme} />}
+        {step === 2 && (
+          <StepDetect
+            profile={profile}
+            loading={profileQuery.isLoading}
+            isError={profileQuery.isError}
+            onRefetch={profileQuery.refetch}
+          />
         )}
-        {step === 2 && profile && (
+        {step === 3 && profile && (
           <StepPick profile={profile} selectedKey={selectedTier.key} onSelect={setSelectedKey} />
         )}
-        {step === 3 && (
+        {step === 4 && (
           <StepConfirm
             tier={selectedTier}
             profile={profile}
@@ -225,16 +291,21 @@ export function ModelWizard({
             onLocalInstallReadyChange={setLocalInstallReady}
           />
         )}
+        {step === 5 && (
+          <StepTelemetry telemetry={telemetry} onChange={setTelemetry} />
+        )}
 
         <WizardFooter
           step={step}
           tier={selectedTier}
-          profileReady={!!profile}
+          profileReady={!!profile && !profileQuery.isError}
+          profileLoading={profileQuery.isLoading}
           cloudKeyState={cloudKeyState}
           localInstallReady={localInstallReady}
           onBack={goBack}
           onNext={goNext}
-          onFinish={() => void finish()}
+          onFinishModel={() => void finishModelSetup()}
+          onFinishWizard={finishWizard}
           onLater={onLater}
         />
       </div>
@@ -248,13 +319,20 @@ function WizardHeader({ step, stepCount, onSkip }: { step: Step; stepCount: numb
   const { t } = useTranslation();
   return (
     <div className="mb-5 flex items-start justify-between gap-4">
-      <div>
+      <div className="min-w-0 flex-1">
         <div className="label-caps text-muted">{t('wizard.stepOf', { step, total: stepCount })}</div>
         <h2 className="mt-1 font-display text-2xl font-semibold tracking-tight">
-          {step === 1 && t('wizard.step1Title')}
-          {step === 2 && t('wizard.step2Title')}
-          {step === 3 && t('wizard.step3Title')}
+          {step === 1 && t('wizard.themeTitle')}
+          {step === 2 && t('wizard.step1Title')}
+          {step === 3 && t('wizard.step2Title')}
+          {step === 4 && t('wizard.step3Title')}
+          {step === 5 && t('wizard.telemetryTitle')}
         </h2>
+        <div className="mt-3 flex gap-1">
+          {Array.from({ length: stepCount }, (_, i) => i + 1).map((i) => (
+            <div key={i} className={cn('h-1 flex-1 rounded', i <= step ? 'bg-indigo-500' : 'bg-surface-2')} />
+          ))}
+        </div>
       </div>
       <button
         type="button"
@@ -272,37 +350,53 @@ function WizardFooter({
   step,
   tier,
   profileReady,
+  profileLoading,
   cloudKeyState,
   localInstallReady,
   onBack,
   onNext,
-  onFinish,
+  onFinishModel,
+  onFinishWizard,
   onLater,
 }: {
   step: Step;
   tier: ModelTier;
   profileReady: boolean;
+  profileLoading: boolean;
   cloudKeyState: ApiKeyValidationState;
   /** #27 — true once the local model is installed and ready. */
   localInstallReady: boolean;
   onBack: () => void;
   onNext: () => void;
-  onFinish: () => void;
+  onFinishModel: () => void;
+  onFinishWizard: () => void;
   /** #673 — permanently marks wizard done without a model; user finishes in Settings. */
   onLater: () => void;
 }) {
   const { t } = useTranslation();
-  const isLast = step === 3;
+  const isModelStep = step === 4;
+  const isFinalStep = step === 5;
   const cloudKeyReady = cloudKeyState === 'valid';
 
   const finishDisabled =
-    isLast && ((tier.cloud && !cloudKeyReady) || (!tier.cloud && !localInstallReady));
+    isModelStep && ((tier.cloud && !cloudKeyReady) || (!tier.cloud && !localInstallReady));
 
   const finishHint = !tier.cloud
     ? t('wizard.finishDisabledHint')
     : cloudKeyState === 'invalid'
       ? t('wizard.cloudKeyInvalid')
       : t('wizard.finishDisabledCloudKey');
+
+  const primaryLabel = isFinalStep
+    ? t('wizard.startUsing')
+    : isModelStep
+      ? t('wizard.use', { tier: tier.title.split(' — ')[0].toLowerCase() })
+      : t('wizard.continue');
+
+  const primaryAction = isFinalStep ? onFinishWizard : isModelStep ? onFinishModel : onNext;
+
+  const primaryDisabled =
+    (step === 2 && (profileLoading || !profileReady)) || finishDisabled;
 
   return (
     <div className="mt-6 flex items-center justify-between gap-3">
@@ -324,36 +418,84 @@ function WizardFooter({
         {finishDisabled && (
           <span className="text-[11.5px] text-muted">{finishHint}</span>
         )}
-        <Button
-          variant="primary"
-          onClick={isLast ? onFinish : onNext}
-          disabled={(step === 1 && !profileReady) || finishDisabled}
-        >
-          {isLast ? t('wizard.use', { tier: tier.title.split(' — ')[0].toLowerCase() }) : t('wizard.continue')}
+        <Button variant="primary" onClick={primaryAction} disabled={primaryDisabled}>
+          {primaryLabel}
         </Button>
       </div>
     </div>
   );
 }
 
-// ─── Step 1 — Detect ─────────────────────────────────────────────────────
+// ─── Step 1 — Theme ──────────────────────────────────────────────────────
+
+function StepTheme({ theme, onSelect }: { theme: 'light' | 'dark'; onSelect: (t: 'light' | 'dark') => void }) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-[13.5px] text-muted">
+        {t('wizard.themeBody')} <kbd className="font-mono">⌘ .</kbd>
+      </p>
+      <div className="flex gap-3">
+        {(['light', 'dark'] as const).map((theme_) => (
+          <button
+            key={theme_}
+            type="button"
+            onClick={() => onSelect(theme_)}
+            className={cn(
+              'flex-1 rounded-xl border-2 bg-bg p-4 text-left',
+              theme === theme_ ? 'border-indigo-500' : 'border-border',
+            )}
+          >
+            <div
+              className="h-14 rounded-md border border-border"
+              style={{ background: theme_ === 'light' ? '#f5f5f9' : '#0f1120' }}
+            />
+            <div className="mt-2 text-sm font-semibold">
+              {theme_ === 'light' ? t('wizard.themeLight') : t('wizard.themeDark')}
+            </div>
+            <div className="mt-1 text-[12px] text-muted">
+              {theme_ === 'light' ? t('wizard.themeLightDesc') : t('wizard.themeDarkDesc')}
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Step 2 — Detect ─────────────────────────────────────────────────────
 
 function StepDetect({
   profile,
   loading,
+  isError,
   onRefetch,
 }: {
   profile: SystemProfile | null;
   loading: boolean;
+  isError: boolean;
   onRefetch: ProfileRefetch;
 }) {
   const { t } = useTranslation();
-  if (loading || !profile) {
+  if (loading) {
     return (
       <div className="flex flex-col gap-2.5">
         {Array.from({ length: 6 }).map((_, i) => (
           <Skeleton key={i} className="h-5 w-2/3" />
         ))}
+      </div>
+    );
+  }
+
+  if (isError || !profile) {
+    return (
+      <div className="flex flex-col gap-3 text-[13.5px]">
+        <div className="rounded-md border border-danger/30 bg-danger-soft p-3 text-danger">
+          {t('wizard.detectError')}
+        </div>
+        <Button size="sm" variant="secondary" icon={<RefreshCw className="size-3.5" />} onClick={() => void onRefetch()}>
+          {t('wizard.retryDetect')}
+        </Button>
       </div>
     );
   }
@@ -419,7 +561,31 @@ function DetectRow({ icon, label, value }: { icon: React.ReactNode; label: strin
   );
 }
 
-// ─── Step 2 — Pick ───────────────────────────────────────────────────────
+// ─── Step 5 — Telemetry ──────────────────────────────────────────────────
+
+function StepTelemetry({
+  telemetry,
+  onChange,
+}: {
+  telemetry: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-col gap-3 text-[13.5px]">
+      <p className="text-muted">{t('wizard.telemetryBody')}</p>
+      <div className="flex items-center gap-3.5 rounded-xl border border-border bg-surface p-4">
+        <Switch checked={telemetry} onChange={onChange} label={t('wizard.telemetryShare')} />
+        <span className="ml-auto text-[11.5px] text-muted">{t('wizard.telemetryOptIn')}</span>
+      </div>
+      <Callout tone="info" title={t('wizard.telemetryNotSentTitle')}>
+        {t('wizard.telemetryNotSentBody')}
+      </Callout>
+    </div>
+  );
+}
+
+// ─── Step 3 — Pick ───────────────────────────────────────────────────────
 
 function StepPick({
   profile,
@@ -513,7 +679,7 @@ function TierCard({
   );
 }
 
-// ─── Step 3 — Confirm ────────────────────────────────────────────────────
+// ─── Step 4 — Confirm ────────────────────────────────────────────────────
 
 function StepConfirm({
   tier,
@@ -824,7 +990,17 @@ function OllamaInstall({
     | { phase: 'done' }
     | { phase: 'error'; code: string; message: string };
 
-  const [state, setState] = useState<PullState>(isInstalled ? { phase: 'done' } : { phase: 'idle' });
+  const [state, setState] = useState<PullState>(() => {
+    if (isInstalled) return { phase: 'done' };
+    const saved = readWizardPull();
+    if (saved?.tierKey === tier.key && saved.model === tier.model && saved.phase === 'pulling') {
+      return { phase: 'pulling', status: saved.lastStatus ?? null, completed: null, total: null };
+    }
+    if (saved?.tierKey === tier.key && saved.model === tier.model && saved.phase === 'done') {
+      return { phase: 'done' };
+    }
+    return { phase: 'idle' };
+  });
   const [detected, setDetected] = useState(ollamaRunning);
   const markDetected = useCallback(() => setDetected(true), []);
 
@@ -836,11 +1012,60 @@ function OllamaInstall({
     onReadyChange(state.phase === 'done');
   }, [state.phase, onReadyChange]);
 
+  useEffect(() => {
+    if (state.phase !== 'pulling') return;
+    let cancelled = false;
+    const tick = async () => {
+      const result = await onRefetchProfile();
+      if (cancelled) return;
+      const data =
+        result && typeof result === 'object' && 'data' in result
+          ? (result as { data?: SystemProfile | null }).data
+          : null;
+      if (data?.ollamaModels.includes(tier.model)) {
+        setState({ phase: 'done' });
+        writeWizardPull({
+          tierKey: tier.key,
+          model: tier.model,
+          phase: 'done',
+          startedAt: readWizardPull()?.startedAt ?? new Date().toISOString(),
+        });
+      }
+    };
+    void tick();
+    const intervalId = window.setInterval(() => {
+      void tick();
+    }, OLLAMA_POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [state.phase, tier.key, tier.model, onRefetchProfile]);
+
+  const persistPull = (phase: WizardPullPhase, lastStatus?: string) => {
+    writeWizardPull({
+      tierKey: tier.key,
+      model: tier.model,
+      phase,
+      startedAt: readWizardPull()?.startedAt ?? new Date().toISOString(),
+      lastStatus,
+    });
+  };
+
   const startPull = async () => {
+    const startedAt = new Date().toISOString();
+    writeWizardPull({
+      tierKey: tier.key,
+      model: tier.model,
+      phase: 'pulling',
+      startedAt,
+      lastStatus: t('wizard.connecting'),
+    });
     setState({ phase: 'pulling', status: t('wizard.connecting'), completed: null, total: null });
     try {
       for await (const event of api.models.pull(tier.model)) {
         if (event.type === 'progress') {
+          persistPull('pulling', event.status ?? undefined);
           setState({
             phase: 'pulling',
             status: event.status,
@@ -848,17 +1073,20 @@ function OllamaInstall({
             total: event.total,
           });
         } else if (event.type === 'done') {
+          persistPull('done');
           setState({ phase: 'done' });
           void onRefetchProfile();
           toast({ tone: 'success', title: t('wizard.installedToast'), message: tier.model });
           return;
         } else {
+          persistPull('error', event.message);
           setState({ phase: 'error', code: event.code, message: event.message });
           return;
         }
       }
     } catch (exc) {
       const message = exc instanceof Error ? exc.message : t('wizard.pullFailed');
+      persistPull('error', message);
       setState({ phase: 'error', code: 'network', message });
     }
   };
@@ -908,7 +1136,10 @@ function OllamaInstall({
         <div className="rounded-md border border-danger/30 bg-danger-soft p-3 text-danger">
           <strong>{t('wizard.installFailed')}</strong> {state.message}
         </div>
-        <Button size="sm" variant="secondary" onClick={() => void startPull()} className="self-start">
+        <Button size="sm" variant="secondary" onClick={() => {
+          clearWizardPull();
+          void startPull();
+        }} className="self-start">
           {t('wizard.retry')}
         </Button>
       </div>
@@ -949,34 +1180,4 @@ function OllamaInstall({
       </div>
     </div>
   );
-}
-
-// ─── localStorage helpers ────────────────────────────────────────────────
-
-function readWizardCompleted(): boolean {
-  try {
-    return localStorage.getItem(WIZARD_COMPLETED_STORAGE_KEY) === 'true';
-  } catch {
-    return true;
-  }
-}
-
-function markWizardCompleted(): void {
-  try {
-    localStorage.setItem(WIZARD_COMPLETED_STORAGE_KEY, 'true');
-  } catch {
-    /* private mode — ignore. */
-  }
-}
-
-const WIZARD_SKIPPED_SESSION_KEY = 'lexflow.wizard-skipped-session';
-
-function markWizardSkipped(): void {
-  // Session-scoped so the wizard reappears next launch (it's the only
-  // discoverability lever for the model setup we have today).
-  try {
-    sessionStorage.setItem(WIZARD_SKIPPED_SESSION_KEY, 'true');
-  } catch {
-    /* ignore */
-  }
 }

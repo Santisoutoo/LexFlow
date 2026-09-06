@@ -16,7 +16,7 @@ import './lib/store'; // side-effect: sync theme attribute
 import './i18n'; // side-effect: initialize i18next before render
 import { App } from './App';
 import { AppUpdateNotice } from './components/domain/AppUpdateNotice';
-import { ModelWizardGate } from './components/domain/ModelWizard';
+import { ModelWizardGate, WizardOverlay } from './components/domain/ModelWizard';
 import { DeferredTutorial } from './components/domain/DeferredTutorial';
 import { SplashGate } from './components/domain/SplashGate';
 import { WelcomeFlow } from './components/domain/WelcomeFlow';
@@ -96,6 +96,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                   <App />
                   <AppUpdateNotice />
                 </AppUpdateProvider>
+                <WizardOverlay />
                 {/* The tour mounts lazily on idle as a sibling overlay — not a
                     wrapper — so @reactour/tour stays out of the entry chunk
                     (#712). Kept inside the router: `beforeClose` navigates to

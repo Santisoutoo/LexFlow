@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { Plus, Paperclip, BookOpenText, SlidersHorizontal, Send, Pencil, Trash2, Menu } from 'lucide-react';
-import { Button, Chip, Kbd, useConfirm } from '@/components/ui';
+import { Button, Chip, Kbd, useConfirm, Callout } from '@/components/ui';
 import { ChatMessage } from '@/components/domain/ChatMessage';
 import { ModelChip } from '@/components/domain/ModelChip';
 import { CitationCard } from '@/components/domain/CitationCard';
@@ -33,6 +33,7 @@ export function ChatPage() {
   const confirm = useConfirm();
   const defaultModel = useUi((s) => s.defaultModel);
   const setDefaultModel = useUi((s) => s.setDefaultModel);
+  const requestWizard = useUi((s) => s.requestWizard);
   const qc = useQueryClient();
   const { data: models = [] } = useModels();
   // Audit #409 — read the URL param so deep links like `/chat/legal-x`
@@ -89,6 +90,7 @@ export function ChatPage() {
   // a currently-available provider we replace it (or clear it) so chat
   // never POSTs an unconfigured model. The wizard's pull lands here too.
   const availableModel = useMemo(() => models.find((m) => m.available) ?? null, [models]);
+  const needsModelSetup = models.length > 0 && !availableModel;
   useEffect(() => {
     if (models.length === 0) return;
     const current = models.find((m) => m.id === defaultModel);
@@ -365,6 +367,16 @@ export function ChatPage() {
 
         <div className="flex-1 overflow-auto py-6 scrollbar-thin">
           <div className="mx-auto flex max-w-3xl flex-col gap-4 px-6">
+            {needsModelSetup && (
+              <Callout tone="warning" title={t('chat.setupAssistantTitle')} className="mt-2">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-[13px]">{t('chat.noModelBody')}</p>
+                  <Button size="sm" variant="primary" onClick={requestWizard}>
+                    {t('chat.setupAssistantCta')}
+                  </Button>
+                </div>
+              </Callout>
+            )}
             {visible.length === 0 ? (
               // No active thread (first time, or the cached id no
               // longer exists). Surface a hint pointing at the input

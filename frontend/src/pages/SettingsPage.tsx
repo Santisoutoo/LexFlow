@@ -22,7 +22,6 @@ import { Trans, useTranslation } from 'react-i18next';
 import { Avatar, Badge, Button, Card, Tabs, useConfirm } from '@/components/ui';
 import { ApiKeyRow } from '@/components/domain/ApiKeyRow';
 import { McpServersSection } from '@/components/domain/McpServersSection';
-import { ModelWizard } from '@/components/domain/ModelWizard';
 import { useTutorialRelaunch } from '@/components/domain/use-tutorial-relaunch';
 import { useHealth, useModels, useInstalledModels, useInvalidateModels, useSemanticStatus, useSyncStatus, useRunSync, useTelemetryStatus, useWhatsNew } from '@/lib/queries';
 import type { InstalledModel } from '@/lib/types';
@@ -256,7 +255,7 @@ function ModelsSection() {
   const invalidateModels = useInvalidateModels();
   const defaultModel = useUi((s) => s.defaultModel);
   const setDefaultModel = useUi((s) => s.setDefaultModel);
-  const [wizardOpen, setWizardOpen] = useState(false);
+  const requestWizard = useUi((s) => s.requestWizard);
   const [secrets, setSecrets] = useState<SecretStatusItem[]>([]);
   const m = models.find((x) => x.id === defaultModel) ?? models[0];
 
@@ -298,18 +297,10 @@ function ModelsSection() {
             {t('settings.models.subtitle')}
           </p>
         </div>
-        <Button size="sm" variant="secondary" icon={<Wand2 className="size-3.5" />} onClick={() => setWizardOpen(true)}>
+        <Button size="sm" variant="secondary" icon={<Wand2 className="size-3.5" />} onClick={requestWizard}>
           {t('settings.models.relaunchWizard')}
         </Button>
       </div>
-
-      {wizardOpen && (
-        <ModelWizard
-          onComplete={() => setWizardOpen(false)}
-          onSkip={() => setWizardOpen(false)}
-          onLater={() => setWizardOpen(false)}
-        />
-      )}
 
       <div className="label-caps mb-2">{t('settings.models.defaultModel')}</div>
       {m && (

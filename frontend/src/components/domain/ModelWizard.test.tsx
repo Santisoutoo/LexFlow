@@ -4,13 +4,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ModelWizard } from './ModelWizard';
+import { ModelWizard, ModelWizardGate } from './ModelWizard';
 import { ConfirmProvider } from '@/components/ui';
 import { api } from '@/lib/api';
 import { liveSecretsApi } from '@/lib/api/secrets';
 import { qk } from '@/lib/queries';
 import type { Model, SystemProfile } from '@/lib/types';
 import { useUi } from '@/lib/store';
+import { WIZARD_PULL_STORAGE_KEY } from './onboarding-storage';
 
 const profileFixture: SystemProfile = {
   totalRamGb: 16,
@@ -64,7 +65,8 @@ function renderWizard(onComplete = vi.fn()) {
   };
 }
 
-async function goToStep3Small() {
+async function goToStep4Confirm() {
+  await userEvent.click(screen.getByRole('button', { name: /continuar/i }));
   await userEvent.click(screen.getByRole('button', { name: /continuar/i }));
   await userEvent.click(screen.getByRole('button', { name: /free local — small/i }));
   await userEvent.click(screen.getByRole('button', { name: /continuar/i }));
@@ -72,6 +74,8 @@ async function goToStep3Small() {
 
 describe('ModelWizard finish gate', () => {
   beforeEach(() => {
+    sessionStorage.clear();
+    localStorage.clear();
     invalidateModelsMock.mockReset();
     useSystemProfileMock.mockReturnValue({
       data: profileFixture,
@@ -96,7 +100,7 @@ describe('ModelWizard finish gate', () => {
 
   it('disables finish on step 3 before local install completes', async () => {
     renderWizard();
-    await goToStep3Small();
+    await goToStep4Confirm();
 
     expect(screen.getByRole('button', { name: /usar free local/i })).toBeDisabled();
     expect(screen.getByText(/instala el modelo primero/i)).toBeInTheDocument();
@@ -108,7 +112,7 @@ describe('ModelWizard finish gate', () => {
     });
 
     renderWizard();
-    await goToStep3Small();
+    await goToStep4Confirm();
     await userEvent.click(screen.getByRole('button', { name: /instalar/i }));
 
     expect(screen.getByRole('button', { name: /usar free local/i })).toBeEnabled();
@@ -125,18 +129,20 @@ describe('ModelWizard finish gate', () => {
     vi.spyOn(api.models, 'list').mockResolvedValue(freshModels);
 
     const { queryClient } = renderWizard(onComplete);
-    await goToStep3Small();
+    await goToStep4Confirm();
     await userEvent.click(screen.getByRole('button', { name: /instalar/i }));
     await userEvent.click(screen.getByRole('button', { name: /usar free local/i }));
 
     expect(useUi.getState().defaultModel).toBe('ollama:llama3.2:3b');
     expect(queryClient.getQueryData(qk.models())).toEqual(freshModels);
     expect(invalidateModelsMock).toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: /empezar a usar lexflow/i }));
     expect(onComplete).toHaveBeenCalledWith('small');
   });
 });
 
-async function goToStep3Cloud() {
+async function goToStep4Cloud() {
+  await userEvent.click(screen.getByRole('button', { name: /continuar/i }));
   await userEvent.click(screen.getByRole('button', { name: /continuar/i }));
   await userEvent.click(screen.getByRole('button', { name: /best cloud — pay-per-use/i }));
   await userEvent.click(screen.getByRole('button', { name: /continuar/i }));
@@ -144,6 +150,8 @@ async function goToStep3Cloud() {
 
 describe('ModelWizard cloud key gate', () => {
   beforeEach(() => {
+    sessionStorage.clear();
+    localStorage.clear();
     invalidateModelsMock.mockReset();
     useSystemProfileMock.mockReturnValue({
       data: profileFixture,
@@ -166,7 +174,7 @@ describe('ModelWizard cloud key gate', () => {
   it('disables Usar until the key probe returns valid', async () => {
     vi.mocked(liveSecretsApi.test).mockResolvedValue({ valid: false, code: 'invalid_api_key' });
     renderWizard();
-    await goToStep3Cloud();
+    await goToStep4Cloud();
 
     expect(screen.getByRole('button', { name: /usar best cloud/i })).toBeDisabled();
     expect(screen.getByText(/pega y valida tu clave api/i)).toBeInTheDocument();
@@ -175,7 +183,7 @@ describe('ModelWizard cloud key gate', () => {
   it('enables Usar after mock test succeeds', async () => {
     vi.mocked(liveSecretsApi.test).mockResolvedValue({ valid: true });
     renderWizard();
-    await goToStep3Cloud();
+    await goToStep4Cloud();
 
     await userEvent.type(screen.getByPlaceholderText(/pega tu api key/i), 'sk-good');
     await userEvent.click(screen.getByRole('button', { name: /guardar/i }));
@@ -190,6 +198,8 @@ describe('ModelWizard cloud key gate', () => {
 
 describe('ModelWizard Ollama install guide', () => {
   beforeEach(() => {
+    sessionStorage.clear();
+    localStorage.clear();
     invalidateModelsMock.mockReset();
     useModelsMock.mockReturnValue({
       data: [{ id: 'ollama:llama3.2:3b', available: true, label: 'llama3.2:3b', vendor: 'ollama', kind: 'local' }],
@@ -208,7 +218,7 @@ describe('ModelWizard Ollama install guide', () => {
       refetch,
     });
     renderWizard();
-    await goToStep3Small();
+    await goToStep4Confirm();
 
     expect(screen.getByText(/instalar ollama/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^instalar$/i })).not.toBeInTheDocument();
@@ -225,7 +235,7 @@ describe('ModelWizard Ollama install guide', () => {
       refetch,
     });
     renderWizard();
-    await goToStep3Small();
+    await goToStep4Confirm();
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /^instalar$/i })).toBeEnabled();
@@ -244,7 +254,7 @@ describe('ModelWizard Ollama install guide', () => {
       refetch,
     });
     renderWizard();
-    await goToStep3Small();
+    await goToStep4Confirm();
 
     expect(screen.getByText(/instalar ollama/i)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /re-detectar/i }));
@@ -253,5 +263,92 @@ describe('ModelWizard Ollama install guide', () => {
       expect(screen.getByRole('button', { name: /^instalar$/i })).toBeEnabled();
     });
     expect(refetch.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('ModelWizard pull persistence', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    invalidateModelsMock.mockReset();
+    useModelsMock.mockReturnValue({
+      data: [{ id: 'ollama:llama3.2:3b', available: true, label: 'llama3.2:3b', vendor: 'ollama', kind: 'local' }],
+    });
+    useUi.setState({ defaultModel: '' });
+    useSystemProfileMock.mockReturnValue({
+      data: profileFixture,
+      isLoading: false,
+      refetch: vi.fn().mockResolvedValue({ data: profileFixture }),
+    });
+    vi.mocked(liveSecretsApi.list).mockResolvedValue([]);
+  });
+
+  it('restores pulling UI after unmount when session storage says pull in progress', async () => {
+    sessionStorage.setItem(
+      WIZARD_PULL_STORAGE_KEY,
+      JSON.stringify({
+        tierKey: 'small',
+        model: 'llama3.2:3b',
+        phase: 'pulling',
+        startedAt: new Date().toISOString(),
+        lastStatus: 'descargando capas',
+      }),
+    );
+
+    const view = renderWizard();
+    await goToStep4Confirm();
+
+    expect(screen.getByText(/descargando capas/i)).toBeInTheDocument();
+    view.unmount();
+
+    renderWizard();
+    await goToStep4Confirm();
+    expect(screen.getByText(/instalando/i)).toBeInTheDocument();
+  });
+});
+
+describe('ModelWizardGate tour trigger', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    localStorage.clear();
+    useUi.setState({ tourRequested: false });
+    useSystemProfileMock.mockReturnValue({
+      data: profileFixture,
+      isLoading: false,
+      refetch: vi.fn().mockResolvedValue({ data: profileFixture }),
+    });
+    useModelsMock.mockReturnValue({
+      data: [{ id: 'ollama:llama3.2:3b', available: true, label: 'llama3.2:3b', vendor: 'ollama', kind: 'local' }],
+    });
+    vi.spyOn(api.models, 'pull').mockImplementation(async function* () {
+      yield { type: 'done', model: 'llama3.2:3b' };
+    });
+    vi.spyOn(api.models, 'list').mockResolvedValue([
+      { id: 'ollama:llama3.2:3b', available: true, label: 'llama3.2:3b', vendor: 'ollama', kind: 'local' },
+    ]);
+  });
+
+  it('requests tour after wizard completion when tutorial is not done', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <ConfirmProvider>
+            <ModelWizardGate>
+              <div>app</div>
+            </ModelWizardGate>
+          </ConfirmProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: /continuar/i }));
+    await userEvent.click(screen.getByRole('button', { name: /continuar/i }));
+    await userEvent.click(screen.getByRole('button', { name: /free local — small/i }));
+    await userEvent.click(screen.getByRole('button', { name: /continuar/i }));
+    await userEvent.click(screen.getByRole('button', { name: /instalar/i }));
+    await userEvent.click(screen.getByRole('button', { name: /usar free local/i }));
+    await userEvent.click(screen.getByRole('button', { name: /empezar a usar lexflow/i }));
+
+    expect(useUi.getState().tourRequested).toBe(true);
   });
 });

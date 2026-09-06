@@ -14,7 +14,6 @@ await page.addInitScript((t) => {
   // Skip welcome / onboarding / wizard / tour so the target page renders
   // unobstructed (keys verified against the gate components).
   localStorage.setItem('lexflow.welcomed', 'true');
-  localStorage.setItem('lexflow.onboarded', '1');
   localStorage.setItem('lexflow.wizard-completed', 'true');
   localStorage.setItem('lexflow.tutorial-completed', 'true');
   localStorage.setItem('lexflow.theme', t);
