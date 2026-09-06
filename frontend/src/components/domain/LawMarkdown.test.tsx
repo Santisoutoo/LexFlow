@@ -18,4 +18,18 @@ describe('LawMarkdown', () => {
     const rel = link.getAttribute('rel') ?? '';
     expect(rel.split(/\s+/)).toEqual(expect.arrayContaining(['noopener', 'noreferrer']));
   });
+
+  it('renders paragraphs as block p elements', () => {
+    const { container } = render(<LawMarkdown>{'First paragraph.\n\nSecond paragraph.'}</LawMarkdown>);
+    const paragraphs = container.querySelectorAll('p');
+    expect(paragraphs.length).toBeGreaterThanOrEqual(1);
+    expect(paragraphs[0]?.tagName).toBe('P');
+  });
+
+  it('forwards start attribute on ordered lists', () => {
+    const { container } = render(<LawMarkdown>{'3. third item\n4. fourth item'}</LawMarkdown>);
+    const ol = container.querySelector('ol');
+    expect(ol).toBeTruthy();
+    expect(ol?.getAttribute('start')).toBe('3');
+  });
 });

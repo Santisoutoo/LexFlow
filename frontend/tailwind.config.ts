@@ -93,6 +93,7 @@ export default {
         // fallbacks for the brief moment before the woff2 loads.
         display: ['"Space Grotesk Variable"', '"Space Grotesk"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         sans:    ['"Inter Variable"', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        serif:   ['"Source Serif 4 Variable"', '"Source Serif 4"', 'ui-serif', 'Georgia', 'serif'],
         mono:    ['"JetBrains Mono Variable"', '"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       fontSize: {
@@ -126,7 +127,7 @@ export default {
         // `measure` for prose. Applied left-anchored (no `mx-auto`) so the
         // content's left edge lines up with the shell padding / breadcrumb.
         content: '80rem', // 1280px
-        measure: '72ch',
+        measure: '70ch',
       },
       spacing: {
         // Adds half-step values used by the spec

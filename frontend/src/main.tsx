@@ -10,6 +10,7 @@ import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@ta
 import '@fontsource-variable/inter/wght.css';
 import '@fontsource-variable/space-grotesk/wght.css';
 import '@fontsource-variable/jetbrains-mono/wght.css';
+import '@fontsource-variable/source-serif-4/wght.css';
 
 import './index.css';
 import './lib/store'; // side-effect: sync theme attribute

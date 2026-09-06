@@ -1007,10 +1007,37 @@ export interface components {
              */
             text: string;
             /**
+             * Blocks
+             * @description Structured view of the body (apartados / letras / párrafos).
+             */
+            blocks?: components["schemas"]["ArticleBodyBlock"][];
+            /**
              * References
              * @description Cross-references found in this article.
              */
             references?: components["schemas"]["Reference"][];
+        };
+        /**
+         * ArticleBodyBlock
+         * @description One legally meaningful block within an article body (#31).
+         */
+        ArticleBodyBlock: {
+            /**
+             * Marker
+             * @description Block label without punctuation ("1", "a"); None for plain paragraphs.
+             */
+            marker?: string | null;
+            /**
+             * Depth
+             * @description 0 = apartado/paragraph, 1 = letra, 2 = parenthesised sub-item.
+             * @default 0
+             */
+            depth?: number;
+            /**
+             * Text
+             * @description Prose for this block only; may still contain inline Markdown.
+             */
+            text: string;
         };
         /**
          * ArticleResponse
@@ -1243,6 +1270,29 @@ export interface components {
             recent_from?: number | null;
         };
         /**
+         * Disposicion
+         * @description A closing disposition of a law (#106).
+         */
+        Disposicion: {
+            /** Heading */
+            heading: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "adicional" | "transitoria" | "derogatoria" | "final";
+            /** Number */
+            number?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Text */
+            text: string;
+            /** Blocks */
+            blocks?: components["schemas"]["ArticleBodyBlock"][];
+            /** References */
+            references?: components["schemas"]["Reference"][];
+        };
+        /**
          * DiffStats
          * @description Statistics for a diff between two versions.
          */
@@ -1433,6 +1483,11 @@ export interface components {
             sections: components["schemas"]["Section"][];
             /** Articles */
             articles: components["schemas"]["Article"][];
+            /**
+             * Disposiciones
+             * @default []
+             */
+            disposiciones?: components["schemas"]["Disposicion"][];
             /** References */
             references: components["schemas"]["Reference"][];
             /** Article Count */

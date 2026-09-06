@@ -16,6 +16,7 @@ import { describe, expect, it } from 'vitest';
 import type { BackendLawDiff, BackendLawSummary, BackendLawVersion } from '../../api';
 import {
   listLawsQuery,
+  transformArticle,
   transformDiff,
   transformLaw,
   transformVersion,
@@ -281,5 +282,41 @@ describe('listLawsQuery', () => {
       page: 2,
       page_size: 30,
     });
+  });
+});
+
+describe('transformArticle', () => {
+  it('maps backend blocks to multi-element body clauses', () => {
+    const article = transformArticle('BOE-A-2015-10565', {
+      number: '4',
+      title: 'Concepto de interesado',
+      text: '1. First.\n\na) Letter one.',
+      blocks: [
+        { marker: '1', depth: 0, text: 'First.' },
+        { marker: 'a', depth: 1, text: 'Letter one.' },
+      ],
+      references: [],
+    });
+    expect(article.body).toHaveLength(2);
+    expect(article.body[0]).toMatchObject({ marker: '1', depth: 0, text: 'First.' });
+    expect(article.body[1]).toMatchObject({ marker: 'a', depth: 1, text: 'Letter one.' });
+  });
+});
+
+describe('transformArticle', () => {
+  it('maps backend blocks to multi-element body clauses', () => {
+    const article = transformArticle('BOE-A-2015-10565', {
+      number: '4',
+      title: 'Concepto de interesado',
+      text: '1. First.\n\na) Letter one.',
+      blocks: [
+        { marker: '1', depth: 0, text: 'First.' },
+        { marker: 'a', depth: 1, text: 'Letter one.' },
+      ],
+      references: [],
+    });
+    expect(article.body).toHaveLength(2);
+    expect(article.body[0]).toMatchObject({ marker: '1', depth: 0, text: 'First.' });
+    expect(article.body[1]).toMatchObject({ marker: 'a', depth: 1, text: 'Letter one.' });
   });
 });

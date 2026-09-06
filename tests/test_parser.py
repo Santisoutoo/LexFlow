@@ -19,6 +19,7 @@ from lexflow.core.parser import (
     parse_frontmatter,
     parse_law_content,
     parse_law_file,
+    split_article_blocks,
     split_frontmatter,
 )
 
@@ -494,6 +495,98 @@ class TestExtractOrdinalArticles:
         assert len(articles) == 1
         assert articles[0].number == "Único"
         assert articles[0].title is None
+
+
+# ---------------------------------------------------------------------------
+# Article body blocks (#31)
+# ---------------------------------------------------------------------------
+
+
+class TestSplitArticleBlocks:
+    def test_apartados_separate_blocks(self) -> None:
+        text = dedent("""\
+            1. Primer apartado.
+
+            2. Segundo apartado.
+
+            3. Tercer apartado.
+        """)
+        blocks = split_article_blocks(text)
+        assert len(blocks) == 3
+        assert blocks[0].marker == "1"
+        assert blocks[0].depth == 0
+        assert "Primer apartado" in blocks[0].text
+        assert blocks[2].marker == "3"
+
+    def test_nested_letras_depth_one(self) -> None:
+        text = dedent("""\
+            1. El Pleno tendrá la siguiente composición:
+
+            a) Presidencia: La persona titular.
+
+            b) Vicepresidencia: La persona titular.
+
+            c) Vocalías: Las personas titulares.
+        """)
+        blocks = split_article_blocks(text)
+        assert blocks[0].marker == "1"
+        assert blocks[1].marker == "a"
+        assert blocks[1].depth == 1
+        assert blocks[2].marker == "b"
+        assert blocks[3].marker == "c"
+
+    def test_nested_subitems_depth_two(self) -> None:
+        text = dedent("""\
+            c) Vocalías: Las personas titulares:
+
+            1) El titular de la Dirección.
+
+            2) Un representante de cada Secretaría.
+        """)
+        blocks = split_article_blocks(text)
+        assert blocks[0].marker == "c"
+        assert blocks[0].depth == 1
+        assert blocks[1].marker == "1"
+        assert blocks[1].depth == 2
+        assert blocks[2].marker == "2"
+        assert blocks[2].depth == 2
+
+    def test_no_numbering_single_paragraph(self) -> None:
+        text = "A los efectos previstos en esta Ley, tendrán capacidad de obrar."
+        blocks = split_article_blocks(text)
+        assert len(blocks) == 1
+        assert blocks[0].marker is None
+        assert blocks[0].depth == 0
+
+    def test_inline_reference_does_not_split(self) -> None:
+        text = "Conforme al artículo 2.1.b) de esta Ley, se aplicará lo dispuesto."
+        blocks = split_article_blocks(text)
+        assert len(blocks) == 1
+
+    def test_table_rows_stay_in_block(self) -> None:
+        text = dedent("""\
+            1. La tabla siguiente:
+
+            | Col A | Col B |
+            | --- | --- |
+            | uno | dos |
+        """)
+        blocks = split_article_blocks(text)
+        assert len(blocks) == 1
+        assert "| Col A |" in blocks[0].text
+
+    def test_build_article_populates_blocks(self) -> None:
+        body = dedent("""\
+            ##### Articulo 2.
+
+            1. Primer apartado.
+            2. Segundo apartado.
+        """)
+        articles = extract_articles(body)
+        art2 = next(a for a in articles if a.number == "2")
+        assert len(art2.blocks) == 2
+        assert art2.blocks[0].marker == "1"
+        assert art2.text.count("1. Primer") == 1
 
 
 # ---------------------------------------------------------------------------

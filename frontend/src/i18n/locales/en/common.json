@@ -307,7 +307,14 @@
     "selectCitation": "Select a citation in the text (superscripts) to see the cited law and its context.",
     "relatedRefs": "Related references",
     "refsHeading": "{{n}} outgoing references",
-    "refsEmpty": "This law has no outgoing references recorded."
+    "refsEmpty": "This law has no outgoing references recorded.",
+    "disposiciones": "Disposiciones",
+    "reading": {
+      "decrease": "Decrease reading size",
+      "increase": "Increase reading size",
+      "serif": "Serif",
+      "serifToggle": "Toggle serif reading face"
+    }
   },
   "diff": {
     "loading": "Loading diff…",
@@ -523,7 +530,8 @@
       "densityCompact": "Compact",
       "densityComfortable": "Comfortable",
       "densityCozy": "Cozy",
-      "readingSizeLabel": "Reading size (law page)"
+      "readingSizeLabel": "Reading size (law page)",
+      "readingSerifLabel": "Serif reading face (law page)"
     },
     "data": {
       "title": "Data",

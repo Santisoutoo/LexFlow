@@ -65,3 +65,8 @@ class TestGetLaw:
         # tag for clients that want to branch without parsing the message.
         assert body["code"] == "law_not_found"
         assert "NONEXISTENT-123" in body["detail"]
+
+    def test_includes_disposiciones_key(self, client: TestClient, mock_registry: LawRegistry) -> None:
+        body = client.get("/api/v1/laws/BOE-A-2000-323").json()
+        assert "disposiciones" in body
+        assert isinstance(body["disposiciones"], list)

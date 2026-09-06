@@ -144,7 +144,7 @@ export const mockApi: ApiClient = {
       }
       const base = LAWS.find((l) => l.id === id);
       if (!base) throw new Error(`law not found: ${id}`);
-      return { ...base, hierarchy: [], articles: ARTICLES.filter((a) => a.lawId === id) };
+      return { ...base, hierarchy: [], articles: ARTICLES.filter((a) => a.lawId === id), disposiciones: [] };
     },
     async versions(id) {
       await delay(120);
