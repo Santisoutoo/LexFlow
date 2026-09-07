@@ -107,6 +107,8 @@ export interface Law {
   versiones: number;
   /** ISO date string of the most recent consolidation, if any. */
   ultimaModificacion?: string;
+  /** Official BOE HTML URL (`metadata.source`), with a buscar/act.php fallback. */
+  sourceUrl?: string;
   /**
    * Topic tags (Obsidian-style). Used to drive `#tag` search and the tags
    * filter on the Explorer. Stored without the leading `#`. Lowercase, kebab.
@@ -177,6 +179,9 @@ export interface Disposicion {
   refs: ArticleRef[];
 }
 
+/** Relationship type from backend `Reference.kind` (#144). Distinct from `ArticleRef.kind`. */
+export type ReferenceRelationKind = 'cites' | 'modifies' | 'repeals' | 'develops';
+
 export interface ArticleRef {
   /** Display label, e.g. "DUDH", "art. 96 CE", "LO 3/2018". */
   label: string;
@@ -185,8 +190,14 @@ export interface ArticleRef {
     lawId: string;
     articleNum?: string;
   };
-  /** Free-form source kind for filtering. */
+  /** Free-form source kind for filtering (entity type — not the graph edge kind). */
   kind?: 'law' | 'article' | 'treaty' | 'doctrine' | 'jurisprudence';
+  /** Article / disposición number where this citation appears (`source_article`). */
+  sourceArticle?: string;
+  /** How this citation relates to its target (`Reference.kind`). */
+  relationKind?: ReferenceRelationKind;
+  /** True when the target law was not resolved (`target_id` is null). */
+  inferred?: boolean;
 }
 
 // ─── Versions / Diff ─────────────────────────────────────────────────────

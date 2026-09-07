@@ -171,6 +171,13 @@ export const EDGE_KIND_LABELS: Record<GraphEdgeKind, string> = {
   repeals: 'Deroga',
 };
 
+/**
+ * Display labels for citation `relationKind` (same four values as graph
+ * edges). Kept as an alias so refs-tab / right-rail consumers don't
+ * import graph vocabulary by name.
+ */
+export const REFERENCE_KIND_LABELS: Record<GraphEdgeKind, string> = EDGE_KIND_LABELS;
+
 /** Options for the shared canvas node painter (#24). */
 export interface PaintNodeOptions {
   x: number;

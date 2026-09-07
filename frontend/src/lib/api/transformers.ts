@@ -31,6 +31,7 @@ import type {
   ArticleClause,
   ArticleDiff,
   ArticleRef,
+  DiffLine,
   DiffResult,
   Disposicion,
   HierarchyNode,
@@ -40,7 +41,15 @@ import type {
   LawVersion,
   ListLawsParams,
   RangoNormativo,
+  ReferenceRelationKind,
 } from '../types';
+
+/** Official BOE consolidada HTML — used when `metadata.source` is missing. */
+const BOE_ACT_URL_PREFIX = 'https://www.boe.es/buscar/act.php?id=';
+
+function boeSourceUrl(identifier: string, source?: string | null): string {
+  return source || `${BOE_ACT_URL_PREFIX}${identifier}`;
+}
 
 // ─── Enum maps ───────────────────────────────────────────────────────────
 
@@ -155,6 +164,7 @@ export function transformLaw(raw: BackendLawSummary): Law {
     // when the user opens a law. Counts are advisory in the Explorer header.
     referencias: 0,
     versiones: 0,
+    sourceUrl: boeSourceUrl(raw.identifier),
   };
 }
 
@@ -178,6 +188,8 @@ export function transformLawDetail(raw: BackendLawDetail): LawDetail {
     // #671 — official topic tags carried on the detail metadata; drives the
     // law-header tag chips in live mode.
     tags: m.tags ?? [],
+    ultimaModificacion: m.last_updated ?? undefined,
+    sourceUrl: boeSourceUrl(m.identifier, m.source),
     hierarchy,
     articles,
     disposiciones,
@@ -185,12 +197,48 @@ export function transformLawDetail(raw: BackendLawDetail): LawDetail {
   };
 }
 
-export function transformReference(ref: BackendReference): ArticleRef {
+const RELATION_KINDS = new Set<ReferenceRelationKind>(['cites', 'modifies', 'repeals', 'develops']);
+
+function toRelationKind(raw: BackendReference['kind'] | undefined): ReferenceRelationKind | undefined {
+  if (raw != null && RELATION_KINDS.has(raw as ReferenceRelationKind)) {
+    return raw as ReferenceRelationKind;
+  }
+  return undefined;
+}
+
+export function transformReference(ref: BackendReference, fallbackSource?: string): ArticleRef {
+  const sourceArticle = ref.source_article || fallbackSource || undefined;
   return {
     label: ref.target_text,
     target: ref.target_id ? { lawId: ref.target_id } : undefined,
     kind: ref.target_id ? 'law' : undefined,
+    sourceArticle,
+    relationKind: toRelationKind(ref.kind) ?? 'cites',
+    inferred: !ref.target_id,
   };
+}
+
+function citationNeedle(label: string): string {
+  return label.trim().toLowerCase();
+}
+
+/**
+ * Place each ref on the clause whose text contains the citation label.
+ * Unmatched refs fall back to the first clause.
+ */
+function distributeRefs(clauses: ArticleClause[], refs: ArticleRef[]): ArticleClause[] {
+  if (clauses.length === 0) return clauses;
+  const assigned = clauses.map((clause) => ({ ...clause, citations: [] as ArticleRef[] }));
+  for (const ref of refs) {
+    const needle = citationNeedle(ref.label);
+    const matchIndex =
+      needle.length === 0
+        ? -1
+        : assigned.findIndex((clause) => citationNeedle(clause.text).includes(needle));
+    const target = assigned[matchIndex >= 0 ? matchIndex : 0];
+    target.citations.push(ref);
+  }
+  return assigned;
 }
 
 function transformBodyBlocks(
@@ -199,19 +247,19 @@ function transformBodyBlocks(
   refs: ArticleRef[],
 ): ArticleClause[] {
   if (blocks && blocks.length > 0) {
-    return blocks.map((block, index) => ({
+    const clauses = blocks.map((block) => ({
       marker: block.marker ?? null,
       text: block.text,
       depth: block.depth ?? 0,
-      // Per-clause citation handles are a follow-up; article-level refs on first clause.
-      citations: index === 0 ? refs : [],
+      citations: [] as ArticleRef[],
     }));
+    return distributeRefs(clauses, refs);
   }
   return [{ marker: null, text: fallbackText, depth: 0, citations: refs }];
 }
 
 export function transformArticle(lawId: string, raw: BackendArticle): Article {
-  const refs = (raw.references ?? []).map(transformReference);
+  const refs = (raw.references ?? []).map((ref) => transformReference(ref, raw.number));
   return {
     id: `${lawId}::${raw.number}`,
     lawId,
@@ -223,7 +271,8 @@ export function transformArticle(lawId: string, raw: BackendArticle): Article {
 }
 
 export function transformDisposicion(lawId: string, raw: BackendDisposicion): Disposicion {
-  const refs = (raw.references ?? []).map(transformReference);
+  const fallbackSource = raw.number ?? raw.heading;
+  const refs = (raw.references ?? []).map((ref) => transformReference(ref, fallbackSource));
   return {
     heading: raw.heading,
     kind: raw.kind,
@@ -277,49 +326,171 @@ function buildVersionStub(commit: string, date: string | null): LawVersion {
   };
 }
 
-function parseUnifiedDiffLines(text: string): ArticleDiff {
-  // The backend returns a single unified diff for the whole file. We surface
-  // it as one synthetic article so the DiffViewer can render it; a future
-  // pass will explode it into per-article diffs (see follow-up issue).
-  const lines = text.split('\n');
-  const left: { t: 'eq' | 'add' | 'del'; s: string }[] = [];
-  const right: { t: 'eq' | 'add' | 'del'; s: string }[] = [];
-  for (const raw of lines) {
-    if (raw.startsWith('+++') || raw.startsWith('---') || raw.startsWith('@@') || raw.startsWith('diff ')) continue;
-    if (raw.startsWith('+')) {
-      right.push({ t: 'add', s: raw.slice(1) });
-    } else if (raw.startsWith('-')) {
-      left.push({ t: 'del', s: raw.slice(1) });
+type ClassifiedDiffLine = DiffLine;
+
+function isDiffHeader(raw: string): boolean {
+  return raw.startsWith('+++') || raw.startsWith('---') || raw.startsWith('@@') || raw.startsWith('diff ');
+}
+
+function classifyDiffLine(raw: string): ClassifiedDiffLine | null {
+  if (isDiffHeader(raw)) return null;
+  if (raw.startsWith('+')) return { t: 'add', s: raw.slice(1) };
+  if (raw.startsWith('-')) return { t: 'del', s: raw.slice(1) };
+  const s = raw.startsWith(' ') ? raw.slice(1) : raw;
+  return { t: 'eq', s };
+}
+
+function classifyUnifiedDiff(text: string): ClassifiedDiffLine[] {
+  const out: ClassifiedDiffLine[] = [];
+  for (const raw of text.split('\n')) {
+    const line = classifyDiffLine(raw);
+    if (line) out.push(line);
+  }
+  return out;
+}
+
+function linesToSides(lines: ClassifiedDiffLine[]): {
+  left: ClassifiedDiffLine[];
+  right: ClassifiedDiffLine[];
+  added: number;
+  removed: number;
+} {
+  const left: ClassifiedDiffLine[] = [];
+  const right: ClassifiedDiffLine[] = [];
+  for (const line of lines) {
+    if (line.t === 'add') {
+      right.push(line);
+    } else if (line.t === 'del') {
+      left.push(line);
     } else {
-      const s = raw.startsWith(' ') ? raw.slice(1) : raw;
-      left.push({ t: 'eq', s });
-      right.push({ t: 'eq', s });
+      left.push(line);
+      right.push(line);
     }
   }
   return {
-    num: 'todo',
-    titulo: 'Diff completo',
-    left: { tag: '', date: '', lines: left },
-    right: { tag: '', date: '', lines: right },
-    totals: {
-      added: right.filter((l) => l.t === 'add').length,
-      removed: left.filter((l) => l.t === 'del').length,
-    },
+    left,
+    right,
+    added: right.filter((l) => l.t === 'add').length,
+    removed: left.filter((l) => l.t === 'del').length,
   };
 }
 
+function articleDiffFromLines(num: string, titulo: string, lines: ClassifiedDiffLine[]): ArticleDiff {
+  const sides = linesToSides(lines);
+  return {
+    num,
+    titulo,
+    left: { tag: '', date: '', lines: sides.left },
+    right: { tag: '', date: '', lines: sides.right },
+    totals: { added: sides.added, removed: sides.removed },
+  };
+}
+
+/**
+ * Markdown / prose heading for an article. Anchored at the start (optional
+ * ATX hashes) so body mentions like "según el Artículo 23" don't open a bucket.
+ * Spirit of backend `_ARTICLE_HEADING_RE` (`Art[ií]culo\s+(\S+)`).
+ */
+const ARTICLE_HEADING_RE = /^(?:#{1,6}\s+)?Art[ií]culo\s+(\S+?)\.?\s*(.*?)\s*$/i;
+
+function matchArticleHeading(text: string): { num: string; titulo: string } | null {
+  const match = ARTICLE_HEADING_RE.exec(text.trim());
+  if (!match) return null;
+  const num = (match[1] ?? '').replace(/\.$/, '');
+  if (!num) return null;
+  const titulo = (match[2] ?? '').replace(/\.$/, '').trim();
+  return { num, titulo };
+}
+
+interface ArticleBucket {
+  num: string;
+  titulo: string;
+  lines: ClassifiedDiffLine[];
+}
+
+function mergeBucketsByNum(buckets: ArticleBucket[]): ArticleBucket[] {
+  const byNum = new Map<string, ArticleBucket>();
+  const order: string[] = [];
+  for (const bucket of buckets) {
+    const existing = byNum.get(bucket.num);
+    if (!existing) {
+      byNum.set(bucket.num, { num: bucket.num, titulo: bucket.titulo, lines: [...bucket.lines] });
+      order.push(bucket.num);
+      continue;
+    }
+    existing.lines.push(...bucket.lines);
+    if (existing.titulo.startsWith('Artículo ') && !bucket.titulo.startsWith('Artículo ')) {
+      existing.titulo = bucket.titulo;
+    }
+  }
+  return order.map((num) => byNum.get(num)).filter((bucket): bucket is ArticleBucket => bucket != null);
+}
+
+function parseUnifiedDiffByArticles(diffText: string, changedArticles?: string[]): ArticleDiff[] {
+  const classified = classifyUnifiedDiff(diffText);
+  const buckets: ArticleBucket[] = [];
+  let current: ArticleBucket | null = null;
+  const preamble: ClassifiedDiffLine[] = [];
+
+  for (const line of classified) {
+    const heading = matchArticleHeading(line.s);
+    if (heading) {
+      if (current && current.num === heading.num) {
+        current.lines.push(line);
+        if (heading.titulo) current.titulo = heading.titulo;
+        continue;
+      }
+      current = { num: heading.num, titulo: heading.titulo || `Artículo ${heading.num}`, lines: [line] };
+      buckets.push(current);
+      continue;
+    }
+    if (current) {
+      current.lines.push(line);
+    } else {
+      preamble.push(line);
+    }
+  }
+
+  if (buckets.length === 0) {
+    return [articleDiffFromLines('todo', 'Diff completo', classified)];
+  }
+
+  const merged = mergeBucketsByNum(buckets);
+  if (preamble.length > 0 && merged[0]) {
+    merged[0].lines = [...preamble, ...merged[0].lines];
+  }
+
+  const parsed = merged.map((bucket) => articleDiffFromLines(bucket.num, bucket.titulo, bucket.lines));
+  if (!changedArticles || changedArticles.length === 0) return parsed;
+
+  const byNum = new Map(parsed.map((article) => [article.num, article]));
+  const ordered: ArticleDiff[] = [];
+  for (const num of changedArticles) {
+    const article = byNum.get(num);
+    if (article) {
+      ordered.push(article);
+      byNum.delete(num);
+    }
+  }
+  for (const article of parsed) {
+    if (byNum.has(article.num)) ordered.push(article);
+  }
+  return ordered;
+}
+
 export function transformDiff(raw: BackendLawDiff): DiffResult {
-  const article = parseUnifiedDiffLines(raw.diff_text);
+  const changedArticles = raw.stats.changed_articles ?? [];
+  const articles = parseUnifiedDiffByArticles(raw.diff_text, changedArticles);
   const stats: BackendDiffStats = raw.stats;
   return {
     lawId: raw.law_id,
     from: buildVersionStub(raw.from_commit, raw.from_date ?? null),
     to: buildVersionStub(raw.to_commit, raw.to_date ?? null),
-    articles: [article],
+    articles,
     totals: {
       added: stats.additions,
       removed: stats.deletions,
-      modified: (stats.changed_articles ?? []).length,
+      modified: changedArticles.length,
     },
   };
 }

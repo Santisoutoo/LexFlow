@@ -13,13 +13,14 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { BackendLawDiff, BackendLawDetail, BackendLawSummary, BackendLawVersion } from '../../api';
+import type { BackendLawDiff, BackendLawDetail, BackendLawSummary, BackendLawVersion, BackendReference } from '../../api';
 import {
   listLawsQuery,
   transformArticle,
   transformDiff,
   transformLaw,
   transformLawDetail,
+  transformReference,
   transformVersion,
 } from './transformers';
 
@@ -155,6 +156,12 @@ describe('transformLaw', () => {
     // still get a defined array so they render nothing rather than crash.
     expect(transformLaw(lawSummary).tags).toEqual([]);
   });
+
+  it('builds a BOE act.php sourceUrl from the identifier', () => {
+    expect(transformLaw(lawSummary).sourceUrl).toBe(
+      'https://www.boe.es/buscar/act.php?id=BOE-A-2000-323',
+    );
+  });
 });
 
 // ─── parseUnifiedDiffLines (via transformDiff) ───────────────────────────
@@ -208,6 +215,41 @@ describe('parseUnifiedDiffLines (via transformDiff)', () => {
     const result = transformDiff(baseDiff);
     expect(result.from.tag).toBe('aaaaaaa');
     expect(result.to.tag).toBe('bbbbbbb');
+  });
+
+  it('falls back to a single Diff completo article when no headings are present', () => {
+    const result = transformDiff({
+      ...baseDiff,
+      diff_text: [' kept line', '-removed', '+added'].join('\n'),
+    });
+    expect(result.articles).toHaveLength(1);
+    expect(result.articles[0].num).toBe('todo');
+    expect(result.articles[0].titulo).toBe('Diff completo');
+  });
+
+  it('segments a multi-article unified diff and keeps per-article totals', () => {
+    const result = transformDiff({
+      ...baseDiff,
+      diff_text: [
+        '+++ b/file',
+        '--- a/file',
+        '@@ -1,3 +1,3 @@',
+        '+###### Artículo 1. Objeto.',
+        '+Texto nuevo del primero.',
+        '@@ -20,4 +20,4 @@',
+        ' ###### Artículo 5. Ámbito.',
+        '-viejo ámbito',
+        '+nuevo ámbito',
+      ].join('\n'),
+      stats: { additions: 3, deletions: 1, changed_articles: ['1', '5'] },
+    });
+    expect(result.articles.length).toBeGreaterThan(1);
+    expect(result.articles.map((a) => a.num)).toEqual(['1', '5']);
+    expect(result.articles[0].titulo).toBe('Objeto');
+    expect(result.articles[1].titulo).toBe('Ámbito');
+    expect(result.articles[0].totals.added).toBeGreaterThan(0);
+    expect(result.articles[1].totals.removed).toBe(1);
+    expect(result.totals.modified).toBe(2);
   });
 });
 
@@ -302,6 +344,59 @@ describe('transformArticle', () => {
     expect(article.body[0]).toMatchObject({ marker: '1', depth: 0, text: 'First.' });
     expect(article.body[1]).toMatchObject({ marker: 'a', depth: 1, text: 'Letter one.' });
   });
+
+  it('distributes citations onto the clause whose text contains the label', () => {
+    const article = transformArticle('BOE-A-2018-16673', {
+      number: '18',
+      title: 'Citas',
+      text: 'Cita la LO 3/2018. También el art. 96 CE.',
+      blocks: [
+        { marker: '1', depth: 0, text: 'Cita la LO 3/2018 en este apartado.' },
+        { marker: '2', depth: 0, text: 'También el art. 96 CE aquí.' },
+      ],
+      references: [
+        { target_text: 'LO 3/2018', target_id: 'BOE-A-2018-16673', kind: 'cites', source_article: '18' },
+        { target_text: 'art. 96 CE', target_id: 'CE-1978', kind: 'modifies', source_article: '18' },
+      ],
+    });
+    expect(article.body[0].citations.map((c) => c.label)).toEqual(['LO 3/2018']);
+    expect(article.body[1].citations.map((c) => c.label)).toEqual(['art. 96 CE']);
+    expect(article.body[1].citations[0].relationKind).toBe('modifies');
+  });
+});
+
+describe('transformReference', () => {
+  it('maps kind and source_article onto relationKind / sourceArticle', () => {
+    const raw: BackendReference = {
+      target_text: 'Ley 15/2022',
+      target_id: 'BOE-A-2022-11589',
+      kind: 'repeals',
+      source_article: '12',
+    };
+    const ref = transformReference(raw);
+    expect(ref).toMatchObject({
+      label: 'Ley 15/2022',
+      target: { lawId: 'BOE-A-2022-11589' },
+      kind: 'law',
+      sourceArticle: '12',
+      relationKind: 'repeals',
+      inferred: false,
+    });
+  });
+
+  it('marks unresolved targets as inferred and uses the fallback source article', () => {
+    const raw: BackendReference = {
+      target_text: 'alguna norma',
+      target_id: null,
+      kind: 'cites',
+    };
+    const ref = transformReference(raw, '4');
+    expect(ref.inferred).toBe(true);
+    expect(ref.target).toBeUndefined();
+    expect(ref.kind).toBeUndefined();
+    expect(ref.sourceArticle).toBe('4');
+    expect(ref.relationKind).toBe('cites');
+  });
 });
 
 describe('transformLawDetail', () => {
@@ -342,5 +437,24 @@ describe('transformLawDetail', () => {
   it('maps raw_text to rawText', () => {
     const law = transformLawDetail(detailRaw);
     expect(law.rawText).toBe('Full raw fallback');
+  });
+
+  it('maps last_updated and source onto ultimaModificacion / sourceUrl', () => {
+    const law = transformLawDetail({
+      ...detailRaw,
+      metadata: {
+        ...detailRaw.metadata,
+        last_updated: '2024-03-05',
+        source: 'https://www.boe.es/buscar/act.php?id=BOE-A-1962-14073',
+      },
+    });
+    expect(law.ultimaModificacion).toBe('2024-03-05');
+    expect(law.sourceUrl).toBe('https://www.boe.es/buscar/act.php?id=BOE-A-1962-14073');
+  });
+
+  it('falls back to the BOE act.php URL when metadata.source is missing', () => {
+    const law = transformLawDetail(detailRaw);
+    expect(law.sourceUrl).toBe('https://www.boe.es/buscar/act.php?id=BOE-A-1962-14073');
+    expect(law.ultimaModificacion).toBeUndefined();
   });
 });

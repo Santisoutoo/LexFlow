@@ -10,6 +10,7 @@
  * flags), update `NeighbourEdge` and `resolveNeighbourNodes` here.
  */
 import type { GraphData, GraphNode, GraphEdge } from '@/lib/types';
+import type { GraphEdgeKind } from '@/lib/graph-colors';
 
 /** Maximum number of neighbour edges surfaced in the right-rail. */
 const MAX_NEIGHBOURS = 12;
@@ -126,25 +127,66 @@ export function resolveNeighbourhood(
 /**
  * Return 1-hop law neighbours of `currentLawId` for the related-laws rail.
  *
- * Deduplicates by target id (a law can be linked by multiple edges) and
- * ignores non-law nodes. Caps at `max`.
+ * Deduplicates by target id (a law can be linked by multiple edges), keeping
+ * the strongest `edgeKind` (repeals > modifies > develops > cites). Ignores
+ * non-law nodes. Sorted by PageRank descending, then capped at `max`.
  */
+export interface RelatedLawNeighbour {
+  node: GraphNode;
+  edgeKind: GraphEdgeKind;
+  /** True when the edge kind is a weak/heuristic signal. Provenance of
+   *  unresolved citations is not on `GraphEdge` yet (#775/#782). */
+  inferred: boolean;
+}
+
+const EDGE_KIND_STRENGTH: Record<GraphEdgeKind, number> = {
+  repeals: 0,
+  modifies: 1,
+  develops: 2,
+  cites: 3,
+};
+
+function strongerEdgeKind(a: GraphEdgeKind, b: GraphEdgeKind): GraphEdgeKind {
+  return EDGE_KIND_STRENGTH[a] <= EDGE_KIND_STRENGTH[b] ? a : b;
+}
+
+function edgeKindOf(edge: GraphEdge): GraphEdgeKind {
+  return edge.kind ?? 'cites';
+}
+
+function pagerankOf(node: GraphNode): number {
+  const value = node.meta?.pagerank;
+  return typeof value === 'number' ? value : 0;
+}
+
 export function resolveRelatedLawNeighbours(
   graph: GraphData,
   currentLawId: string,
   max = MAX_RELATED_LAWS,
-): GraphNode[] {
+): RelatedLawNeighbour[] {
   const index = buildNodeIndex(graph.nodes);
-  const neighbours = resolveNeighbourNodes(graph.edges, index, currentLawId);
-  const seen = new Set<string>();
-  const result: GraphNode[] = [];
+  const merged = new Map<string, RelatedLawNeighbour>();
 
-  for (const { otherNode, otherId } of neighbours) {
-    if (otherNode.kind !== 'law' || otherId === currentLawId || seen.has(otherId)) continue;
-    seen.add(otherId);
-    result.push(otherNode);
-    if (result.length >= max) break;
+  for (const edge of graph.edges) {
+    const otherId =
+      edge.source === currentLawId ? edge.target :
+      edge.target === currentLawId ? edge.source :
+      null;
+    if (!otherId || otherId === currentLawId) continue;
+
+    const otherNode = index.get(otherId);
+    if (!otherNode || otherNode.kind !== 'law') continue;
+
+    const edgeKind = edgeKindOf(edge);
+    const existing = merged.get(otherId);
+    if (!existing) {
+      merged.set(otherId, { node: otherNode, edgeKind, inferred: false });
+      continue;
+    }
+    existing.edgeKind = strongerEdgeKind(existing.edgeKind, edgeKind);
   }
 
-  return result;
+  return [...merged.values()]
+    .sort((a, b) => pagerankOf(b.node) - pagerankOf(a.node))
+    .slice(0, max);
 }

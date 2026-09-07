@@ -36,6 +36,15 @@ describe('RelatedLaws', () => {
     expect(screen.queryByText('Not connected')).not.toBeInTheDocument();
   });
 
+  it('shows the edge-kind label on each row', () => {
+    render(
+      <RelatedLaws graph={graph} currentLawId="centre" onNavigate={() => undefined} />,
+    );
+
+    expect(screen.getByText('Modifica')).toBeInTheDocument();
+    expect(screen.getAllByText('Cita').length).toBeGreaterThanOrEqual(1);
+  });
+
   it('navigates when a chip is clicked', async () => {
     const onNavigate = vi.fn();
     render(

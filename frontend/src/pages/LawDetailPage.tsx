@@ -11,18 +11,19 @@ import { GraphCanvasLazy } from '@/components/domain/GraphCanvasLazy';
 import { VersionTimeline } from '@/components/domain/VersionTimeline';
 import { ErrorState } from '@/components/domain/ErrorState';
 import { Skeleton, SkeletonLines } from '@/components/domain/Skeleton';
-import { Badge, Button, Chip, Tabs } from '@/components/ui';
+import { Badge, Button, Tabs } from '@/components/ui';
 import { RightRail } from '@/components/shell/RightRail';
 import { useAddUserTag, useGraph, useLaw, useRemoveUserTag, useUserTags, useVersions } from '@/lib/queries';
 import { useUi } from '@/lib/store';
-import { formatDate, cn } from '@/lib/utils';
+import { formatDate, cn, groupBy } from '@/lib/utils';
 import {
   buildReadingItems,
   flattenToc,
   parseArticleHash,
   VIRTUALIZE_THRESHOLD,
 } from '@/lib/law-reading';
-import type { Article, ArticleRef, GraphData, GraphNodeKind, HierarchyNode, LawDetail } from '@/lib/types';
+import type { Article, ArticleRef, GraphData, GraphNodeKind, HierarchyNode, LawDetail, LawVersion } from '@/lib/types';
+import { REFERENCE_KIND_LABELS } from '@/lib/graph-colors';
 import { RelatedLaws } from './RelatedLaws';
 
 const VERSION_KIND_BADGE: Record<'publish' | 'default', string> = {
@@ -33,6 +34,21 @@ const VERSION_KIND_BADGE: Record<'publish' | 'default', string> = {
 const ALL_GRAPH_KINDS: GraphNodeKind[] = ['law', 'article', 'reference', 'amendment', 'repealed'];
 
 type Tab = 'texto' | 'versiones' | 'grafo' | 'refs' | 'disc';
+
+/**
+ * `versions` is newest-first (git log). `toIndex` is the row the user
+ * clicked; the parent commit is the next (older) entry. Null when the
+ * row is the oldest version and has no parent to diff against.
+ */
+function buildDiffSearchParams(
+  versions: LawVersion[],
+  toIndex: number,
+): { from: string; to: string } | null {
+  const to = versions[toIndex];
+  const from = versions[toIndex + 1];
+  if (!to || !from) return null;
+  return { from: from.tag, to: to.tag };
+}
 
 export function LawDetailPage() {
   const { lawId } = useParams<{ lawId: string }>();
@@ -53,7 +69,7 @@ export function LawDetailPage() {
   }, [location.hash]);
 
   const { data: law, isLoading, error, refetch } = useLaw(lawId);
-  const { data: versions = [] } = useVersions(lawId);
+  const { data: versions = [], isLoading: versionsLoading } = useVersions(lawId);
   // #670 — custom user tags on this law. Keyed off the route param (like
   // `useVersions`/`useGraph` above), not `law.id`, so the hook can be
   // called before the `!law` early-return without an unsafe `law.id` access.
@@ -89,16 +105,21 @@ export function LawDetailPage() {
   const lawRefs = useMemo<ArticleRef[]>(() => {
     const seen = new Set<string>();
     const out: ArticleRef[] = [];
+    const pushRef = (ref: ArticleRef, fallbackSource: string) => {
+      const sourceArticle = ref.sourceArticle ?? fallbackSource;
+      const key = `${ref.label}|${sourceArticle}|${ref.target?.lawId ?? ''}|${ref.target?.articleNum ?? ''}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push(sourceArticle === ref.sourceArticle ? ref : { ...ref, sourceArticle });
+    };
     for (const article of articles) {
-      for (const ref of article.refs ?? []) {
-        const key = `${ref.label}|${ref.target?.lawId ?? ''}|${ref.target?.articleNum ?? ''}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        out.push(ref);
-      }
+      for (const ref of article.refs ?? []) pushRef(ref, article.num);
+    }
+    for (const disposicion of disposiciones) {
+      for (const ref of disposicion.refs ?? []) pushRef(ref, disposicion.heading);
     }
     return out;
-  }, [articles]);
+  }, [articles, disposiciones]);
 
   if (error) return <div className="p-10"><ErrorState description={String(error)} onRetry={() => refetch()} /></div>;
   if (!law || isLoading) return <LoadingSkeleton />;
@@ -149,31 +170,47 @@ export function LawDetailPage() {
         )}
         {tab === 'versiones' && (
           <div className="flex-1 overflow-auto p-8 scrollbar-thin">
-            <VersionTimeline versions={versions} current={versions[versions.length - 1]?.tag} />
+            <VersionTimeline versions={versions} current={versions[0]?.tag} />
             <div className="mt-6">
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="font-display text-base font-semibold">{t('lawDetail.changesByVersion')}</h3>
                 <Button size="sm" variant="secondary" icon={<GitCompareArrows className="size-3.5" />}
+                  disabled={versionsLoading || versions.length < 2}
                   onClick={() => navigate(`/laws/${encodeURIComponent(lawId ?? '')}/diff`)}>
                   {t('lawDetail.compareVersions')}
                 </Button>
               </div>
-              {[...versions].reverse().map((v, i) => (
-                <div key={v.tag} className="mb-2.5 flex items-center gap-3.5 rounded-xl border border-border bg-surface p-4">
-                  <span className={cn('inline-flex size-9 items-center justify-center rounded-md', VERSION_KIND_BADGE[v.kind === 'publish' ? 'publish' : 'default'])}>
-                    {v.kind === 'publish' ? <Plus className="size-4" /> : <GitCompareArrows className="size-4" />}
-                  </span>
-                  <div className="flex-1">
-                    <div className="flex items-baseline gap-2">
-                      <span className="font-mono font-semibold">{v.tag}</span>
-                      <span className="text-sm">{v.label}</span>
-                      {i === 0 && <Badge tone="success">vigente</Badge>}
+              {versions.map((v, i) => {
+                const diffParams = buildDiffSearchParams(versions, i);
+                return (
+                  <div key={v.tag} className="mb-2.5 flex items-center gap-3.5 rounded-xl border border-border bg-surface p-4">
+                    <span className={cn('inline-flex size-9 items-center justify-center rounded-md', VERSION_KIND_BADGE[v.kind === 'publish' ? 'publish' : 'default'])}>
+                      {v.kind === 'publish' ? <Plus className="size-4" /> : <GitCompareArrows className="size-4" />}
+                    </span>
+                    <div className="flex-1">
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-mono font-semibold">{v.tag}</span>
+                        <span className="text-sm">{v.label}</span>
+                        {i === 0 && <Badge tone="success">vigente</Badge>}
+                      </div>
+                      <div className="mt-0.5 text-[12px] text-muted">{formatDate(v.date)}</div>
                     </div>
-                    <div className="mt-0.5 text-[12px] text-muted">{formatDate(v.date)}</div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={versionsLoading || !diffParams}
+                      onClick={() => {
+                        if (!diffParams || !lawId) return;
+                        navigate(
+                          `/laws/${encodeURIComponent(lawId)}/diff?from=${encodeURIComponent(diffParams.from)}&to=${encodeURIComponent(diffParams.to)}`,
+                        );
+                      }}
+                    >
+                      {t('lawDetail.viewChanges')}
+                    </Button>
                   </div>
-                  <Button size="sm" variant="ghost" onClick={() => navigate(`/laws/${encodeURIComponent(lawId ?? '')}/diff`)}>{t('lawDetail.viewChanges')}</Button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -222,12 +259,34 @@ function LawDetailRefsTab({ refs, onRefClick }: { refs: ArticleRef[]; onRefClick
       </div>
     );
   }
+  const grouped = groupBy(refs, (ref) => ref.sourceArticle ?? '—');
   return (
     <div className="flex-1 overflow-auto p-6 md:p-8 scrollbar-thin">
       <div className="mb-3 label-caps">{t('lawDetail.refsHeading', { n: refs.length })}</div>
-      <div className="flex flex-wrap gap-1.5">
-        {refs.map((ref, i) => (
-          <Chip key={`${ref.label}-${i}`} onClick={() => onRefClick(ref)}>{ref.label}</Chip>
+      <div className="flex flex-col gap-5">
+        {Object.entries(grouped).map(([source, group]) => (
+          <section key={source}>
+            <div className="mb-2 label-caps">
+              {source === '—'
+                ? t('lawDetail.refsUngrouped')
+                : t('lawDetail.refsFromArticle', { article: source })}
+            </div>
+            <div className="flex flex-col gap-1">
+              {group.map((ref, i) => (
+                <button
+                  key={`${ref.label}-${source}-${i}`}
+                  type="button"
+                  onClick={() => onRefClick(ref)}
+                  className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-left text-[13px] hover:bg-surface-2"
+                >
+                  <span className="min-w-0 flex-1 truncate font-medium">{ref.label}</span>
+                  {ref.relationKind && (
+                    <Badge tone="outline">{REFERENCE_KIND_LABELS[ref.relationKind]}</Badge>
+                  )}
+                </button>
+              ))}
+            </div>
+          </section>
         ))}
       </div>
     </div>
@@ -569,7 +628,16 @@ function DetailRightRail({
         <div className="space-y-3">
           <div>
             <h3 className="font-display text-base font-semibold">{selectedRef.label}</h3>
-            <p className="mt-1 text-[12.5px] text-muted">{t('lawDetail.citedFrom', { law: law.short })}</p>
+            <p className="mt-1 text-[12.5px] text-muted">
+              {selectedRef.sourceArticle
+                ? t('lawDetail.citedFromArticle', { article: selectedRef.sourceArticle })
+                : t('lawDetail.citedFrom', { law: law.short })}
+            </p>
+            {selectedRef.relationKind && (
+              <div className="mt-2">
+                <Badge tone="outline">{REFERENCE_KIND_LABELS[selectedRef.relationKind]}</Badge>
+              </div>
+            )}
           </div>
           {selectedRef.target && (
             <button

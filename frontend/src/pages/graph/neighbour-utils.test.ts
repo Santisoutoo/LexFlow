@@ -110,9 +110,9 @@ describe('resolveNeighbourNodes', () => {
 
 describe('resolveRelatedLawNeighbours', () => {
   const centre = node('centre');
-  const lawA = node('law-a', { label: 'Law A' });
-  const lawB = node('law-b', { label: 'Law B' });
-  const lawC = node('law-c', { label: 'Law C' });
+  const lawA = node('law-a', { label: 'Law A', meta: { pagerank: 0.1 } });
+  const lawB = node('law-b', { label: 'Law B', meta: { pagerank: 0.9 } });
+  const lawC = node('law-c', { label: 'Law C', meta: { pagerank: 0.4 } });
   const article = node('art-1', { kind: 'article' });
   const graph = {
     nodes: [centre, lawA, lawB, lawC, article],
@@ -127,12 +127,19 @@ describe('resolveRelatedLawNeighbours', () => {
 
   it('returns only 1-hop law neighbours', () => {
     const result = resolveRelatedLawNeighbours(graph, 'centre');
-    expect(result.map((n) => n.id).sort()).toEqual(['law-a', 'law-b', 'law-c']);
+    expect(result.map((n) => n.node.id).sort()).toEqual(['law-a', 'law-b', 'law-c']);
   });
 
-  it('deduplicates multiple edges to the same law', () => {
+  it('deduplicates multiple edges to the same law, keeping the strongest kind', () => {
     const result = resolveRelatedLawNeighbours(graph, 'centre');
-    expect(result.filter((n) => n.id === 'law-a')).toHaveLength(1);
+    const lawARow = result.find((n) => n.node.id === 'law-a');
+    expect(result.filter((n) => n.node.id === 'law-a')).toHaveLength(1);
+    expect(lawARow?.edgeKind).toBe('modifies');
+  });
+
+  it('sorts neighbours by pagerank descending', () => {
+    const result = resolveRelatedLawNeighbours(graph, 'centre');
+    expect(result.map((n) => n.node.id)).toEqual(['law-b', 'law-c', 'law-a']);
   });
 
   it('excludes the centre law id', () => {
@@ -141,12 +148,27 @@ describe('resolveRelatedLawNeighbours', () => {
       edges: [edge('e1', 'centre', 'centre'), edge('e2', 'centre', 'law-a')],
     };
     const result = resolveRelatedLawNeighbours(selfGraph, 'centre');
-    expect(result.map((n) => n.id)).toEqual(['law-a']);
+    expect(result.map((n) => n.node.id)).toEqual(['law-a']);
   });
 
-  it('caps at max', () => {
+  it('caps at max after ranking', () => {
     const result = resolveRelatedLawNeighbours(graph, 'centre', 2);
     expect(result).toHaveLength(2);
+    expect(result.map((n) => n.node.id)).toEqual(['law-b', 'law-c']);
+  });
+
+  it('merges duplicate edges to the strongest kind (repeals > modifies)', () => {
+    const mergeGraph = {
+      nodes: [centre, lawA],
+      edges: [
+        edge('e1', 'centre', 'law-a', { kind: 'cites' }),
+        edge('e2', 'centre', 'law-a', { kind: 'repeals' }),
+        edge('e3', 'centre', 'law-a', { kind: 'modifies' }),
+      ],
+    };
+    const result = resolveRelatedLawNeighbours(mergeGraph, 'centre');
+    expect(result).toHaveLength(1);
+    expect(result[0].edgeKind).toBe('repeals');
   });
 });
 

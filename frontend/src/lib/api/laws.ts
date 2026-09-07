@@ -54,6 +54,6 @@ export const liveLawsApi: ApiClient['laws'] = {
     const raw = await http<BackendLawReferencesResponse>(
       `/laws/${encodeURIComponent(id)}/references`,
     );
-    return raw.references.map(transformReference);
+    return raw.references.map((ref) => transformReference(ref));
   },
 };

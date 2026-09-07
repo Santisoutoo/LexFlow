@@ -32,7 +32,7 @@ function clauseKey(clause: ArticleClause, index: number): string {
 
 /**
  * Single article rendered with number in the gutter, body in the reading
- * column, and references as monospace chips below.
+ * column, and citations as superscripts on the clause they belong to.
  *
  * Audit #409 perf: wrapped with ``React.memo`` so the LawDetailPage's
  * "texto" tab — which can list dozens of articles — does not re-render
@@ -78,21 +78,6 @@ function ArticleBlockImpl({ article, size = 16, serif = false, highlighted = fal
           ))}
         </div>
       ))}
-      {article.refs.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {article.refs.map((r, i) => (
-            <span
-              key={i}
-              className={cn(
-                'inline-flex items-center gap-1 rounded px-2 py-px font-mono text-[11px]',
-                'bg-surface-2 text-muted',
-              )}
-            >
-              {r.label}
-            </span>
-          ))}
-        </div>
-      )}
     </article>
   );
 }

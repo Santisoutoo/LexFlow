@@ -57,21 +57,6 @@ function DisposicionBlockImpl({ disposicion, size = 16, serif = false, onCitatio
           ))}
         </div>
       ))}
-      {disposicion.refs.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {disposicion.refs.map((r, i) => (
-            <span
-              key={i}
-              className={cn(
-                'inline-flex items-center gap-1 rounded px-2 py-px font-mono text-[11px]',
-                'bg-surface-2 text-muted',
-              )}
-            >
-              {r.label}
-            </span>
-          ))}
-        </div>
-      )}
     </article>
   );
 }

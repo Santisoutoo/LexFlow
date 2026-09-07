@@ -22,8 +22,9 @@
  * - `useGraph` return shape → `src/lib/queries.ts` `useGraph`
  */
 import { Network } from 'lucide-react';
-import { Chip } from '@/components/ui';
+import { Badge, Chip } from '@/components/ui';
 import type { GraphData } from '@/lib/types';
+import { EDGE_KIND_LABELS } from '@/lib/graph-colors';
 import { resolveRelatedLawNeighbours } from './graph/neighbour-utils';
 
 interface RelatedLawsProps {
@@ -69,13 +70,17 @@ export function RelatedLaws({ graph, currentLawId, onNavigate }: RelatedLawsProp
         </span>
       </div>
       <div className="flex flex-col gap-0.5">
-        {related.map((node) => (
+        {related.map(({ node, edgeKind, inferred }) => (
           <Chip
             key={node.id}
             onClick={() => onNavigate(node.id)}
-            className="w-full justify-start truncate text-left"
+            className="w-full justify-start text-left"
           >
-            {node.label}
+            <span className="min-w-0 flex-1 truncate">{node.label}</span>
+            <Badge tone="outline">{EDGE_KIND_LABELS[edgeKind]}</Badge>
+            {inferred && (
+              <span className="text-[10.5px] font-normal text-muted">inferida</span>
+            )}
           </Chip>
         ))}
       </div>
