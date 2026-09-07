@@ -41,8 +41,8 @@ const BAR_VALUES = [21, 18, 24, 26, 22, 29, 28, 31, 27, 34, 36, 33];
 const RECENT_FROM = 8;
 
 const COPY = {
-  es: { tabA: 'Compliance', tabB: 'Analítica', range: 'Últimos 12 meses', sector: 'Sector: todos', csv: 'CSV', chartTitle: 'Reformas legislativas por mes', chartMeta: '2023-2024 · acumulado' },
-  en: { tabA: 'Compliance', tabB: 'Analytics', range: 'Last 12 months', sector: 'Sector: all', csv: 'CSV', chartTitle: 'Legislative reforms per month', chartMeta: '2023-2024 · cumulative' },
+  es: { tabA: 'Compliance', tabB: 'Analítica', chartTitle: 'Reformas legislativas por mes', chartMeta: '2023-2024 · acumulado' },
+  en: { tabA: 'Compliance', tabB: 'Analytics', chartTitle: 'Legislative reforms per month', chartMeta: '2023-2024 · cumulative' },
 } as const;
 
 interface Props { lang: Lang; }
@@ -60,11 +60,6 @@ export function DashboardPreview({ lang }: Props) {
           <span className="lf-prev-dash-tab active" role="tab">{t.tabA}</span>
           <span className="lf-prev-dash-tab" role="tab">{t.tabB}</span>
         </div>
-        <span className="lf-prev-dash-actions">
-          <span className="lf-prev-pill">{t.range}</span>
-          <span className="lf-prev-pill">{t.sector}</span>
-          <span className="lf-prev-pill">{t.csv}</span>
-        </span>
       </header>
       <div className="lf-prev-dash-grid">
         {cards.map((c) => <DashCard key={c.title} card={c} />)}

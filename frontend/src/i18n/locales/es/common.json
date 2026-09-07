@@ -287,7 +287,9 @@
     "deleteConfirm": "¿Eliminar la conversación \"{{title}}\"?",
     "createFailed": "No se pudo crear la conversación",
     "renameFailed": "No se pudo renombrar",
-    "deleteFailed": "No se pudo eliminar"
+    "deleteFailed": "No se pudo eliminar",
+    "assistantBadge": "Asistente",
+    "streaming": "escribiendo…"
   },
   "lawDetail": {
     "tabs": {
@@ -722,7 +724,36 @@
     "sectorAll": "Sector: Todos",
     "chartTitle": "Reformas legislativas por mes",
     "chartSubtitle": "2023 – 2024 · acumulado",
-    "openInPlotly": "Abrir en Plotly"
+    "exportCsv": "CSV",
+    "tabs": {
+      "compliance": "Compliance",
+      "analytics": "Analítica"
+    }
+  },
+  "commandPalette": {
+    "ariaLabel": "Paleta de comandos",
+    "placeholder": "Buscar leyes, artículos, #tag, comandos…",
+    "resultsAria": "Resultados",
+    "noResults": "Sin resultados para \"{{query}}\".",
+    "footerNavigate": "navegar",
+    "footerOpen": "abrir",
+    "resultCount": "{{count}} resultados",
+    "groups": {
+      "tags": "Tags",
+      "userTags": "Mis tags",
+      "laws": "Leyes",
+      "articles": "Artículos",
+      "commands": "Comandos"
+    },
+    "tagSubtitle_one": "{{count}} norma con este tag",
+    "tagSubtitle_other": "{{count}} normas con este tag",
+    "commands": {
+      "theme": "Cambiar tema",
+      "goGraph": "Ir al grafo",
+      "goChat": "Ir al chat",
+      "goDash": "Cuadros de mando",
+      "export": "Exportar página como PDF"
+    }
   },
   "common": {
     "save": "Guardar",

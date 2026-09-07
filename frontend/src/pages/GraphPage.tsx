@@ -302,7 +302,7 @@ export function GraphPage() {
           <p className="hidden w-full text-[11px] text-muted md:block">{t('graph.filterDimHint')}</p>
           {isGlobal && (
             <div className="flex w-full flex-wrap items-center gap-1.5">
-              <span className="label-caps text-[10px]">{t('graph.budget.label')}</span>
+              <span className="label-caps">{t('graph.budget.label')}</span>
               {GLOBAL_NODE_BUDGET_PRESETS.map((preset) => (
                 <Chip
                   key={preset}
@@ -398,7 +398,7 @@ export function GraphPage() {
 
               {legendCommunities.length > 0 && (
                 <div className="mb-3">
-                  <div className="label-caps mb-1.5 text-[10px]">{t('graph.legend.clusters')}</div>
+                  <div className="label-caps mb-1.5">{t('graph.legend.clusters')}</div>
                   <div className="flex flex-col gap-1 text-[12px]">
                     {legendCommunities.map((community) => (
                       <div key={community} className="flex items-center gap-2">
@@ -416,7 +416,7 @@ export function GraphPage() {
 
               {legendNodeKinds.length > 0 && (
                 <div className="mb-3">
-                  <div className="label-caps mb-1.5 text-[10px]">{t('graph.legend.nodeKinds')}</div>
+                  <div className="label-caps mb-1.5">{t('graph.legend.nodeKinds')}</div>
                   <div className="flex flex-wrap gap-2 text-[12px]">
                     {legendNodeKinds.map((kind) => (
                       <div key={kind} className="flex items-center gap-1">
@@ -428,7 +428,7 @@ export function GraphPage() {
                 </div>
               )}
 
-              <div className="label-caps mb-1.5 text-[10px]">{t('graph.edges')}</div>
+              <div className="label-caps mb-1.5">{t('graph.edges')}</div>
               <div className="flex flex-col gap-1.5 text-[12px]">
                 {legendEdgeKinds.map((kind) => (
                   <div key={kind} className="flex items-center gap-2">

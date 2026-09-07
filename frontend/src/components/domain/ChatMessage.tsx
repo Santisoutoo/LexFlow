@@ -1,4 +1,5 @@
 import { Fragment, memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Settings as ToolIcon, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui';
 import { BrandMark } from '@/components/BrandMark';
@@ -18,6 +19,7 @@ export interface ChatMessageProps {
  * the memoisation intact.
  */
 function ChatMessageImpl({ message, onSourceClick }: ChatMessageProps) {
+  const { t } = useTranslation();
   if (message.role === 'user') {
     return (
       <div className="self-end max-w-[85%]">
@@ -51,11 +53,11 @@ function ChatMessageImpl({ message, onSourceClick }: ChatMessageProps) {
       <div className="mb-2 flex items-center gap-2">
         <BrandMark size={18} />
         <span className="text-[12.5px] font-semibold text-indigo-700 dark:text-indigo-200">LexFlow</span>
-        <Badge tone="info" className="text-[10px]">Asistente</Badge>
+        <Badge tone="info" className="text-[11px]">{t('chat.assistantBadge')}</Badge>
         {message.streaming && (
           <span className="ml-1 inline-flex items-center gap-1 text-[11px] text-muted">
             <span className="size-1.5 animate-pulse rounded-full bg-indigo-500" />
-            escribiendo…
+            {t('chat.streaming')}
           </span>
         )}
       </div>
@@ -64,7 +66,7 @@ function ChatMessageImpl({ message, onSourceClick }: ChatMessageProps) {
       </div>
       {message.sources.length > 0 && (
         <div className="mt-3.5">
-          <div className="label-caps mb-1.5">Fuentes</div>
+          <div className="label-caps mb-1.5">{t('chat.sources')}</div>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
             {message.sources.map((s, i) => (
               <CitationCard key={i} source={s} onClick={() => onSourceClick?.(s)} />

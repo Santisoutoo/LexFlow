@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Search, BookOpenText, FileText, Moon, Network, MessagesSquare, BarChart3, Download, Hash } from 'lucide-react';
 import { Kbd } from '@/components/ui';
 import { useUi } from '@/lib/store';
@@ -9,18 +10,22 @@ import { cn } from '@/lib/utils';
 import { HighlightedSnippet } from '@/components/domain/HighlightedSnippet';
 import { STATIC_COMMANDS, filterCommands } from './command-palette/commands';
 
+type PaletteGroupId = 'tags' | 'userTags' | 'laws' | 'articles' | 'commands';
+
 interface PaletteItem {
   id: string;
-  group: 'Tags' | 'Mis tags' | 'Leyes' | 'Artículos' | 'Comandos';
+  group: PaletteGroupId;
   icon: React.ReactNode;
   title: string;
-  /** Plain text or rich node (e.g. `<HighlightedSnippet>` for search hits). */
   subtitle?: React.ReactNode;
   kbd?: string;
   run: () => void;
 }
 
+const GROUP_ORDER: PaletteGroupId[] = ['tags', 'userTags', 'laws', 'articles', 'commands'];
+
 export function CommandPalette() {
+  const { t } = useTranslation();
   const paletteOpen = useUi((s) => s.paletteOpen);
   const setPaletteOpen = useUi((s) => s.setPaletteOpen);
   const toggleTheme = useUi((s) => s.toggleTheme);
@@ -30,9 +35,6 @@ export function CommandPalette() {
   const [q, setQ] = useState('');
   const [active, setActive] = useState(0);
 
-  // P0 a11y #714: without a trap, Tab moved focus to the inert page behind
-  // the open palette. Trap it inside the panel; the input keeps its own
-  // rAF autofocus, so the trap only handles Tab-wrap + focus restore.
   useFocusTrap(panelRef, paletteOpen);
 
   useEffect(() => {
@@ -44,56 +46,53 @@ export function CommandPalette() {
     }
   }, [paletteOpen]);
 
-  // Audit #409: ``active`` used to be set to ``0`` only on
-  // ``paletteOpen``; typing past the result count left ``active``
-  // pointing into the void, so ``Enter`` became a no-op. Resetting
-  // whenever the query changes guarantees Enter always runs the
-  // top item even after the list shortens.
   useEffect(() => {
     setActive(0);
   }, [q]);
 
   const { data: searchData } = useSearch(q);
   const { data: vocab = [] } = useTags();
-  // #670 — custom user-tag vocabulary, surfaced as its own "Mis tags"
-  // group so it never blends with the official BOE `vocab` above.
   const { data: userTagVocab = [] } = useUserTagVocab();
 
-  // Build the palette item list inside a single memo so the keydown
-  // effect below doesn't re-subscribe on every render
-  // (react-hooks/exhaustive-deps). Recomputes only when the query, the
-  // tag vocabulary or the search results change.
+  const groupLabels: Record<PaletteGroupId, string> = useMemo(
+    () => ({
+      tags: t('commandPalette.groups.tags'),
+      userTags: t('commandPalette.groups.userTags'),
+      laws: t('commandPalette.groups.laws'),
+      articles: t('commandPalette.groups.articles'),
+      commands: t('commandPalette.groups.commands'),
+    }),
+    [t],
+  );
+
   const items: PaletteItem[] = useMemo(() => {
-    // Detect `#tag` typing: suggest matching tag names; also surface them
-    // when the input is empty as quick filters.
     const m = q.match(/(^|\s)#(\S*)$/);
     const tagQuery = m ? m[2].toLowerCase() : null;
     const tagSuggestions = tagQuery !== null
       ? vocab.filter(({ tag }) => tag.toLowerCase().includes(tagQuery)).slice(0, 6)
       : (q.trim() === '' ? vocab.slice(0, 5) : []);
-    // Mirror the official-tag scoping (#670): filter user tags by the `#`
-    // fragment (matching slug OR label) and cap, so typing a query narrows
-    // them and a large vocabulary never renders unbounded rows.
     const userTagSuggestions = tagQuery !== null
       ? userTagVocab
           .filter(({ tag, label }) => tag.toLowerCase().includes(tagQuery) || label.toLowerCase().includes(tagQuery))
           .slice(0, 6)
       : (q.trim() === '' ? userTagVocab.slice(0, 5) : []);
 
-    // Icon and run-callback map, keyed by CommandId — kept here because they
-    // capture React context (navigate, toggleTheme, setPaletteOpen) and
-    // contain JSX, which would make the commands module impure.
     const commandExtras: Record<string, { icon: React.ReactNode; run: () => void }> = {
-      theme:    { icon: <Moon className="size-3.5" />,             run: () => { toggleTheme(); setPaletteOpen(false); } },
-      'go-graph': { icon: <Network className="size-3.5" />,        run: () => { navigate('/graph'); setPaletteOpen(false); } },
-      'go-chat':  { icon: <MessagesSquare className="size-3.5" />, run: () => { navigate('/chat'); setPaletteOpen(false); } },
-      'go-dash':  { icon: <BarChart3 className="size-3.5" />,      run: () => { navigate('/dashboards'); setPaletteOpen(false); } },
-      export:   { icon: <Download className="size-3.5" />,         run: () => { window.print(); setPaletteOpen(false); } },
+      theme: { icon: <Moon className="size-3.5" />, run: () => { toggleTheme(); setPaletteOpen(false); } },
+      'go-graph': { icon: <Network className="size-3.5" />, run: () => { navigate('/graph'); setPaletteOpen(false); } },
+      'go-chat': { icon: <MessagesSquare className="size-3.5" />, run: () => { navigate('/chat'); setPaletteOpen(false); } },
+      'go-dash': { icon: <BarChart3 className="size-3.5" />, run: () => { navigate('/dashboards'); setPaletteOpen(false); } },
+      export: { icon: <Download className="size-3.5" />, run: () => { window.print(); setPaletteOpen(false); } },
     };
 
-    const commands: PaletteItem[] = filterCommands(STATIC_COMMANDS, q).map((def) => ({
+    const translatedCommands = STATIC_COMMANDS.map((def) => ({
+      ...def,
+      title: t(def.titleKey),
+    }));
+
+    const commands: PaletteItem[] = filterCommands(translatedCommands, q).map((def) => ({
       id: def.id,
-      group: 'Comandos' as const,
+      group: 'commands' as const,
       title: def.title,
       kbd: def.kbd,
       ...commandExtras[def.id],
@@ -102,23 +101,23 @@ export function CommandPalette() {
     return [
       ...tagSuggestions.map<PaletteItem>(({ tag, count }) => ({
         id: `tag-${tag}`,
-        group: 'Tags',
+        group: 'tags',
         icon: <Hash className="size-3.5" />,
         title: `#${tag}`,
-        subtitle: `${count} ${count === 1 ? 'norma' : 'normas'} con este tag`,
+        subtitle: t('commandPalette.tagSubtitle', { count }),
         run: () => { navigate(`/explorer?tags=${encodeURIComponent(tag)}`); setPaletteOpen(false); },
       })),
       ...userTagSuggestions.map<PaletteItem>(({ tag, label, count }) => ({
         id: `user-tag-${tag}`,
-        group: 'Mis tags',
+        group: 'userTags',
         icon: <Hash className="size-3.5" />,
         title: label,
-        subtitle: `${count} ${count === 1 ? 'norma' : 'normas'} con este tag`,
+        subtitle: t('commandPalette.tagSubtitle', { count }),
         run: () => { navigate(`/explorer?userTag=${encodeURIComponent(tag)}`); setPaletteOpen(false); },
       })),
       ...(searchData?.hits ?? []).map<PaletteItem>((h) => ({
         id: h.id,
-        group: h.kind === 'law' ? 'Leyes' : 'Artículos',
+        group: h.kind === 'law' ? 'laws' : 'articles',
         icon: h.kind === 'law' ? <BookOpenText className="size-3.5" /> : <FileText className="size-3.5" />,
         title: h.title,
         subtitle: h.snippet ? (
@@ -138,14 +137,14 @@ export function CommandPalette() {
       })),
       ...commands,
     ];
-  }, [q, vocab, userTagVocab, searchData, navigate, toggleTheme, setPaletteOpen]);
+  }, [q, vocab, userTagVocab, searchData, navigate, toggleTheme, setPaletteOpen, t]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!paletteOpen) return;
       if (e.key === 'Escape') { setPaletteOpen(false); return; }
       if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => Math.min(items.length - 1, a + 1)); }
-      if (e.key === 'ArrowUp')   { e.preventDefault(); setActive((a) => Math.max(0, a - 1)); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setActive((a) => Math.max(0, a - 1)); }
       if (e.key === 'Enter') { e.preventDefault(); items[active]?.run(); }
     };
     window.addEventListener('keydown', onKey);
@@ -154,14 +153,11 @@ export function CommandPalette() {
 
   if (!paletteOpen) return null;
 
-  // group items
-  const groups: PaletteItem['group'][] = ['Tags', 'Mis tags', 'Leyes', 'Artículos', 'Comandos'];
-
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Paleta de comandos"
+      aria-label={t('commandPalette.ariaLabel')}
       className="fixed inset-0 z-overlay flex items-start justify-center pt-[12vh] bg-black/35 backdrop-blur-[2px] animate-in"
       onClick={() => setPaletteOpen(false)}
     >
@@ -176,22 +172,24 @@ export function CommandPalette() {
             ref={inputRef}
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar leyes, artículos, #tag, comandos…"
+            placeholder={t('commandPalette.placeholder')}
             className="flex-1 bg-transparent text-[14.5px] outline-none placeholder:text-muted"
           />
           <Kbd>esc</Kbd>
         </div>
 
-        <div role="listbox" aria-label="Resultados" className="max-h-[420px] overflow-auto p-2 scrollbar-thin">
+        <div role="listbox" aria-label={t('commandPalette.resultsAria')} className="max-h-[420px] overflow-auto p-2 scrollbar-thin">
           {items.length === 0 && (
-            <div className="px-6 py-10 text-center text-sm text-muted">Sin resultados para "{q}".</div>
+            <div className="px-6 py-10 text-center text-sm text-muted">
+              {t('commandPalette.noResults', { query: q })}
+            </div>
           )}
-          {groups.map((g) => {
+          {GROUP_ORDER.map((g) => {
             const rows = items.filter((i) => i.group === g);
             if (!rows.length) return null;
             return (
               <div key={g} className="mb-2">
-                <div className="label-caps px-2.5 pt-1 pb-1">{g}</div>
+                <div className="label-caps px-2.5 pt-1 pb-1">{groupLabels[g]}</div>
                 {rows.map((it) => {
                   const idx = items.indexOf(it);
                   return (
@@ -208,14 +206,11 @@ export function CommandPalette() {
                     >
                       <span className={cn(
                         'inline-flex size-6 items-center justify-center rounded',
-                        it.group === 'Tags' && 'bg-amber-soft text-amber-700 dark:text-amber-300',
-                        it.group === 'Mis tags' && 'bg-amber-soft text-amber-700 dark:text-amber-200',
-                        it.group === 'Leyes' && 'bg-primary-soft text-indigo-700',
-                        it.group === 'Artículos' && 'bg-amber-soft text-amber-700',
-                        // Deslop #798: was a copy-pasted arbitrary HSL tint; now the
-                        // shared --reference-soft(-fg) tokens (index.css), which already
-                        // flip light/dark, so no `dark:` variant is needed.
-                        it.group === 'Comandos' && 'bg-reference-soft text-reference-soft-fg',
+                        it.group === 'tags' && 'bg-amber-soft text-amber-700 dark:text-amber-300',
+                        it.group === 'userTags' && 'bg-amber-soft text-amber-700 dark:text-amber-200',
+                        it.group === 'laws' && 'bg-primary-soft text-indigo-700',
+                        it.group === 'articles' && 'bg-amber-soft text-amber-700',
+                        it.group === 'commands' && 'bg-reference-soft text-reference-soft-fg',
                       )}>{it.icon}</span>
                       <div className="min-w-0 flex-1">
                         <div className="truncate font-medium">{it.title}</div>
@@ -231,9 +226,13 @@ export function CommandPalette() {
         </div>
 
         <div className="flex items-center gap-3.5 border-t border-border px-4 py-2 text-[11px] text-muted">
-          <span className="inline-flex items-center gap-1"><Kbd>↑</Kbd><Kbd>↓</Kbd> navegar</span>
-          <span className="inline-flex items-center gap-1"><Kbd>↵</Kbd> abrir</span>
-          <span className="ml-auto font-mono">{items.length} resultados</span>
+          <span className="inline-flex items-center gap-1">
+            <Kbd>↑</Kbd><Kbd>↓</Kbd> {t('commandPalette.footerNavigate')}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <Kbd>↵</Kbd> {t('commandPalette.footerOpen')}
+          </span>
+          <span className="ml-auto font-mono">{t('commandPalette.resultCount', { count: items.length })}</span>
         </div>
       </div>
     </div>
