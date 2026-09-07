@@ -5,7 +5,7 @@
  * command definitions unit-testable (#556).
  *
  * Deliberately free of React and closures: a `CommandDef` carries only
- * plain data (id, title, optional kbd hint). Icons and `run` callbacks are
+ * plain data (id, titleKey, optional kbd hint). Icons and `run` callbacks are
  * wired up inside `CommandPalette` after filtering so this module stays
  * fully testable without a DOM.
  *
@@ -21,10 +21,15 @@ export type CommandId = 'theme' | 'go-graph' | 'go-chat' | 'go-dash' | 'export';
 export interface CommandDef {
   /** Stable identifier; doubles as the React list key. */
   id: CommandId;
-  /** Display label shown in the palette row. */
-  title: string;
+  /** i18n key under `commandPalette.commands.*`. */
+  titleKey: string;
   /** Optional keyboard shortcut hint displayed next to the row. */
   kbd?: string;
+}
+
+/** Command row with a resolved display title (for filtering and rendering). */
+export interface TranslatedCommandDef extends CommandDef {
+  title: string;
 }
 
 /**
@@ -34,11 +39,11 @@ export interface CommandDef {
  * by `CommandPalette` after filtering.
  */
 export const STATIC_COMMANDS: CommandDef[] = [
-  { id: 'theme',    title: 'Cambiar tema',             kbd: '⌘ .' },
-  { id: 'go-graph', title: 'Ir al grafo',              kbd: 'g g' },
-  { id: 'go-chat',  title: 'Ir al chat',               kbd: 'g c' },
-  { id: 'go-dash',  title: 'Cuadros de mando',         kbd: 'g d' },
-  { id: 'export',   title: 'Exportar página como PDF'             },
+  { id: 'theme', titleKey: 'commandPalette.commands.theme', kbd: '⌘ .' },
+  { id: 'go-graph', titleKey: 'commandPalette.commands.goGraph', kbd: 'g g' },
+  { id: 'go-chat', titleKey: 'commandPalette.commands.goChat', kbd: 'g c' },
+  { id: 'go-dash', titleKey: 'commandPalette.commands.goDash', kbd: 'g d' },
+  { id: 'export', titleKey: 'commandPalette.commands.export' },
 ];
 
 /**
@@ -47,12 +52,8 @@ export const STATIC_COMMANDS: CommandDef[] = [
  * Returns the full list unchanged when `query` is empty, mirroring the
  * original inline filter (``!q || title.includes(q)``) exactly — the raw
  * query is matched as-is, with no trimming, so behaviour is preserved.
- *
- * @param commands - Source registry to filter (typically `STATIC_COMMANDS`).
- * @param query    - Raw palette input value, may be empty.
- * @returns Subset of `commands` whose `title` contains `query` (case-insensitive).
  */
-export function filterCommands(commands: CommandDef[], query: string): CommandDef[] {
+export function filterCommands(commands: TranslatedCommandDef[], query: string): TranslatedCommandDef[] {
   if (!query) return commands;
   const needle = query.toLowerCase();
   return commands.filter((c) => c.title.toLowerCase().includes(needle));

@@ -59,7 +59,7 @@ export default {
         danger:  'hsl(354 70% 50% / <alpha-value>)',
         info:    'hsl(206 80% 50% / <alpha-value>)',
 
-        // Graph nodes (deuteranopia + protanopia safe)
+        // Graph nodes (shape-coded kinds; hues tuned for edge-kind separation)
         node: {
           law:       'hsl(232 72% 52% / <alpha-value>)',
           article:   'hsl(36 95% 56%  / <alpha-value>)',

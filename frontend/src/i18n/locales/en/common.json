@@ -287,7 +287,9 @@
     "deleteConfirm": "Delete the conversation \"{{title}}\"?",
     "createFailed": "Couldn't create the conversation",
     "renameFailed": "Couldn't rename",
-    "deleteFailed": "Couldn't delete"
+    "deleteFailed": "Couldn't delete",
+    "assistantBadge": "Assistant",
+    "streaming": "typing…"
   },
   "lawDetail": {
     "tabs": {
@@ -722,7 +724,36 @@
     "sectorAll": "Sector: All",
     "chartTitle": "Legislative amendments per month",
     "chartSubtitle": "2023 – 2024 · cumulative",
-    "openInPlotly": "Open in Plotly"
+    "exportCsv": "CSV",
+    "tabs": {
+      "compliance": "Compliance",
+      "analytics": "Analytics"
+    }
+  },
+  "commandPalette": {
+    "ariaLabel": "Command palette",
+    "placeholder": "Search laws, articles, #tag, commands…",
+    "resultsAria": "Results",
+    "noResults": "No results for \"{{query}}\".",
+    "footerNavigate": "navigate",
+    "footerOpen": "open",
+    "resultCount": "{{count}} results",
+    "groups": {
+      "tags": "Tags",
+      "userTags": "My tags",
+      "laws": "Laws",
+      "articles": "Articles",
+      "commands": "Commands"
+    },
+    "tagSubtitle_one": "{{count}} statute with this tag",
+    "tagSubtitle_other": "{{count}} statutes with this tag",
+    "commands": {
+      "theme": "Toggle theme",
+      "goGraph": "Go to graph",
+      "goChat": "Go to chat",
+      "goDash": "Dashboards",
+      "export": "Export page as PDF"
+    }
   },
   "common": {
     "save": "Save",

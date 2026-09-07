@@ -154,10 +154,10 @@ export const GRAPH_PRIMARY_FILL_SOFT = 'hsl(232 72% 52% / 0.10)';
  * omits ``kind`` (legacy edges from before #144).
  */
 export const GRAPH_EDGE_STROKE: Record<GraphEdgeKind, string> = {
-  cites: 'hsl(232 60% 60%)', // indigo (light)
-  develops: 'hsl(195 65% 55%)', // cyan (matches `amendment` node)
-  modifies: 'hsl(36 90% 55%)', // amber (matches `article` node)
-  repeals: 'hsl(0 70% 55%)', // red
+  cites: 'hsl(232 55% 58%)', // indigo — desaturated for CVD separation from cyan
+  develops: 'hsl(195 80% 42%)', // cyan — darker/saturated vs cites
+  modifies: 'hsl(36 95% 52%)', // amber (matches `article` node)
+  repeals: 'hsl(0 75% 48%)', // red — darker for contrast
 };
 
 /**
