@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Hash, Plus, X } from 'lucide-react';
+import { Hash, Plus, X, ExternalLink } from 'lucide-react';
 import { Badge } from '@/components/ui';
 import { formatDate, statusLabel } from '@/lib/utils';
 import type { Law, UserTag } from '@/lib/types';
@@ -39,11 +39,23 @@ export function LawHeader({
   const tone =
     law.status === 'vigente' ? 'success' :
     law.status === 'derogada' ? 'danger' : 'amber';
+  const boeUrl = law.sourceUrl ?? (law.boe ? `https://www.boe.es/buscar/act.php?id=${law.boe}` : undefined);
   return (
     <header className="bg-bg pt-5 pb-0 px-8">
       <div className="mb-2 flex items-center gap-2">
         <Badge tone={tone}>{statusLabel(law.status)}</Badge>
         <span className="font-mono text-[12px] text-muted">{law.boe}</span>
+        {boeUrl && (
+          <a
+            href={boeUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-[12px] text-indigo-700 hover:underline dark:text-indigo-300"
+          >
+            <ExternalLink className="size-3" aria-hidden />
+            {t('lawHeader.viewOnBoe')}
+          </a>
+        )}
         <span className="text-[12px] text-muted">·</span>
         <span className="text-[12px] text-muted">{law.rango}</span>
         {/* Deslop sprint #798 — Save/Share/Export removed: `onExport`/

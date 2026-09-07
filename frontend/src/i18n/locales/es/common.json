@@ -40,6 +40,7 @@
     "addUserTagPlaceholder": "nueva etiqueta",
     "share": "Compartir",
     "export": "Exportar",
+    "viewOnBoe": "Ver en BOE",
     "version": "Versión",
     "stats": {
       "articles": "Artículos",
@@ -304,6 +305,9 @@
     "citationSelected": "Cita seleccionada",
     "lawInfo": "Información de la norma",
     "citedFrom": "Norma citada desde {{law}}.",
+    "citedFromArticle": "Citado desde art. {{article}}.",
+    "refsFromArticle": "Art. {{article}}",
+    "refsUngrouped": "Sin artículo de origen",
     "selectCitation": "Selecciona una cita en el texto (superíndices) para ver la norma citada y su contexto.",
     "relatedRefs": "Referencias relacionadas",
     "refsHeading": "{{n}} referencias salientes",
@@ -335,10 +339,8 @@
     "theLaw": "la norma",
     "sideBySide": "Lado a lado",
     "inline": "En línea",
-    "exportDiff": "Exportar diff",
     "added": "añadidos",
     "removed": "eliminados",
-    "nextPrev": "siguiente / anterior",
     "changedArticles": "Artículos modificados"
   },
   "search": {

@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ChevronLeft, Download, ArrowRight } from 'lucide-react';
-import { Button, Kbd, Tabs } from '@/components/ui';
+import { ChevronLeft, ArrowRight } from 'lucide-react';
+import { Tabs } from '@/components/ui';
 import { DiffViewer } from '@/components/domain/DiffViewer';
 import { ErrorState } from '@/components/domain/ErrorState';
 import { RightRail } from '@/components/shell/RightRail';
@@ -61,7 +61,6 @@ export function DiffPage() {
                 { id: 'side', label: t('diff.sideBySide') },
                 { id: 'inline', label: t('diff.inline') },
               ]} />
-              <Button size="sm" variant="ghost" icon={<Download className="size-3.5" />}>{t('diff.exportDiff')}</Button>
             </span>
           </div>
           <h1 className="font-display text-2xl font-semibold">
@@ -75,7 +74,6 @@ export function DiffPage() {
             <span className="ml-auto inline-flex items-center gap-3">
               <span><span className="font-semibold text-success">+{article.totals.added}</span> {t('diff.added')}</span>
               <span><span className="font-semibold text-danger">−{article.totals.removed}</span> {t('diff.removed')}</span>
-              <span className="inline-flex items-center gap-1.5"><Kbd>j</Kbd><Kbd>k</Kbd> {t('diff.nextPrev')}</span>
             </span>
           </div>
         </div>

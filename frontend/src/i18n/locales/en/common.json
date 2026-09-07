@@ -40,6 +40,7 @@
     "addUserTagPlaceholder": "new tag",
     "share": "Share",
     "export": "Export",
+    "viewOnBoe": "View on BOE",
     "version": "Version",
     "stats": {
       "articles": "Articles",
@@ -304,6 +305,9 @@
     "citationSelected": "Selected citation",
     "lawInfo": "Law information",
     "citedFrom": "Law cited from {{law}}.",
+    "citedFromArticle": "Cited from art. {{article}}.",
+    "refsFromArticle": "Art. {{article}}",
+    "refsUngrouped": "No source article",
     "selectCitation": "Select a citation in the text (superscripts) to see the cited law and its context.",
     "relatedRefs": "Related references",
     "refsHeading": "{{n}} outgoing references",
@@ -335,10 +339,8 @@
     "theLaw": "the law",
     "sideBySide": "Side by side",
     "inline": "Inline",
-    "exportDiff": "Export diff",
     "added": "added",
     "removed": "removed",
-    "nextPrev": "next / previous",
     "changedArticles": "Changed articles"
   },
   "search": {
