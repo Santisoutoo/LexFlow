@@ -177,6 +177,20 @@ def _split_system(messages: list[ChatMessage]) -> tuple[Any, list[dict[str, Any]
                     ],
                 }
             )
+        elif msg.role == "assistant" and msg.tool_calls:
+            content_blocks: list[dict[str, Any]] = []
+            if msg.content:
+                content_blocks.append({"type": "text", "text": msg.content})
+            for call in msg.tool_calls:
+                content_blocks.append(
+                    {
+                        "type": "tool_use",
+                        "id": call.call_id,
+                        "name": call.name,
+                        "input": call.arguments,
+                    }
+                )
+            out.append({"role": "assistant", "content": content_blocks})
         else:
             out.append({"role": msg.role, "content": msg.content})
     system_prompt: Any = "\n\n".join(system_parts) if system_parts else anthropic.NOT_GIVEN

@@ -275,6 +275,7 @@
     "onlyInForce": "Solo vigentes",
     "comingSoon": "Próximamente",
     "enterHint": "Enter envía · ⇧↵ línea",
+    "aiDisclaimer": "Contenido generado por IA. Puede contener errores y no constituye asesoramiento jurídico.",
     "noModelTitle": "No hay modelo configurado",
     "noModelBody": "Configura un modelo en Ajustes → Modelos (o arranca Ollama/LM Studio) antes de chatear.",
     "setupAssistantTitle": "Configura tu asistente (2 min)",

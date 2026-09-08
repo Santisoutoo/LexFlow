@@ -46,9 +46,11 @@ from lexflow.chat.base import (
     FinishChunk,
     TextChunk,
     ToolCallChunk,
+    ToolCallRef,
     ToolSpec,
 )
 from lexflow.chat.mcp_server import TOOL_SPECS, dispatch_tool
+from lexflow.chat.prompts import build_system_prompt
 from lexflow.chat.storage_models import ChatMessage, ChatThread
 
 # Hard cap on the agentic loop (#195). Once hit, we stop iterating even
@@ -169,20 +171,49 @@ def _persist_user_turn(session: Session, thread: ChatThread, content: str) -> No
     session.commit()
 
 
-def _persist_assistant_turn(session: Session, thread: ChatThread, content: str) -> None:
+def _persist_assistant_turn(
+    session: Session,
+    thread: ChatThread,
+    content: str,
+    payload: dict[str, Any] | None = None,
+) -> None:
     """Save the assistant turn and bump the thread's activity timestamp.
 
     Empty replies still get a row so the UI doesn't render a "ghost
     turn"; the empty content tells the rail "nothing to show here".
+    Optional ``payload`` carries ``sources`` and/or intermediate
+    ``tool_calls`` for refetch reconstruction.
     """
+    payload_json = None
+    if payload is not None:
+        payload_json = json.dumps(payload, ensure_ascii=False)
     assistant_message = ChatMessage(
         thread_id=thread.id,
         role="assistant",
         content=content,
+        payload_json=payload_json,
     )
     session.add(assistant_message)
     thread.updated_at = datetime.now(UTC)
     session.add(thread)
+    session.commit()
+
+
+def _persist_tool_turn(
+    session: Session,
+    thread: ChatThread,
+    call: ToolCallChunk,
+    result: dict[str, Any],
+) -> None:
+    """Persist one executed tool turn for refetch and history rebuild."""
+    payload = {"name": call.name, "args": call.arguments, "call_id": call.call_id}
+    tool_message = ChatMessage(
+        thread_id=thread.id,
+        role="tool",
+        content=json.dumps(result, ensure_ascii=False, default=str),
+        payload_json=json.dumps(payload, ensure_ascii=False),
+    )
+    session.add(tool_message)
     session.commit()
 
 
@@ -208,6 +239,22 @@ def _run_tool_call(call: ToolCallChunk) -> dict[str, Any]:
         return {"error": "tool_error", "detail": str(exc)}
 
 
+def _record_assistant_tool_calls(
+    history: list[ProviderMessage],
+    calls: list[ToolCallChunk],
+    *,
+    content: str = "",
+) -> None:
+    """Append the assistant turn that requested *calls* before tool results."""
+    history.append(
+        ProviderMessage(
+            role="assistant",
+            content=content,
+            tool_calls=[ToolCallRef(call_id=call.call_id, name=call.name, arguments=call.arguments) for call in calls],
+        )
+    )
+
+
 def _record_tool_outcome(
     history: list[ProviderMessage],
     call: ToolCallChunk,
@@ -228,19 +275,99 @@ def _record_tool_outcome(
     )
 
 
-def _thread_history(thread: ChatThread) -> list[ProviderMessage]:
-    """Convert a thread's persisted messages to provider input.
+def _decode_stored_payload(raw: str | None) -> dict[str, Any] | None:
+    """Parse a persisted ``payload_json`` column, tolerating corruption."""
+    if not raw:
+        return None
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    return value if isinstance(value, dict) else None
 
-    Tool messages are skipped — the providers don't accept them as raw
-    turns; their content will be reconstructed via the MCP loop in the
-    follow-up issue.
-    """
+
+def _tool_calls_from_payload(payload: dict[str, Any]) -> list[ToolCallRef]:
+    """Rebuild ``ToolCallRef`` list from a stored assistant payload."""
+    raw_calls = payload.get("tool_calls")
+    if not isinstance(raw_calls, list):
+        return []
+    refs: list[ToolCallRef] = []
+    for item in raw_calls:
+        if not isinstance(item, dict):
+            continue
+        call_id = item.get("call_id")
+        name = item.get("name")
+        arguments = item.get("arguments")
+        if not isinstance(call_id, str) or not isinstance(name, str):
+            continue
+        if not isinstance(arguments, dict):
+            arguments = {}
+        refs.append(ToolCallRef(call_id=call_id, name=name, arguments=arguments))
+    return refs
+
+
+def _thread_history(thread: ChatThread) -> list[ProviderMessage]:
+    """Convert a thread's persisted messages to provider input."""
     messages: list[ProviderMessage] = []
     for stored in thread.messages:
-        if stored.role not in {"user", "assistant", "system"}:
+        payload = _decode_stored_payload(stored.payload_json)
+        if stored.role == "tool":
+            name = "tool"
+            call_id = "tool"
+            if payload:
+                if isinstance(payload.get("name"), str):
+                    name = payload["name"]
+                if isinstance(payload.get("call_id"), str):
+                    call_id = payload["call_id"]
+                elif name:
+                    call_id = name
+            messages.append(
+                ProviderMessage(
+                    role="tool",
+                    content=stored.content,
+                    tool_call_id=call_id,
+                    name=name,
+                )
+            )
             continue
-        messages.append(ProviderMessage(role=stored.role, content=stored.content))
+        if stored.role == "assistant" and payload:
+            tool_calls = _tool_calls_from_payload(payload)
+            if tool_calls:
+                messages.append(ProviderMessage(role="assistant", content=stored.content, tool_calls=tool_calls))
+                continue
+        if stored.role in {"user", "assistant", "system"}:
+            messages.append(ProviderMessage(role=stored.role, content=stored.content))
     return messages
+
+
+def _with_system_prompt(history: list[ProviderMessage]) -> list[ProviderMessage]:
+    """Prepend the grounding system prompt when history lacks one."""
+    if history and history[0].role == "system":
+        return history
+    return [ProviderMessage(role="system", content=build_system_prompt()), *history]
+
+
+def _dedupe_citations(citations: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Drop duplicate law/article pairs while preserving order."""
+    seen: set[tuple[str, str]] = set()
+    out: list[dict[str, Any]] = []
+    for citation in citations:
+        law_id = citation.get("law_id")
+        if not isinstance(law_id, str) or not law_id:
+            continue
+        article = citation.get("article_number")
+        article_key = article if isinstance(article, str) else ""
+        key = (law_id, article_key)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(citation)
+    return out
+
+
+def _assistant_tool_calls_payload(calls: list[ToolCallChunk]) -> dict[str, Any]:
+    """Serialise intermediate assistant tool calls for persistence."""
+    return {"tool_calls": [{"call_id": call.call_id, "name": call.name, "arguments": call.arguments} for call in calls]}
 
 
 def _refresh_and_load_history(session: Session, thread: ChatThread) -> list[ProviderMessage]:
@@ -297,6 +424,7 @@ async def stream_chat_reply(
     # Same offload rationale as above — ``refresh`` + the lazy
     # ``thread.messages`` load are both blocking DB calls.
     history = await anyio.to_thread.run_sync(_refresh_and_load_history, session, thread)
+    history = _with_system_prompt(history)
 
     # 3. Stream. The agentic loop (#195) iterates ``stream_chat_typed``
     #    up to ``_MAX_TOOL_ITERATIONS`` times: each iteration either
@@ -308,6 +436,7 @@ async def stream_chat_reply(
     #    ``stream_chat_typed`` impl on ``ChatProvider`` — behaves
     #    identically to the pre-#195 path (one iteration, text only).
     assistant_chunks: list[str] = []
+    collected_sources: list[dict[str, Any]] = []
     tools = [ToolSpec(**spec) for spec in TOOL_SPECS]
 
     def _is_tools_unsupported(error: ChatProviderError) -> bool:
@@ -332,11 +461,13 @@ async def stream_chat_reply(
             for _ in range(_MAX_TOOL_ITERATIONS):
                 finish_reason: str | None = None
                 pending_calls: list[ToolCallChunk] = []
+                iteration_text: list[str] = []
                 async for typed in provider.stream_chat_typed(history, model_name, tools=attempt_tools):
                     if isinstance(typed, TextChunk):
                         if not typed.delta:
                             continue
                         assistant_chunks.append(typed.delta)
+                        iteration_text.append(typed.delta)
                         yield format_sse(SseEvent.TEXT, {"delta": typed.delta})
                     elif isinstance(typed, ToolCallChunk):
                         pending_calls.append(typed)
@@ -349,6 +480,14 @@ async def stream_chat_reply(
                         break
                 if not pending_calls or finish_reason == "stop":
                     break
+                _record_assistant_tool_calls(history, pending_calls, content="".join(iteration_text))
+                await anyio.to_thread.run_sync(
+                    _persist_assistant_turn,
+                    session,
+                    thread,
+                    "".join(iteration_text),
+                    _assistant_tool_calls_payload(pending_calls),
+                )
                 for call in pending_calls:
                     # S4.1 (#90): tool dispatch is synchronous (SQLite scans,
                     # sometimes a cold embedding-index build) — running it
@@ -357,8 +496,11 @@ async def stream_chat_reply(
                     # thread, same pattern as ``api/warmup.py``.
                     result = await anyio.to_thread.run_sync(_run_tool_call, call)
                     for citation in _extract_citations(result):
+                        collected_sources.append(citation)
                         yield format_sse(SseEvent.SOURCE, citation)
+                    await anyio.to_thread.run_sync(_persist_tool_turn, session, thread, call, result)
                     _record_tool_outcome(history, call, result)
+                collected_sources[:] = _dedupe_citations(collected_sources)
         except ChatProviderError as exc:
             if attempt_tools and _is_tools_unsupported(exc):
                 # Degrade to a tool-less chat for this turn and start over.
@@ -399,6 +541,13 @@ async def stream_chat_reply(
     # 4. Persist whatever we got. Even an empty reply gets a row so the
     #    UI doesn't render a "ghost turn". Offloaded for the same reason
     #    as the user-turn persist above (#77 S1.1).
-    await anyio.to_thread.run_sync(_persist_assistant_turn, session, thread, "".join(assistant_chunks))
+    final_payload = {"sources": collected_sources} if collected_sources else None
+    await anyio.to_thread.run_sync(
+        _persist_assistant_turn,
+        session,
+        thread,
+        "".join(assistant_chunks),
+        final_payload,
+    )
 
     yield format_sse(SseEvent.DONE, {})

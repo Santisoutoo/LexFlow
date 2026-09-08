@@ -164,6 +164,14 @@ def _contents_payload(messages: list[ChatMessage]) -> list[dict[str, Any]]:
                 }
             )
             continue
+        if msg.role == "assistant" and msg.tool_calls:
+            parts: list[dict[str, Any]] = []
+            if msg.content:
+                parts.append({"text": msg.content})
+            for call in msg.tool_calls:
+                parts.append({"function_call": {"name": call.name, "args": call.arguments}})
+            out.append({"role": "model", "parts": parts})
+            continue
         role = _ROLE_MAP.get(msg.role, "user")
         out.append({"role": role, "parts": [{"text": msg.content}]})
     return out

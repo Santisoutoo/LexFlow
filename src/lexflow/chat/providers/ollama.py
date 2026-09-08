@@ -152,6 +152,24 @@ def _messages_payload(messages: list[ChatMessage]) -> list[dict[str, Any]]:
             if msg.name:
                 entry["tool_name"] = msg.name
             out.append(entry)
+        elif msg.role == "assistant" and msg.tool_calls:
+            out.append(
+                {
+                    "role": "assistant",
+                    "content": msg.content,
+                    "tool_calls": [
+                        {
+                            "id": call.call_id,
+                            "type": "function",
+                            "function": {
+                                "name": call.name,
+                                "arguments": call.arguments,
+                            },
+                        }
+                        for call in msg.tool_calls
+                    ],
+                }
+            )
         else:
             out.append({"role": msg.role, "content": msg.content})
     return out

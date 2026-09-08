@@ -443,6 +443,7 @@ export function ChatPage() {
               </span>
             </div>
           </div>
+          <p className="mx-auto mt-2 max-w-3xl text-center text-[11px] text-muted">{t('chat.aiDisclaimer')}</p>
         </div>
       </div>
 

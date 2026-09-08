@@ -31,6 +31,19 @@ class ChatProviderError(Exception):
     """Raised when a chat provider encounters an error."""
 
 
+class ToolCallRef(BaseModel):
+    """One tool invocation the assistant requested.
+
+    Carried on ``ChatMessage`` when ``role == "assistant"`` so provider
+    adapters can emit the assistant turn that precedes a ``tool`` result
+    in the OpenAI / Anthropic / Gemini wire protocols.
+    """
+
+    call_id: str
+    name: str
+    arguments: dict[str, Any]
+
+
 class ChatMessage(BaseModel):
     role: str  # "user" | "assistant" | "system" | "tool"
     content: str
@@ -39,6 +52,9 @@ class ChatMessage(BaseModel):
     # provider adapters surface the source tool when relevant.
     tool_call_id: str | None = None
     name: str | None = None
+    # Populated on assistant turns that issued native tool calls before
+    # the matching ``tool`` messages land in history.
+    tool_calls: list[ToolCallRef] | None = None
 
 
 # ─── Typed stream chunks (#195) ─────────────────────────────────────────
