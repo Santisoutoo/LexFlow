@@ -174,6 +174,56 @@ class TestChatStreaming:
         assistant = detail["messages"][-1]
         assert assistant["role"] == "assistant"
         assert assistant["content"] == "partial "
+        assert assistant["payload"]["error"]["detail"] == "upstream blew up"
+
+    def test_tools_unsupported_emits_degraded_and_persists_flag(
+        self,
+        client: TestClient,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        class _DegradeProvider(ChatProvider):
+            def __init__(self) -> None:
+                self.calls = 0
+
+            async def list_models(self) -> list[str]:
+                return ["fake-model"]
+
+            async def stream_chat(self, messages: list[object], model: str) -> AsyncIterator[str]:
+                self.calls += 1
+                if self.calls == 1:
+                    raise ChatProviderError("model does not support tools")
+                yield "Respuesta sin herramientas."
+
+        from lexflow.chat import provider_registry as registry_mod
+
+        ollama_spec = registry_mod.PROVIDERS_BY_KEY["ollama"]
+        patched = registry_mod.ProviderSpec(
+            key=ollama_spec.key,
+            local=ollama_spec.local,
+            factory=lambda: _DegradeProvider(),
+            default_context=ollama_spec.default_context,
+            env_key=ollama_spec.env_key,
+        )
+        monkeypatch.setitem(registry_mod.PROVIDERS_BY_KEY, "ollama", patched)
+
+        thread_id = _create_thread(client)
+        response = client.post(
+            f"/api/v1/chat/threads/{thread_id}/send",
+            json={"message": "?", "model": "ollama:fake-model"},
+        )
+        assert response.status_code == 200
+        events = _parse_sse(response.text)
+        names = [name for name, _ in events]
+        assert "degraded" in names
+        degraded = next(data for name, data in events if name == "degraded")
+        assert degraded == {"reason": "tools_unsupported"}
+        assert names[-1] == "done"
+
+        detail = client.get(f"/api/v1/chat/threads/{thread_id}").json()
+        assistant = detail["messages"][-1]
+        assert assistant["role"] == "assistant"
+        assert assistant["payload"]["corpus_degraded"] is True
+        assert assistant["content"] == "Respuesta sin herramientas."
 
     def test_unknown_provider_errors_cleanly(
         self,

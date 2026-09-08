@@ -1,7 +1,7 @@
 import { Fragment, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Settings as ToolIcon, ChevronRight } from 'lucide-react';
-import { Badge } from '@/components/ui';
+import { Badge, Callout } from '@/components/ui';
 import { BrandMark } from '@/components/BrandMark';
 import { CitationCard } from './CitationCard';
 import type { ChatMessage as ChatMessageT, ChatSource } from '@/lib/types';
@@ -54,7 +54,16 @@ function ChatMessageImpl({ message, onSourceClick }: ChatMessageProps) {
         <BrandMark size={18} />
         <span className="text-[12.5px] font-semibold text-indigo-700 dark:text-indigo-200">LexFlow</span>
         <Badge tone="info" className="text-[11px]">{t('chat.assistantBadge')}</Badge>
-        {message.streaming && (
+        {message.corpusDegraded && (
+          <Badge tone="amber" className="text-[11px]">{t('chat.degradedNoCorpus')}</Badge>
+        )}
+        {message.streaming && message.toolActivity && (
+          <span className="ml-1 inline-flex items-center gap-1 text-[11px] text-muted">
+            <span className="size-1.5 animate-pulse rounded-full bg-indigo-500" />
+            {t(message.toolActivity)}
+          </span>
+        )}
+        {message.streaming && !message.toolActivity && (
           <span className="ml-1 inline-flex items-center gap-1 text-[11px] text-muted">
             <span className="size-1.5 animate-pulse rounded-full bg-indigo-500" />
             {t('chat.streaming')}
@@ -64,12 +73,21 @@ function ChatMessageImpl({ message, onSourceClick }: ChatMessageProps) {
       <div className="text-[14.5px] leading-relaxed">
         {message.content.map((p, i) => <Paragraph key={i} text={p} />)}
       </div>
+      {message.error && (
+        <Callout tone="danger" title={t('chat.errorTitle')} className="mt-3">
+          {message.error.detail}
+        </Callout>
+      )}
       {message.sources.length > 0 && (
         <div className="mt-3.5">
           <div className="label-caps mb-1.5">{t('chat.sources')}</div>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-            {message.sources.map((s, i) => (
-              <CitationCard key={i} source={s} onClick={() => onSourceClick?.(s)} />
+            {message.sources.map((s) => (
+              <CitationCard
+                key={`${s.target?.lawId ?? s.law}::${s.target?.articleNum ?? ''}`}
+                source={s}
+                onClick={() => onSourceClick?.(s)}
+              />
             ))}
           </div>
         </div>

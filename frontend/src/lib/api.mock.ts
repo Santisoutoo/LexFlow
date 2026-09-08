@@ -8,8 +8,8 @@
  */
 
 import type {
-  ApiClient, ChatChunk, ChatMessage, DiffResult, GraphData, ListLawsParams,
-  Paginated, Law, UserTag, UserTagCount,
+  ApiClient, ChatChunk, ChatMessage, ChatSource, DiffResult, GraphData, ListLawsParams,
+  Paginated, Law, UserTag, UserTagCount, AssistantMessage,
 } from './types';
 import {
   LAWS, LAW_DETAIL, ARTICLES, VERSIONS, DIFF_BY_LAW, GRAPH, CHAT_THREADS,
@@ -448,9 +448,18 @@ export const mockApi: ApiClient = {
     async *send(_threadId, _content, _opts): AsyncGenerator<ChatChunk> {
       // Simulate a streamed reply with a couple of tool calls in front.
       await delay(220);
-      yield { type: 'tool_call', name: 'search_corpus', args: { q: _content.slice(0, 40), limit: 5 } };
+      yield { type: 'tool_call', name: 'search_law', args: { q: _content.slice(0, 40), limit: 5 } };
       await delay(280);
-      yield { type: 'tool_result', name: 'search_corpus', result: '5 resultados encontrados' };
+      yield {
+        type: 'source',
+        source: {
+          law: 'Ley Orgánica 3/2018 (LOPDGDD)',
+          article: 'Art. 28',
+          date: '2018-12-06',
+          snippet: 'El responsable del tratamiento adoptará todas las medidas necesarias para cumplir el principio de responsabilidad activa…',
+          target: { lawId: 'BOE-A-2018-16673', articleNum: '28' },
+        },
+      };
       await delay(180);
 
       const chunks = [
@@ -463,16 +472,6 @@ export const mockApi: ApiClient = {
       ];
       for (const c of chunks) { await delay(140); yield { type: 'text', delta: c }; }
 
-      yield {
-        type: 'source',
-        source: {
-          law: 'Ley Orgánica 3/2018 (LOPDGDD)',
-          article: 'Art. 28',
-          date: '2018-12-06',
-          snippet: 'El responsable del tratamiento adoptará todas las medidas necesarias para cumplir el principio de responsabilidad activa…',
-          target: { lawId: 'BOE-A-2018-16673', articleNum: '28' },
-        },
-      };
       await delay(100);
       yield { type: 'done' };
     },
@@ -631,23 +630,63 @@ export const mockApi: ApiClient = {
   },
 };
 
+const TOOL_ACTIVITY_KEYS: Record<string, string> = {
+  search_law: 'chat.toolActivity.searchCorpus',
+  search_semantic_top_k: 'chat.toolActivity.searchCorpus',
+  get_law: 'chat.toolActivity.getLaw',
+  get_article: 'chat.toolActivity.getArticle',
+  get_stats: 'chat.toolActivity.getStats',
+};
+const DEFAULT_TOOL_ACTIVITY = 'chat.toolActivity.default';
+
+function sourceDedupeKey(source: ChatSource): string {
+  return `${source.target?.lawId ?? source.law}::${source.target?.articleNum ?? ''}`;
+}
+
+function ensureAssistantShell(message: ChatMessage | null): AssistantMessage {
+  if (message?.role === 'assistant') return message;
+  return {
+    id: crypto.randomUUID(),
+    role: 'assistant',
+    streaming: true,
+    createdAt: new Date().toISOString(),
+    content: [],
+    sources: [],
+  };
+}
+
 /** Convert chat chunks into a mutable assistant message — used by ChatPage. */
 export function applyChunk(message: ChatMessage | null, chunk: ChatChunk): ChatMessage | null {
-  if (chunk.type === 'done') return message && message.role === 'assistant' ? { ...message, streaming: false } : message;
-  if (chunk.type === 'text') {
-    if (!message || message.role !== 'assistant') {
-      return {
-        id: crypto.randomUUID(), role: 'assistant', streaming: true,
-        createdAt: new Date().toISOString(),
-        content: [chunk.delta], sources: [],
-      };
-    }
-    const next = [...message.content];
-    next[next.length - 1] = (next[next.length - 1] ?? '') + chunk.delta;
-    return { ...message, content: next };
+  if (chunk.type === 'done') {
+    return message && message.role === 'assistant'
+      ? { ...message, streaming: false, toolActivity: null }
+      : message;
   }
-  if (chunk.type === 'source' && message?.role === 'assistant') {
-    return { ...message, sources: [...message.sources, chunk.source] };
+  if (chunk.type === 'tool_call') {
+    const assistant = ensureAssistantShell(message);
+    const activityKey = TOOL_ACTIVITY_KEYS[chunk.name] ?? DEFAULT_TOOL_ACTIVITY;
+    return { ...assistant, toolActivity: activityKey };
+  }
+  if (chunk.type === 'text') {
+    const assistant = message?.role === 'assistant' ? message : ensureAssistantShell(message);
+    const next = [...assistant.content];
+    if (next.length === 0) next.push('');
+    next[next.length - 1] = (next[next.length - 1] ?? '') + chunk.delta;
+    return { ...assistant, content: next, toolActivity: null };
+  }
+  if (chunk.type === 'source') {
+    const assistant = ensureAssistantShell(message);
+    const key = sourceDedupeKey(chunk.source);
+    if (assistant.sources.some((s) => sourceDedupeKey(s) === key)) return assistant;
+    return { ...assistant, sources: [...assistant.sources, chunk.source] };
+  }
+  if (chunk.type === 'error') {
+    const assistant = ensureAssistantShell(message);
+    return { ...assistant, error: { detail: chunk.detail }, toolActivity: null };
+  }
+  if (chunk.type === 'degraded') {
+    const assistant = ensureAssistantShell(message);
+    return { ...assistant, corpusDegraded: true, toolActivity: null };
   }
   return message;
 }

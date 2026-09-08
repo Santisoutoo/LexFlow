@@ -86,23 +86,63 @@ class TestExtractCitations:
     def test_search_law_shape(self) -> None:
         result = {
             "items": [
-                {"law_id": "BOE-A-1978-31229", "article_number": "18", "snippet": "..."},
-                {"law_id": "BOE-A-2000-323"},
+                {
+                    "law_id": "BOE-A-1978-31229",
+                    "article_number": "18",
+                    "snippet": "Los derechos fundamentales…",
+                    "law_title": "Constitución Española",
+                    "publication_date": "1978-12-29",
+                },
+                {"law_id": "BOE-FAKE-NOT-IN-REGISTRY"},
             ]
         }
-        citations = _extract_citations(result)
+        citations = _extract_citations(result, tool_name="search_law", tool_args={})
         assert citations == [
-            {"law_id": "BOE-A-1978-31229", "article_number": "18"},
-            {"law_id": "BOE-A-2000-323"},
+            {
+                "law_id": "BOE-A-1978-31229",
+                "article_number": "18",
+                "snippet": "Los derechos fundamentales…",
+                "law_title": "Constitución Española",
+                "publication_date": "1978-12-29",
+            },
+            {"law_id": "BOE-FAKE-NOT-IN-REGISTRY"},
         ]
 
     def test_get_law_shape(self) -> None:
-        result = {"metadata": {"identifier": "BOE-A-2018-16673"}, "articles": []}
-        assert _extract_citations(result) == [{"law_id": "BOE-A-2018-16673"}]
+        result = {
+            "metadata": {
+                "identifier": "BOE-A-2018-16673",
+                "title": "LOPDGDD",
+                "publication_date": "2018-12-06",
+            },
+            "articles": [],
+        }
+        assert _extract_citations(result, tool_name="get_law", tool_args={}) == [
+            {
+                "law_id": "BOE-A-2018-16673",
+                "law_title": "LOPDGDD",
+                "publication_date": "2018-12-06",
+            }
+        ]
+
+    def test_get_article_shape(self) -> None:
+        result = {
+            "number": "28",
+            "text": "El responsable del tratamiento adoptará todas las medidas necesarias…",
+        }
+        citations = _extract_citations(
+            result,
+            tool_name="get_article",
+            tool_args={"law_id": "BOE-A-2018-16673", "article_number": "28"},
+        )
+        assert len(citations) == 1
+        assert citations[0]["law_id"] == "BOE-A-2018-16673"
+        assert citations[0]["article_number"] == "28"
+        assert citations[0]["snippet"].startswith("El responsable")
 
     def test_empty_result_returns_empty(self) -> None:
-        assert _extract_citations({}) == []
-        assert _extract_citations({"error": "not_found"}) == []
+        assert _extract_citations({}, tool_name="search_law", tool_args={}) == []
+        assert _extract_citations({"error": "not_found"}, tool_name="get_law", tool_args={}) == []
 
 
 # ─── End-to-end through the SSE endpoint ────────────────────────────────
@@ -405,7 +445,9 @@ class TestToolUseLoopE2E:
         final_assistant = assistant_rows[-1]
         assert final_assistant["payload"] is not None
         assert final_assistant["payload"]["sources"]
-        assert all("law_id" in s for s in final_assistant["payload"]["sources"])
+        first_source = final_assistant["payload"]["sources"][0]
+        assert "law_id" in first_source
+        assert first_source.get("snippet") or first_source.get("law_title")
 
     def test_second_send_rebuilds_tool_history(
         self,

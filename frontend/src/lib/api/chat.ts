@@ -73,12 +73,20 @@ function sourceFromWire(raw: Record<string, unknown>): ChatSource {
     '';
   const articleNum =
     (typeof raw.article_number === 'string' && raw.article_number) ||
-    (typeof raw.article === 'string' && raw.article) ||
     '';
+  const lawTitle =
+    (typeof raw.law_title === 'string' && raw.law_title) ||
+    lawId;
+  const articleDisplay = articleNum
+    ? `Art. ${articleNum}`
+    : (typeof raw.article === 'string' ? raw.article : '');
+  const date =
+    (typeof raw.publication_date === 'string' && raw.publication_date) ||
+    (typeof raw.date === 'string' ? raw.date : '');
   return {
-    law: lawId,
-    article: articleNum,
-    date: typeof raw.date === 'string' ? raw.date : '',
+    law: lawTitle,
+    article: articleDisplay,
+    date,
     snippet: typeof raw.snippet === 'string' ? raw.snippet : '',
     target: lawId ? { lawId, articleNum: articleNum || undefined } : undefined,
   };
@@ -102,12 +110,21 @@ function messageFromWire(raw: BackendChatMessageRead): ChatMessage | null {
     const sources = rawSources
       .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
       .map(sourceFromWire);
+    const errorPayload = payload.error;
+    const error =
+      typeof errorPayload === 'object' &&
+      errorPayload !== null &&
+      typeof (errorPayload as Record<string, unknown>).detail === 'string'
+        ? { detail: (errorPayload as Record<string, unknown>).detail as string }
+        : undefined;
     return {
       id: raw.id,
       role: 'assistant',
       createdAt: raw.created_at,
       content: [raw.content],
       sources,
+      error,
+      corpusDegraded: payload.corpus_degraded === true,
     };
   }
   if (raw.role === 'tool') {
@@ -154,11 +171,12 @@ function parseSseEvent(eventName: string, data: string): ChatChunk | null {
       return { type: 'source', source };
     }
     case 'error': {
-      // The streaming layer emits a sanitised ``detail`` string.
-      // Surface it as a synthesised final text delta so the rail at
-      // least shows what went wrong instead of an empty turn.
       const detail = typeof obj.detail === 'string' ? obj.detail : 'Provider error';
-      return { type: 'text', delta: `\n\n⚠️ ${detail}` };
+      return { type: 'error', detail };
+    }
+    case 'degraded': {
+      const reason = typeof obj.reason === 'string' ? obj.reason : 'unknown';
+      return { type: 'degraded', reason };
     }
     case 'done':
       return { type: 'done' };

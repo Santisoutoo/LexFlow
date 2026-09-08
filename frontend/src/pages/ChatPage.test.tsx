@@ -66,3 +66,30 @@ describe('ChatPage no-model banner', () => {
     expect(screen.getByText(/generado por IA/i)).toBeInTheDocument();
   });
 });
+
+describe('ChatPage empty state and accessibility', () => {
+  beforeEach(() => {
+    useUi.setState({ defaultModel: 'ollama:qwen2.5:7b', wizardRequested: false });
+    useChatThreadsMock.mockReturnValue({ data: [{ id: 't1', title: 'Test', updatedAt: new Date().toISOString() }] });
+    useChatThreadMock.mockReturnValue({ data: [] });
+    useModelsMock.mockReturnValue({
+      data: [
+        { id: 'ollama:qwen2.5:7b', available: true, label: 'qwen2.5:7b', vendor: 'ollama', kind: 'local' },
+      ],
+    });
+  });
+
+  it('shows honest empty-state hint without @ or #tag', () => {
+    renderChat();
+    expect(screen.getByText(/consultará el corpus automáticamente/i)).toBeInTheDocument();
+    expect(screen.queryByText('@')).not.toBeInTheDocument();
+    expect(screen.queryByText('#tag')).not.toBeInTheDocument();
+  });
+
+  it('exposes aria-live polite on the transcript region', () => {
+    renderChat();
+    const liveRegion = document.querySelector('[aria-live="polite"]');
+    expect(liveRegion).not.toBeNull();
+    expect(liveRegion).toHaveAttribute('aria-atomic', 'false');
+  });
+});
