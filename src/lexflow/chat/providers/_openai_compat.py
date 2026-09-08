@@ -122,6 +122,24 @@ def adapt_messages(messages: list[ChatMessage]) -> list[dict[str, Any]]:
                     "tool_call_id": msg.tool_call_id or msg.name or "tool",
                 }
             )
+        elif msg.role == "assistant" and msg.tool_calls:
+            out.append(
+                {
+                    "role": "assistant",
+                    "content": msg.content or None,
+                    "tool_calls": [
+                        {
+                            "id": call.call_id,
+                            "type": "function",
+                            "function": {
+                                "name": call.name,
+                                "arguments": json.dumps(call.arguments, ensure_ascii=False),
+                            },
+                        }
+                        for call in msg.tool_calls
+                    ],
+                }
+            )
         else:
             out.append({"role": msg.role, "content": msg.content})
     return out

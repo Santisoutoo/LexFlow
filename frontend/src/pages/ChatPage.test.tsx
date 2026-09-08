@@ -60,4 +60,9 @@ describe('ChatPage no-model banner', () => {
     await userEvent.click(screen.getByRole('button', { name: /configurar asistente/i }));
     expect(useUi.getState().wizardRequested).toBe(true);
   });
+
+  it('shows the AI disclaimer under the composer', () => {
+    renderChat();
+    expect(screen.getByText(/generado por IA/i)).toBeInTheDocument();
+  });
 });

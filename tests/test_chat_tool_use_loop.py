@@ -31,9 +31,11 @@ from lexflow.chat.base import (
     ToolCallChunk,
     ToolSpec,
 )
+from lexflow.chat.prompts import build_system_prompt
 from lexflow.chat.streaming import (
     _extract_citations,
     _persist_assistant_turn,
+    _persist_tool_turn,
     _persist_user_turn,
     _refresh_and_load_history,
     _run_tool_call,
@@ -292,6 +294,12 @@ class TestToolUseLoopE2E:
         assert len(tool_messages) == 1
         assert tool_messages[0].tool_call_id == "c1"
         assert tool_messages[0].name == "get_stats"
+        assistant_before_tool = second_history[second_history.index(tool_messages[0]) - 1]
+        assert assistant_before_tool.role == "assistant"
+        assert assistant_before_tool.tool_calls is not None
+        assert len(assistant_before_tool.tool_calls) == 1
+        assert assistant_before_tool.tool_calls[0].call_id == "c1"
+        assert assistant_before_tool.tool_calls[0].name == "get_stats"
 
     def test_semantic_tool_emits_sources(
         self,
@@ -365,6 +373,87 @@ class TestToolUseLoopE2E:
         assert _persist_user_turn in offloaded_funcs
         assert _refresh_and_load_history in offloaded_funcs
         assert _persist_assistant_turn in offloaded_funcs
+        assert _persist_tool_turn in offloaded_funcs
+
+    def test_persists_tool_turns_and_sources(
+        self,
+        client: TestClient,
+        patch_ollama_provider,
+        mock_registry,
+        prebuilt_semantic_index,
+    ) -> None:
+        del mock_registry, prebuilt_semantic_index
+        provider = _SemanticToolProvider()
+        patch_ollama_provider(lambda: provider)
+        thread_id = _create_thread(client)
+        response = client.post(
+            f"/api/v1/chat/threads/{thread_id}/send",
+            json={"message": "¿qué dice sobre protección de datos?", "model": "ollama:fake"},
+        )
+        assert response.status_code == 200
+
+        detail = client.get(f"/api/v1/chat/threads/{thread_id}")
+        assert detail.status_code == 200
+        messages = detail.json()["messages"]
+        roles = [m["role"] for m in messages]
+        assert "tool" in roles
+        tool_rows = [m for m in messages if m["role"] == "tool"]
+        assert tool_rows[0]["payload"]["name"] == "search_semantic_top_k"
+        assert tool_rows[0]["payload"]["args"]["query"] == "protección de datos"
+
+        assistant_rows = [m for m in messages if m["role"] == "assistant"]
+        final_assistant = assistant_rows[-1]
+        assert final_assistant["payload"] is not None
+        assert final_assistant["payload"]["sources"]
+        assert all("law_id" in s for s in final_assistant["payload"]["sources"])
+
+    def test_second_send_rebuilds_tool_history(
+        self,
+        client: TestClient,
+        patch_ollama_provider,
+        mock_registry,
+    ) -> None:
+        provider = _ToolUsingProvider()
+        patch_ollama_provider(lambda: provider)
+        thread_id = _create_thread(client)
+        first = client.post(
+            f"/api/v1/chat/threads/{thread_id}/send",
+            json={"message": "¿cuántas leyes?", "model": "ollama:fake"},
+        )
+        assert first.status_code == 200
+        provider.iterations = 0
+        provider.observed_histories.clear()
+
+        second = client.post(
+            f"/api/v1/chat/threads/{thread_id}/send",
+            json={"message": "¿y artículos?", "model": "ollama:fake"},
+        )
+        assert second.status_code == 200
+        first_call_history = provider.observed_histories[0]
+        assert first_call_history[0].role == "system"
+        assert "corpus" in first_call_history[0].content.lower()
+        tool_msgs = [m for m in first_call_history if m.role == "tool"]
+        assert tool_msgs
+        assistant_with_calls = [m for m in first_call_history if m.role == "assistant" and m.tool_calls]
+        assert assistant_with_calls
+
+    def test_system_prompt_prepended_to_provider_history(
+        self,
+        client: TestClient,
+        patch_ollama_provider,
+        mock_registry,
+    ) -> None:
+        provider = _ToolUsingProvider()
+        patch_ollama_provider(lambda: provider)
+        thread_id = _create_thread(client)
+        response = client.post(
+            f"/api/v1/chat/threads/{thread_id}/send",
+            json={"message": "hola", "model": "ollama:fake"},
+        )
+        assert response.status_code == 200
+        first_history = provider.observed_histories[0]
+        assert first_history[0].role == "system"
+        assert build_system_prompt() in first_history[0].content
 
     def test_runaway_loop_stops_at_iteration_cap(
         self,

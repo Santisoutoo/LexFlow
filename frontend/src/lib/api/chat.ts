@@ -61,6 +61,30 @@ function threadFromWire(raw: BackendChatThreadRead): ChatThread {
 }
 
 /**
+ * Normalise a persisted or SSE source dict into ``ChatSource``.
+ *
+ * Backend citations use ``law_id`` / ``article_number``; mocks may use
+ * ``law`` / ``article`` — accept both.
+ */
+function sourceFromWire(raw: Record<string, unknown>): ChatSource {
+  const lawId =
+    (typeof raw.law_id === 'string' && raw.law_id) ||
+    (typeof raw.law === 'string' && raw.law) ||
+    '';
+  const articleNum =
+    (typeof raw.article_number === 'string' && raw.article_number) ||
+    (typeof raw.article === 'string' && raw.article) ||
+    '';
+  return {
+    law: lawId,
+    article: articleNum,
+    date: typeof raw.date === 'string' ? raw.date : '',
+    snippet: typeof raw.snippet === 'string' ? raw.snippet : '',
+    target: lawId ? { lawId, articleNum: articleNum || undefined } : undefined,
+  };
+}
+
+/**
  * Project a persisted message into the SPA's discriminated shape.
  *
  * Tool turns carry ``name`` / ``args`` under ``payload`` and the
@@ -74,7 +98,10 @@ function messageFromWire(raw: BackendChatMessageRead): ChatMessage | null {
     return { id: raw.id, role: 'user', createdAt: raw.created_at, content: raw.content };
   }
   if (raw.role === 'assistant') {
-    const sources = Array.isArray(payload.sources) ? (payload.sources as ChatSource[]) : [];
+    const rawSources = Array.isArray(payload.sources) ? payload.sources : [];
+    const sources = rawSources
+      .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
+      .map(sourceFromWire);
     return {
       id: raw.id,
       role: 'assistant',
@@ -122,15 +149,8 @@ function parseSseEvent(eventName: string, data: string): ChatChunk | null {
       return { type: 'tool_call', name, args };
     }
     case 'source': {
-      const lawId = typeof obj.law_id === 'string' ? obj.law_id : '';
-      const articleNum = typeof obj.article_number === 'string' ? obj.article_number : '';
-      const source: ChatSource = {
-        law: lawId,
-        article: articleNum,
-        date: '',
-        snippet: '',
-        target: lawId ? { lawId, articleNum: articleNum || undefined } : undefined,
-      };
+      const source = sourceFromWire(obj);
+      if (!source.law) return null;
       return { type: 'source', source };
     }
     case 'error': {

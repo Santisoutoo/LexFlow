@@ -275,6 +275,7 @@
     "onlyInForce": "In-force only",
     "comingSoon": "Coming soon",
     "enterHint": "Enter sends · ⇧↵ newline",
+    "aiDisclaimer": "AI-generated content. May contain errors and does not constitute legal advice.",
     "noModelTitle": "No model configured",
     "noModelBody": "Configure a model in Settings → Models (or start Ollama/LM Studio) before chatting.",
     "setupAssistantTitle": "Set up your assistant (2 min)",

@@ -688,3 +688,85 @@ class TestLMStudioTypedStreaming:
         tool_turn = next(m for m in _FakeOpenAICompletions.captured["messages"] if m["role"] == "tool")
         assert tool_turn["tool_call_id"] == "call_99"
         assert tool_turn["content"] == '{"items":[]}'
+
+
+class TestOpenAIAssistantToolCalls:
+    def test_adapt_messages_emits_assistant_tool_calls(self) -> None:
+        from lexflow.chat.base import ToolCallRef
+        from lexflow.chat.providers._openai_compat import adapt_messages
+
+        adapted = adapt_messages(
+            [
+                ChatMessage(role="user", content="hi"),
+                ChatMessage(
+                    role="assistant",
+                    content="",
+                    tool_calls=[ToolCallRef(call_id="call_1", name="search_law", arguments={"query": "RGPD"})],
+                ),
+                ChatMessage(
+                    role="tool",
+                    content='{"items":[]}',
+                    tool_call_id="call_1",
+                    name="search_law",
+                ),
+            ]
+        )
+        assistant = next(m for m in adapted if m["role"] == "assistant")
+        assert assistant["tool_calls"][0]["id"] == "call_1"
+        assert assistant["tool_calls"][0]["function"]["name"] == "search_law"
+        assert '"query"' in assistant["tool_calls"][0]["function"]["arguments"]
+
+
+class TestAnthropicAssistantToolCalls:
+    def test_split_system_emits_tool_use_blocks(self) -> None:
+        from lexflow.chat.base import ToolCallRef
+        from lexflow.chat.providers.anthropic_provider import _split_system
+
+        _, adapted = _split_system(
+            [
+                ChatMessage(
+                    role="assistant",
+                    content="Consultando",
+                    tool_calls=[ToolCallRef(call_id="toolu_1", name="search_law", arguments={"query": "x"})],
+                ),
+            ]
+        )
+        assert adapted[0]["content"][0] == {"type": "text", "text": "Consultando"}
+        assert adapted[0]["content"][1]["type"] == "tool_use"
+        assert adapted[0]["content"][1]["id"] == "toolu_1"
+
+
+class TestGoogleAssistantToolCalls:
+    def test_contents_payload_emits_function_call_parts(self) -> None:
+        from lexflow.chat.base import ToolCallRef
+        from lexflow.chat.providers.google_provider import _contents_payload
+
+        adapted = _contents_payload(
+            [
+                ChatMessage(
+                    role="assistant",
+                    content="",
+                    tool_calls=[ToolCallRef(call_id="search_law", name="search_law", arguments={"query": "y"})],
+                ),
+            ]
+        )
+        assert adapted[0]["role"] == "model"
+        assert adapted[0]["parts"][0]["function_call"]["name"] == "search_law"
+
+
+class TestOllamaAssistantToolCalls:
+    def test_messages_payload_emits_assistant_tool_calls(self) -> None:
+        from lexflow.chat.base import ToolCallRef
+        from lexflow.chat.providers.ollama import _messages_payload
+
+        adapted = _messages_payload(
+            [
+                ChatMessage(
+                    role="assistant",
+                    content="",
+                    tool_calls=[ToolCallRef(call_id="c1", name="get_stats", arguments={})],
+                ),
+            ]
+        )
+        assert adapted[0]["role"] == "assistant"
+        assert adapted[0]["tool_calls"][0]["function"]["name"] == "get_stats"
