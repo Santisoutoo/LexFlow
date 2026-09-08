@@ -35,13 +35,20 @@ describe('applyChunk', () => {
   });
 
   it('stores error and degraded flags on the assistant shell', () => {
-    let msg = applyChunk(null, { type: 'error', detail: 'upstream failed' });
+    let msg = applyChunk(null, { type: 'tool_call', name: 'search_law', args: { q: 'datos' } });
+    if (msg?.role === 'assistant') {
+      expect(msg.toolActivity).toBe('chat.toolActivity.searchCorpus');
+    }
+
+    msg = applyChunk(msg, { type: 'error', detail: 'upstream failed' });
     if (msg?.role === 'assistant') {
       expect(msg.error).toEqual({ detail: 'upstream failed' });
+      expect(msg.toolActivity).toBeNull();
     }
     msg = applyChunk(msg, { type: 'degraded', reason: 'tools_unsupported' });
     if (msg?.role === 'assistant') {
       expect(msg.corpusDegraded).toBe(true);
+      expect(msg.toolActivity).toBeNull();
     }
     msg = applyChunk(msg, { type: 'done' });
     if (msg?.role === 'assistant') {

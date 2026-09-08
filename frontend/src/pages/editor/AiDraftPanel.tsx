@@ -83,6 +83,8 @@ export function AiDraftPanel({ editor, onClose }: AiDraftPanelProps) {
 
   const draftText = stream?.role === 'assistant' ? stream.content.join('\n\n').trim() : '';
   const sources: ChatSource[] = stream?.role === 'assistant' ? stream.sources : [];
+  const streamError = stream?.role === 'assistant' ? stream.error?.detail : null;
+  const displayError = error ?? streamError;
 
   const generate = async (text: string) => {
     const content = text.trim();
@@ -207,7 +209,9 @@ export function AiDraftPanel({ editor, onClose }: AiDraftPanelProps) {
           </Button>
         </section>
 
-        {error && <div className="rounded-lg bg-danger-soft px-3 py-2 text-[12.5px] text-danger">{error}</div>}
+        {displayError && (
+          <div className="rounded-lg bg-danger-soft px-3 py-2 text-[12.5px] text-danger">{displayError}</div>
+        )}
 
         {/* Streamed result. */}
         {(busy || draftText) && (

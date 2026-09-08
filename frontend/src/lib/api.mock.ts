@@ -682,11 +682,11 @@ export function applyChunk(message: ChatMessage | null, chunk: ChatChunk): ChatM
   }
   if (chunk.type === 'error') {
     const assistant = ensureAssistantShell(message);
-    return { ...assistant, error: { detail: chunk.detail } };
+    return { ...assistant, error: { detail: chunk.detail }, toolActivity: null };
   }
   if (chunk.type === 'degraded') {
     const assistant = ensureAssistantShell(message);
-    return { ...assistant, corpusDegraded: true };
+    return { ...assistant, corpusDegraded: true, toolActivity: null };
   }
   return message;
 }
