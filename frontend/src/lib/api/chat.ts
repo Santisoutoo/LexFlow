@@ -117,6 +117,7 @@ function messageFromWire(raw: BackendChatMessageRead): ChatMessage | null {
       typeof (errorPayload as Record<string, unknown>).detail === 'string'
         ? { detail: (errorPayload as Record<string, unknown>).detail as string }
         : undefined;
+    const model = typeof payload.model === 'string' ? payload.model : undefined;
     return {
       id: raw.id,
       role: 'assistant',
@@ -125,6 +126,7 @@ function messageFromWire(raw: BackendChatMessageRead): ChatMessage | null {
       sources,
       error,
       corpusDegraded: payload.corpus_degraded === true,
+      model,
     };
   }
   if (raw.role === 'tool') {
@@ -190,35 +192,50 @@ function parseSseEvent(eventName: string, data: string): ChatChunk | null {
  * line event boundary, reads ``event:`` + ``data:`` lines per block,
  * and forwards parsed chunks to the caller. Terminates on ``done``.
  */
-async function* consumeSse(body: ReadableStream<Uint8Array>): AsyncGenerator<ChatChunk> {
+async function* consumeSse(
+  body: ReadableStream<Uint8Array>,
+  signal?: AbortSignal,
+): AsyncGenerator<ChatChunk> {
   const reader = body.getReader();
   const decoder = new TextDecoder('utf-8');
   let buffer = '';
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    let separator: number;
-    while ((separator = buffer.indexOf('\n\n')) !== -1) {
-      const block = buffer.slice(0, separator);
-      buffer = buffer.slice(separator + 2);
-      let eventName = 'message';
-      const dataLines: string[] = [];
-      for (const rawLine of block.split('\n')) {
-        const line = rawLine.replace(/\r$/, '');
-        if (!line || line.startsWith(':')) continue;
-        const colon = line.indexOf(':');
-        const field = colon === -1 ? line : line.slice(0, colon);
-        const value = colon === -1 ? '' : line.slice(colon + 1).replace(/^\s/, '');
-        if (field === 'event') eventName = value;
-        else if (field === 'data') dataLines.push(value);
+  const onAbort = () => {
+    void reader.cancel();
+  };
+  signal?.addEventListener('abort', onAbort, { once: true });
+  try {
+    while (true) {
+      if (signal?.aborted) {
+        throw new DOMException('The operation was aborted.', 'AbortError');
       }
-      const chunk = parseSseEvent(eventName, dataLines.join('\n'));
-      if (chunk) {
-        yield chunk;
-        if (chunk.type === 'done') return;
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let separator: number;
+      while ((separator = buffer.indexOf('\n\n')) !== -1) {
+        const block = buffer.slice(0, separator);
+        buffer = buffer.slice(separator + 2);
+        let eventName = 'message';
+        const dataLines: string[] = [];
+        for (const rawLine of block.split('\n')) {
+          const line = rawLine.replace(/\r$/, '');
+          if (!line || line.startsWith(':')) continue;
+          const colon = line.indexOf(':');
+          const field = colon === -1 ? line : line.slice(0, colon);
+          const value = colon === -1 ? '' : line.slice(colon + 1).replace(/^\s/, '');
+          if (field === 'event') eventName = value;
+          else if (field === 'data') dataLines.push(value);
+        }
+        const chunk = parseSseEvent(eventName, dataLines.join('\n'));
+        if (chunk) {
+          yield chunk;
+          if (chunk.type === 'done') return;
+        }
       }
     }
+  } finally {
+    signal?.removeEventListener('abort', onAbort);
+    reader.releaseLock();
   }
 }
 
@@ -273,6 +290,7 @@ export const liveChatApi: ApiClient['chat'] = {
         message: content,
         model: opts.model ?? '',
       }),
+      signal: opts.signal,
     });
     if (!response.ok) {
       let body: unknown = undefined;
@@ -286,6 +304,6 @@ export const liveChatApi: ApiClient['chat'] = {
     if (!response.body) {
       throw new ApiError(response.status, null, 'Chat stream had no body');
     }
-    yield* consumeSse(response.body);
+    yield* consumeSse(response.body, opts.signal);
   },
 };

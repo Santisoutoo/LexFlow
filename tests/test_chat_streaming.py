@@ -21,6 +21,7 @@ from fastapi.testclient import TestClient
 from pytest import MonkeyPatch
 
 from lexflow.chat.base import ChatProvider, ChatProviderError
+from lexflow.chat.storage_models import DEFAULT_THREAD_TITLE
 
 
 class _FakeProvider(ChatProvider):
@@ -260,3 +261,55 @@ class TestChatStreaming:
             json={"message": "hi", "model": "ollama:fake-model"},
         )
         assert response.status_code == 404
+
+    def test_auto_title_after_first_message(
+        self,
+        client: TestClient,
+        patch_provider,
+    ) -> None:
+        patch_provider(["Hola"])
+        create = client.post("/api/v1/chat/threads", json={"model": "ollama:fake-model"})
+        thread_id = create.json()["id"]
+        assert create.json()["title"] == DEFAULT_THREAD_TITLE
+        client.post(
+            f"/api/v1/chat/threads/{thread_id}/send",
+            json={"message": "¿Qué exige el artículo 28 del RGPD?", "model": "ollama:fake-model"},
+        )
+        detail = client.get(f"/api/v1/chat/threads/{thread_id}").json()
+        assert detail["title"] != DEFAULT_THREAD_TITLE
+        assert "artículo 28" in detail["title"]
+
+    def test_custom_title_not_overwritten(
+        self,
+        client: TestClient,
+        patch_provider,
+    ) -> None:
+        patch_provider(["ok"])
+        thread_id = _create_thread(client)
+        client.post(
+            f"/api/v1/chat/threads/{thread_id}/send",
+            json={"message": "primera", "model": "ollama:fake-model"},
+        )
+        client.patch(f"/api/v1/chat/threads/{thread_id}", json={"title": "Mi título"})
+        client.post(
+            f"/api/v1/chat/threads/{thread_id}/send",
+            json={"message": "segunda", "model": "ollama:fake-model"},
+        )
+        detail = client.get(f"/api/v1/chat/threads/{thread_id}").json()
+        assert detail["title"] == "Mi título"
+
+    def test_assistant_payload_records_model(
+        self,
+        client: TestClient,
+        patch_provider,
+    ) -> None:
+        patch_provider(["Hola"])
+        thread_id = _create_thread(client)
+        client.post(
+            f"/api/v1/chat/threads/{thread_id}/send",
+            json={"message": "hi", "model": "ollama:fake-model"},
+        )
+        detail = client.get(f"/api/v1/chat/threads/{thread_id}").json()
+        assistant = detail["messages"][-1]
+        assert assistant["payload"]["model"] == "ollama:fake-model"
+        assert detail["model"] == "ollama:fake-model"

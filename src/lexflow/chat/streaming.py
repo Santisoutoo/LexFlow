@@ -33,6 +33,7 @@ import json
 import logging
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
+from functools import partial
 from typing import Any
 
 import anyio.to_thread
@@ -49,9 +50,10 @@ from lexflow.chat.base import (
     ToolCallRef,
     ToolSpec,
 )
+from lexflow.chat.context import bound_history, compact_tool_content
 from lexflow.chat.mcp_server import TOOL_SPECS, dispatch_tool
 from lexflow.chat.prompts import build_system_prompt
-from lexflow.chat.storage_models import ChatMessage, ChatThread
+from lexflow.chat.storage_models import DEFAULT_THREAD_TITLE, ChatMessage, ChatThread
 from lexflow.core.exceptions import LawNotFoundError
 from lexflow.core.registry import get_registry
 
@@ -250,11 +252,41 @@ def _persist_user_turn(session: Session, thread: ChatThread, content: str) -> No
     session.commit()
 
 
+def _derive_title_from_message(text: str, *, max_len: int = 60) -> str:
+    """Build a short thread title from the first user message."""
+    collapsed = " ".join(text.split())
+    if collapsed.endswith("?"):
+        collapsed = collapsed[:-1].rstrip()
+    if len(collapsed) <= max_len:
+        return collapsed
+    return collapsed[: max_len - 1].rstrip() + "…"
+
+
+def _maybe_auto_title_thread(
+    session: Session,
+    thread: ChatThread,
+    user_message_content: str,
+) -> None:
+    """Rename a default-titled thread after its first user turn."""
+    session.refresh(thread)
+    if thread.title != DEFAULT_THREAD_TITLE:
+        return
+    user_turns = sum(1 for message in thread.messages if message.role == "user")
+    if user_turns != 1:
+        return
+    thread.title = _derive_title_from_message(user_message_content)
+    thread.updated_at = datetime.now(UTC)
+    session.add(thread)
+    session.commit()
+
+
 def _persist_assistant_turn(
     session: Session,
     thread: ChatThread,
     content: str,
     payload: dict[str, Any] | None = None,
+    *,
+    model_id: str | None = None,
 ) -> None:
     """Save the assistant turn and bump the thread's activity timestamp.
 
@@ -263,9 +295,15 @@ def _persist_assistant_turn(
     Optional ``payload`` carries ``sources`` and/or intermediate
     ``tool_calls`` for refetch reconstruction.
     """
-    payload_json = None
+    merged: dict[str, Any] | None = None
     if payload is not None:
-        payload_json = json.dumps(payload, ensure_ascii=False)
+        merged = dict(payload)
+    if model_id:
+        if merged is None:
+            merged = {"model": model_id}
+        else:
+            merged["model"] = model_id
+    payload_json = json.dumps(merged, ensure_ascii=False) if merged is not None else None
     assistant_message = ChatMessage(
         thread_id=thread.id,
         role="assistant",
@@ -347,7 +385,10 @@ def _record_tool_outcome(
     history.append(
         ProviderMessage(
             role="tool",
-            content=json.dumps(result, ensure_ascii=False, default=str),
+            content=compact_tool_content(
+                json.dumps(result, ensure_ascii=False, default=str),
+                tool_name=call.name,
+            ),
             tool_call_id=call.call_id,
             name=call.name,
         )
@@ -403,7 +444,7 @@ def _thread_history(thread: ChatThread) -> list[ProviderMessage]:
             messages.append(
                 ProviderMessage(
                     role="tool",
-                    content=stored.content,
+                    content=compact_tool_content(stored.content, tool_name=name),
                     tool_call_id=call_id,
                     name=name,
                 )
@@ -422,8 +463,8 @@ def _thread_history(thread: ChatThread) -> list[ProviderMessage]:
 def _with_system_prompt(history: list[ProviderMessage]) -> list[ProviderMessage]:
     """Prepend the grounding system prompt when history lacks one."""
     if history and history[0].role == "system":
-        return history
-    return [ProviderMessage(role="system", content=build_system_prompt()), *history]
+        return bound_history(history)
+    return bound_history([ProviderMessage(role="system", content=build_system_prompt()), *history])
 
 
 def _dedupe_citations(citations: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -447,6 +488,13 @@ def _dedupe_citations(citations: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def _assistant_tool_calls_payload(calls: list[ToolCallChunk]) -> dict[str, Any]:
     """Serialise intermediate assistant tool calls for persistence."""
     return {"tool_calls": [{"call_id": call.call_id, "name": call.name, "arguments": call.arguments} for call in calls]}
+
+
+def _set_thread_model(session: Session, thread: ChatThread, model_id: str) -> None:
+    """Persist the model used for the current turn on the thread row."""
+    thread.model = model_id
+    session.add(thread)
+    session.commit()
 
 
 def _refresh_and_load_history(session: Session, thread: ChatThread) -> list[ProviderMessage]:
@@ -489,6 +537,7 @@ async def stream_chat_reply(
     #    swallow the user's question. Sync SQLite commit — offloaded so it
     #    doesn't stall other concurrent requests/streams (#77 S1.1).
     await anyio.to_thread.run_sync(_persist_user_turn, session, thread, user_message_content)
+    await anyio.to_thread.run_sync(_set_thread_model, session, thread, model_id)
 
     # 2. Resolve provider + assemble context.
     try:
@@ -563,11 +612,14 @@ async def stream_chat_reply(
                     break
                 _record_assistant_tool_calls(history, pending_calls, content="".join(iteration_text))
                 await anyio.to_thread.run_sync(
-                    _persist_assistant_turn,
-                    session,
-                    thread,
-                    "".join(iteration_text),
-                    _assistant_tool_calls_payload(pending_calls),
+                    partial(
+                        _persist_assistant_turn,
+                        session,
+                        thread,
+                        "".join(iteration_text),
+                        _assistant_tool_calls_payload(pending_calls),
+                        model_id=model_id,
+                    ),
                 )
                 for call in pending_calls:
                     # S4.1 (#90): tool dispatch is synchronous (SQLite scans,
@@ -634,11 +686,15 @@ async def stream_chat_reply(
     if corpus_degraded:
         final_payload["corpus_degraded"] = True
     await anyio.to_thread.run_sync(
-        _persist_assistant_turn,
-        session,
-        thread,
-        "".join(assistant_chunks),
-        final_payload or None,
+        partial(
+            _persist_assistant_turn,
+            session,
+            thread,
+            "".join(assistant_chunks),
+            final_payload or None,
+            model_id=model_id,
+        ),
     )
+    await anyio.to_thread.run_sync(_maybe_auto_title_thread, session, thread, user_message_content)
 
     yield format_sse(SseEvent.DONE, {})

@@ -280,6 +280,8 @@
     "setupAssistantTitle": "Configura tu asistente (2 min)",
     "setupAssistantCta": "Configurar asistente",
     "send": "Enviar",
+    "stop": "Detener",
+    "stopAria": "Detener la respuesta",
     "sources": "Fuentes",
     "renameAria": "Renombrar {{title}}",
     "deleteAria": "Eliminar {{title}}",

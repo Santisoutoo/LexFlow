@@ -58,7 +58,7 @@ from lexflow.chat.schemas import (
     ChatThreadPatch,
     ChatThreadRead,
 )
-from lexflow.chat.storage_models import ChatMessage, ChatThread
+from lexflow.chat.storage_models import DEFAULT_THREAD_TITLE, ChatMessage, ChatThread
 from lexflow.chat.streaming import split_model_id, stream_chat_reply
 
 logger = logging.getLogger(__name__)
@@ -280,7 +280,7 @@ def create_thread(
 ) -> ChatThreadRead:
     """Insert a new thread and return its read shape."""
     thread = ChatThread(
-        title=body.title or "Nueva conversación",
+        title=body.title or DEFAULT_THREAD_TITLE,
         model=body.model or "",
     )
     session.add(thread)

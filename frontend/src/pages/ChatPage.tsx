@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
-import { Plus, Paperclip, BookOpenText, SlidersHorizontal, Send, Pencil, Trash2, Menu } from 'lucide-react';
+import { Plus, Paperclip, BookOpenText, SlidersHorizontal, Send, Square, Pencil, Trash2, Menu } from 'lucide-react';
 import { Button, Chip, Kbd, useConfirm, Callout } from '@/components/ui';
 import { ChatMessage } from '@/components/domain/ChatMessage';
 import { ModelChip } from '@/components/domain/ModelChip';
@@ -18,8 +18,8 @@ import {
   useModels,
 } from '@/lib/queries';
 import { api } from '@/lib/api';
-import { applyChunk } from '@/lib/api.mock';
 import { useUi } from '@/lib/store';
+import { useChatStream } from '@/stores/chat-stream';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import type { ChatMessage as ChatMessageT, ChatSource } from '@/lib/types';
@@ -72,13 +72,13 @@ export function ChatPage() {
       setDraft(incoming);
     }
   }, [location.state]);
-  const [stream, setStream] = useState<ChatMessageT | null>(null);
-  // Optimistic echo of the just-sent user turn. The backend persists it
-  // as part of /send, but the thread query only refetches *after* the
-  // stream finishes — without this the user's own message wouldn't appear
-  // until then (part of the "I send hola and see nothing" bug, #564).
-  const [pendingUser, setPendingUser] = useState<ChatMessageT | null>(null);
-  const [sending, setSending] = useState(false);
+  const threadStream = useChatStream((s) => s.getThreadState(activeId));
+  const startSend = useChatStream((s) => s.startSend);
+  const setPendingUser = useChatStream((s) => s.setPendingUser);
+  const applyStreamChunk = useChatStream((s) => s.applyChunk);
+  const stopSend = useChatStream((s) => s.stopSend);
+  const finishSend = useChatStream((s) => s.finishSend);
+  const { stream, pendingUser, sending } = threadStream;
   const [liveAnnouncement, setLiveAnnouncement] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   // Scroll-to-bottom rAF ref: coalesces per-token scroll calls during SSE
@@ -250,33 +250,28 @@ export function ChatPage() {
     }
     const content = draft;
     setDraft('');
-    setSending(true);
-    // Optimistically echo the user turn so it shows immediately.
-    setPendingUser({ id: `pending-${Date.now()}`, role: 'user', createdAt: new Date().toISOString(), content });
-    let current: ChatMessageT | null = null;
+    const abortController = startSend(target);
+    setPendingUser(target, { id: `pending-${Date.now()}`, role: 'user', createdAt: new Date().toISOString(), content });
     try {
-      for await (const chunk of api.chat.send(target, content, { model: defaultModel })) {
-        current = applyChunk(current, chunk);
-        setStream(current);
+      for await (const chunk of api.chat.send(target, content, { model: defaultModel, signal: abortController.signal })) {
+        applyStreamChunk(target, chunk);
       }
     } catch (exc) {
-      // Surface the failure with a toast and restore the draft so the
-      // user can retry without retyping. Without this the indicator
-      // hung forever and the draft was silently discarded.
-      const message = exc instanceof Error ? exc.message : 'Error desconocido';
-      toast({ tone: 'danger', title: 'No se pudo enviar el mensaje', message });
-      setDraft(content);
+      const aborted = exc instanceof DOMException && exc.name === 'AbortError';
+      if (!aborted) {
+        const message = exc instanceof Error ? exc.message : 'Error desconocido';
+        toast({ tone: 'danger', title: 'No se pudo enviar el mensaje', message });
+        setDraft(content);
+      }
     } finally {
-      // Refetch the thread so the *persisted* user + assistant turns
-      // render. Without this the streamed reply vanished the instant
-      // `stream` cleared (the core #564 bug). Await the refetch before
-      // dropping the optimistic echoes so there's no blank flash.
-      setSending(false);
       await qc.invalidateQueries({ queryKey: qk.chatThread(target) });
       void qc.invalidateQueries({ queryKey: qk.chatThreads() });
-      setStream(null);
-      setPendingUser(null);
+      finishSend(target);
     }
+  };
+
+  const handleStop = () => {
+    stopSend(activeId);
   };
 
   return (
@@ -473,7 +468,15 @@ export function ChatPage() {
               <span className="ml-auto flex items-center gap-2">
                 <span className="text-[11px] text-muted">{t('chat.enterHint')}</span>
                 <Kbd>↵</Kbd>
-                <Button size="sm" icon={<Send className="size-3.5" />} onClick={send} disabled={sending}>{t('chat.send')}</Button>
+                <Button
+                  size="sm"
+                  icon={sending ? <Square className="size-3.5" /> : <Send className="size-3.5" />}
+                  onClick={sending ? handleStop : send}
+                  disabled={!sending && !draft.trim()}
+                  aria-label={sending ? t('chat.stopAria') : t('chat.send')}
+                >
+                  {sending ? t('chat.stop') : t('chat.send')}
+                </Button>
               </span>
             </div>
           </div>
