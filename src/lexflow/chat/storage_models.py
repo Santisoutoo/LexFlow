@@ -49,13 +49,16 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+DEFAULT_THREAD_TITLE = "Nueva conversación"
+
+
 class ChatThread(SQLModel, table=True):
     """One chat conversation."""
 
     __tablename__ = "chat_threads"
 
     id: str = Field(default_factory=_new_id, primary_key=True)
-    title: str = Field(default="Nueva conversación", index=True)
+    title: str = Field(default=DEFAULT_THREAD_TITLE, index=True)
     # `model` is the user's chosen model id (e.g. "openai:gpt-4o"). Stored
     # so re-opening a thread keeps the same provider/model — but the user
     # can flip it on a per-message basis.

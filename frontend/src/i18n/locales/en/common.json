@@ -280,6 +280,8 @@
     "setupAssistantTitle": "Set up your assistant (2 min)",
     "setupAssistantCta": "Set up assistant",
     "send": "Send",
+    "stop": "Stop",
+    "stopAria": "Stop the response",
     "sources": "Sources",
     "renameAria": "Rename {{title}}",
     "deleteAria": "Delete {{title}}",

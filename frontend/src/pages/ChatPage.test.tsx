@@ -1,12 +1,14 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ChatPage } from './ChatPage';
 import { ConfirmProvider } from '@/components/ui';
 import { useUi } from '@/lib/store';
+import { useChatStream } from '@/stores/chat-stream';
+import { api } from '@/lib/api';
 
 const useModelsMock = vi.fn();
 const useChatThreadsMock = vi.fn();
@@ -18,12 +20,28 @@ vi.mock('@/lib/queries', () => ({
     chatThreads: () => ['chat-threads'],
   },
   useChatThreads: () => useChatThreadsMock(),
-  useChatThread: () => useChatThreadMock(),
+  useChatThread: (id: string) => useChatThreadMock(id),
   useCreateChatThread: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteChatThread: () => ({ mutateAsync: vi.fn() }),
   useRenameChatThread: () => ({ mutateAsync: vi.fn() }),
   useModels: () => useModelsMock(),
 }));
+
+function renderChatAt(path = '/chat') {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[path]}>
+        <ConfirmProvider>
+          <Routes>
+            <Route path="/chat" element={<ChatPage />} />
+            <Route path="/chat/:threadId" element={<ChatPage />} />
+          </Routes>
+        </ConfirmProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
 
 function renderChat() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -91,5 +109,49 @@ describe('ChatPage empty state and accessibility', () => {
     const liveRegion = document.querySelector('[aria-live="polite"]');
     expect(liveRegion).not.toBeNull();
     expect(liveRegion).toHaveAttribute('aria-atomic', 'false');
+  });
+});
+
+describe('ChatPage thread-scoped streaming', () => {
+  beforeEach(() => {
+    useUi.setState({ defaultModel: 'ollama:qwen2.5:7b', wizardRequested: false });
+    useChatStream.setState({ threads: {} });
+    useChatThreadsMock.mockReturnValue({
+      data: [
+        { id: 'thread-a', title: 'A', updatedAt: new Date().toISOString() },
+        { id: 'thread-b', title: 'B', updatedAt: new Date().toISOString() },
+      ],
+    });
+    useChatThreadMock.mockImplementation((threadId: string) => ({
+      data:
+        threadId === 'thread-a'
+          ? [{ id: 'm1', role: 'user', createdAt: new Date().toISOString(), content: 'hola A' }]
+          : [],
+    }));
+    useModelsMock.mockReturnValue({
+      data: [
+        { id: 'ollama:qwen2.5:7b', available: true, label: 'qwen2.5:7b', vendor: 'ollama', kind: 'local' },
+      ],
+    });
+  });
+
+  it('does not bleed partial stream from thread A into thread B', async () => {
+    const sendSpy = vi.spyOn(api.chat, 'send').mockImplementation(async function* (_threadId) {
+      yield { type: 'text', delta: 'partial from A' };
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      yield { type: 'done' };
+    });
+
+    renderChatAt('/chat/thread-a');
+
+    const textarea = screen.getByPlaceholderText(/pregunta algo al corpus/i);
+    await userEvent.type(textarea, 'hola');
+    await userEvent.click(screen.getByRole('button', { name: /^enviar$/i }));
+    await screen.findByText('partial from A');
+
+    await userEvent.click(screen.getByRole('button', { name: /^B$/i }));
+    expect(screen.queryByText('partial from A')).toBeNull();
+
+    sendSpy.mockRestore();
   });
 });

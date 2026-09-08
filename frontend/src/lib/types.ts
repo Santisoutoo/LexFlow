@@ -354,6 +354,10 @@ export interface AssistantMessage extends ChatMessageBase {
   error?: { detail: string };
   /** True when the model could not use corpus tools for this turn. */
   corpusDegraded?: boolean;
+  /** Provider model id used for this turn (from persisted payload). */
+  model?: string;
+  /** Human-readable model label resolved client-side. */
+  modelLabel?: string;
 }
 export interface ToolCallMessage extends ChatMessageBase {
   role: 'tool';
@@ -769,7 +773,7 @@ export interface ApiClient {
     send(
       threadId: string,
       content: string,
-      opts?: { model?: string }
+      opts?: { model?: string; signal?: AbortSignal }
     ): AsyncIterable<ChatChunk>;
   };
   models: {

@@ -1,9 +1,11 @@
-import { Fragment, memo } from 'react';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Settings as ToolIcon, ChevronRight } from 'lucide-react';
 import { Badge, Callout } from '@/components/ui';
 import { BrandMark } from '@/components/BrandMark';
 import { CitationCard } from './CitationCard';
+import { ChatMarkdown } from './ChatMarkdown';
+import { useModels } from '@/lib/queries';
 import type { ChatMessage as ChatMessageT, ChatSource } from '@/lib/types';
 
 export interface ChatMessageProps {
@@ -20,6 +22,14 @@ export interface ChatMessageProps {
  */
 function ChatMessageImpl({ message, onSourceClick }: ChatMessageProps) {
   const { t } = useTranslation();
+  const { data: models = [] } = useModels();
+  const modelLabel = useMemo(() => {
+    if (message.role !== 'assistant') return undefined;
+    if (message.modelLabel) return message.modelLabel;
+    if (!message.model) return undefined;
+    const match = models.find((m) => m.id === message.model);
+    return match?.label ?? message.model.split(':').slice(-1)[0];
+  }, [message, models]);
   if (message.role === 'user') {
     return (
       <div className="self-end max-w-[85%]">
@@ -47,13 +57,16 @@ function ChatMessageImpl({ message, onSourceClick }: ChatMessageProps) {
       </div>
     );
   }
-  // assistant
+  const modelLabelResolved = message.role === 'assistant' ? modelLabel : undefined;
   return (
     <div className="self-start">
       <div className="mb-2 flex items-center gap-2">
         <BrandMark size={18} />
         <span className="text-[12.5px] font-semibold text-indigo-700 dark:text-indigo-200">LexFlow</span>
         <Badge tone="info" className="text-[11px]">{t('chat.assistantBadge')}</Badge>
+        {modelLabelResolved && !message.streaming && (
+          <Badge tone="neutral" className="text-[11px] font-mono">{modelLabelResolved}</Badge>
+        )}
         {message.corpusDegraded && (
           <Badge tone="amber" className="text-[11px]">{t('chat.degradedNoCorpus')}</Badge>
         )}
@@ -71,7 +84,9 @@ function ChatMessageImpl({ message, onSourceClick }: ChatMessageProps) {
         )}
       </div>
       <div className="text-[14.5px] leading-relaxed">
-        {message.content.map((p, i) => <Paragraph key={i} text={p} />)}
+        {message.content.map((p, i) => (
+          <ChatMarkdown key={i}>{p}</ChatMarkdown>
+        ))}
       </div>
       {message.error && (
         <Callout tone="danger" title={t('chat.errorTitle')} className="mt-3">
@@ -96,38 +111,4 @@ function ChatMessageImpl({ message, onSourceClick }: ChatMessageProps) {
   );
 }
 
-/**
- * Tiny markdown renderer for **bold** and `1.` list items — keeps the
- * dependency surface small. Upgrade to react-markdown if you need more.
- *
- * Renders via plain JSX (React auto-escapes text children), so backend
- * content cannot inject HTML even if a tool result or model output ever
- * carries `<script>` or similar payloads.
- */
 export const ChatMessage = memo(ChatMessageImpl);
-
-function Paragraph({ text }: { text: string }) {
-  const isList = /^\d+\.\s/.test(text);
-  if (isList) {
-    const m = text.match(/^(\d+)\.\s+(.*)/);
-    if (m) {
-      return (
-        <div className="mb-2 flex gap-2.5">
-          <span className="font-mono font-semibold text-indigo-600 dark:text-indigo-300 shrink-0">{m[1]}.</span>
-          <span className="flex-1">{renderBold(m[2])}</span>
-        </div>
-      );
-    }
-  }
-  return <p className="mb-2 text-pretty">{renderBold(text)}</p>;
-}
-
-function renderBold(s: string): React.ReactNode[] {
-  const parts = s.split(/(\*\*[^*]+?\*\*)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={i}>{part.slice(2, -2)}</strong>;
-    }
-    return <Fragment key={i}>{part}</Fragment>;
-  });
-}

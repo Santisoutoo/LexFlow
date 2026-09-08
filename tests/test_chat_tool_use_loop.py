@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncIterator
+from functools import partial
 
 import anyio.to_thread
 import pytest
@@ -334,6 +335,7 @@ class TestToolUseLoopE2E:
         assert len(tool_messages) == 1
         assert tool_messages[0].tool_call_id == "c1"
         assert tool_messages[0].name == "get_stats"
+        assert len(tool_messages[0].content) <= 4000
         assistant_before_tool = second_history[second_history.index(tool_messages[0]) - 1]
         assert assistant_before_tool.role == "assistant"
         assert assistant_before_tool.tool_calls is not None
@@ -412,7 +414,10 @@ class TestToolUseLoopE2E:
         offloaded_funcs = {func for func, *_ in calls}
         assert _persist_user_turn in offloaded_funcs
         assert _refresh_and_load_history in offloaded_funcs
-        assert _persist_assistant_turn in offloaded_funcs
+        assert any(
+            func is _persist_assistant_turn or (isinstance(func, partial) and func.func is _persist_assistant_turn)
+            for func in offloaded_funcs
+        )
         assert _persist_tool_turn in offloaded_funcs
 
     def test_persists_tool_turns_and_sources(
