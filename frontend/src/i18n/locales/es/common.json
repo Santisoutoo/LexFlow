@@ -267,8 +267,7 @@
     "turns": "{{n}} turnos",
     "sourcesCited": "{{n}} fuentes citadas",
     "startTitle": "Empieza preguntando al corpus",
-    "startHintPre": "Escribe tu pregunta abajo. Cita un artículo con",
-    "startHintMid": "o filtra por",
+    "startHint": "Escribe tu pregunta abajo. El asistente consultará el corpus automáticamente.",
     "placeholder": "Pregunta algo al corpus…",
     "attach": "Adjuntar",
     "citeArticle": "Citar artículo…",
@@ -290,7 +289,17 @@
     "renameFailed": "No se pudo renombrar",
     "deleteFailed": "No se pudo eliminar",
     "assistantBadge": "Asistente",
-    "streaming": "escribiendo…"
+    "streaming": "escribiendo…",
+    "streamComplete": "Respuesta completada.",
+    "errorTitle": "Error del asistente",
+    "degradedNoCorpus": "sin consulta al corpus",
+    "toolActivity": {
+      "searchCorpus": "Consultando el corpus…",
+      "getLaw": "Leyendo la norma…",
+      "getArticle": "Leyendo el artículo…",
+      "getStats": "Consultando estadísticas…",
+      "default": "Consultando herramientas…"
+    }
   },
   "lawDetail": {
     "tabs": {

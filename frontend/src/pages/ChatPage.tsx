@@ -25,6 +25,15 @@ import { toast } from '@/lib/toast';
 import type { ChatMessage as ChatMessageT, ChatSource } from '@/lib/types';
 import { groupThreads } from './chat/group-threads';
 
+function sourceHref(source: ChatSource): string | null {
+  if (!source.target?.lawId) return null;
+  const base = `/laws/${encodeURIComponent(source.target.lawId)}`;
+  if (source.target.articleNum) {
+    return `${base}#art-${encodeURIComponent(source.target.articleNum)}`;
+  }
+  return base;
+}
+
 const FALLBACK_THREAD_ID = 'eipd';
 
 export function ChatPage() {
@@ -70,6 +79,7 @@ export function ChatPage() {
   // until then (part of the "I send hola and see nothing" bug, #564).
   const [pendingUser, setPendingUser] = useState<ChatMessageT | null>(null);
   const [sending, setSending] = useState(false);
+  const [liveAnnouncement, setLiveAnnouncement] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   // Scroll-to-bottom rAF ref: coalesces per-token scroll calls during SSE
   // streaming into a single frame so the scroll stays smooth. The id lets
@@ -146,6 +156,22 @@ export function ChatPage() {
       }
     };
   }, [visible.length, stream, activeId]);
+
+  // Screen-reader announcements: tool activity, stream completion, errors.
+  useEffect(() => {
+    if (stream?.role !== 'assistant') return;
+    if (stream.toolActivity) {
+      setLiveAnnouncement(t(stream.toolActivity));
+      return;
+    }
+    if (stream.error?.detail) {
+      setLiveAnnouncement(stream.error.detail);
+      return;
+    }
+    if (!stream.streaming && stream.content.some((p) => p.trim().length > 0)) {
+      setLiveAnnouncement(t('chat.streamComplete'));
+    }
+  }, [stream, t]);
 
   const startNewThread = async () => {
     // Audit #463 — replace the legacy "navigate to empty rail" stub
@@ -366,7 +392,12 @@ export function ChatPage() {
         </header>
 
         <div className="flex-1 overflow-auto py-6 scrollbar-thin">
-          <div className="mx-auto flex max-w-3xl flex-col gap-4 px-6">
+          <div
+            className="mx-auto flex max-w-3xl flex-col gap-4 px-6"
+            aria-live="polite"
+            aria-atomic="false"
+          >
+            <span className="sr-only">{liveAnnouncement}</span>
             {needsModelSetup && (
               <Callout tone="warning" title={t('chat.setupAssistantTitle')} className="mt-2">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -383,14 +414,17 @@ export function ChatPage() {
               // below instead of an empty column.
               <div className="mt-12 text-center text-[13px] text-muted">
                 <p className="font-display text-[15px] font-semibold text-fg">{t('chat.startTitle')}</p>
-                <p className="mt-1.5">{t('chat.startHintPre')} <span className="font-mono">@</span> {t('chat.startHintMid')} <span className="font-mono">#tag</span>.</p>
+                <p className="mt-1.5">{t('chat.startHint')}</p>
               </div>
             ) : (
               visible.map((m) => (
                 <ChatMessage
                   key={m.id}
                   message={m}
-                  onSourceClick={(s: ChatSource) => s.target && navigate(`/laws/${encodeURIComponent(s.target.lawId)}`)}
+                  onSourceClick={(s: ChatSource) => {
+                    const href = sourceHref(s);
+                    if (href) navigate(href);
+                  }}
                 />
               ))
             )}
@@ -453,8 +487,15 @@ export function ChatPage() {
           {visible
             .filter((m): m is Extract<ChatMessageT, { role: 'assistant' }> => m.role === 'assistant')
             .flatMap((m) => m.sources)
-            .map((s, i) => (
-              <CitationCard key={i} source={s} onClick={() => s.target && navigate(`/laws/${encodeURIComponent(s.target.lawId)}`)} />
+            .map((s) => (
+              <CitationCard
+                key={`${s.target?.lawId ?? s.law}::${s.target?.articleNum ?? ''}`}
+                source={s}
+                onClick={() => {
+                  const href = sourceHref(s);
+                  if (href) navigate(href);
+                }}
+              />
             ))}
         </div>
       </RightRail>

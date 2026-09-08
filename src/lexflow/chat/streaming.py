@@ -52,6 +52,8 @@ from lexflow.chat.base import (
 from lexflow.chat.mcp_server import TOOL_SPECS, dispatch_tool
 from lexflow.chat.prompts import build_system_prompt
 from lexflow.chat.storage_models import ChatMessage, ChatThread
+from lexflow.core.exceptions import LawNotFoundError
+from lexflow.core.registry import get_registry
 
 # Hard cap on the agentic loop (#195). Once hit, we stop iterating even
 # if the model keeps asking for more tool calls — runaway loops would
@@ -72,6 +74,7 @@ class SseEvent:
     TEXT = "text"
     TOOL_CALL = "tool_call"
     SOURCE = "source"
+    DEGRADED = "degraded"
     ERROR = "error"
     DONE = "done"
 
@@ -119,38 +122,114 @@ def format_sse(event: str, data: Any) -> str:
     return f"event: {event}\ndata: {payload}\n\n"
 
 
-def _extract_citations(result: dict[str, Any]) -> list[dict[str, Any]]:
-    """Pull law/article citations out of an MCP tool result (#195).
+_SNIPPET_MAX_LEN = 220
 
-    Handles three shapes the tools emit today:
 
-    * ``search_law`` → ``{"items": [{"law_id", "article_number", ...}, ...]}``
-    * ``get_law``    → ``{"metadata": {"identifier": "BOE-..."} , ...}``
-    * ``get_article``→ a single article (``{"number": "1", ...}``) — too
-      thin on its own; left out for now.
+def _truncate_snippet(text: str) -> str:
+    """Trim article text to a card-friendly snippet."""
+    cleaned = text.strip()
+    if len(cleaned) <= _SNIPPET_MAX_LEN:
+        return cleaned
+    return cleaned[:_SNIPPET_MAX_LEN].rstrip() + "…"
 
-    Each surfaced citation has ``law_id`` (always) and ``article_number``
-    (optional). The frontend already renders these on the ``source``
-    SSE event into clickable badges.
+
+def _law_title_from_registry(law_id: str) -> str | None:
+    """Resolve a display title for *law_id*, or ``None`` when missing."""
+    try:
+        return get_registry().get_law(law_id).metadata.title
+    except LawNotFoundError:
+        return None
+
+
+def _publication_date_from_registry(law_id: str) -> str | None:
+    """Resolve an ISO publication date for *law_id*, or ``None``."""
+    try:
+        published = get_registry().get_law(law_id).metadata.publication_date
+    except LawNotFoundError:
+        return None
+    return str(published) if published is not None else None
+
+
+def _enrich_citation(citation: dict[str, Any]) -> dict[str, Any]:
+    """Fill missing title/date from the registry when a tool omitted them."""
+    law_id = citation.get("law_id")
+    if not isinstance(law_id, str) or not law_id:
+        return citation
+    if "law_title" not in citation:
+        title = _law_title_from_registry(law_id)
+        if title:
+            citation["law_title"] = title
+    if "publication_date" not in citation:
+        published = _publication_date_from_registry(law_id)
+        if published:
+            citation["publication_date"] = published
+    return citation
+
+
+def _extract_citations(
+    result: dict[str, Any],
+    *,
+    tool_name: str,
+    tool_args: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Pull enriched law/article citations out of an MCP tool result (#195, #39).
+
+    Emits ``law_id`` (always when present), optional ``article_number``,
+    ``law_title``, ``snippet``, and ``publication_date`` for the frontend
+    citation cards. Error payloads and ``get_stats`` emit nothing.
     """
+    if not isinstance(result, dict) or result.get("error"):
+        return []
+
     citations: list[dict[str, Any]] = []
-    items = result.get("items") if isinstance(result, dict) else None
-    if isinstance(items, list):
-        for hit in items:
-            if not isinstance(hit, dict):
-                continue
-            law_id = hit.get("law_id")
-            if isinstance(law_id, str) and law_id:
+
+    if tool_name in {"search_law", "search_semantic_top_k"}:
+        items = result.get("items")
+        if isinstance(items, list):
+            for hit in items:
+                if not isinstance(hit, dict):
+                    continue
+                law_id = hit.get("law_id")
+                if not isinstance(law_id, str) or not law_id:
+                    continue
                 citation: dict[str, Any] = {"law_id": law_id}
+                law_title = hit.get("law_title")
+                if isinstance(law_title, str) and law_title:
+                    citation["law_title"] = law_title
                 article = hit.get("article_number")
                 if isinstance(article, str) and article:
                     citation["article_number"] = article
-                citations.append(citation)
-    metadata = result.get("metadata") if isinstance(result, dict) else None
-    if isinstance(metadata, dict):
-        identifier = metadata.get("identifier")
-        if isinstance(identifier, str) and identifier:
-            citations.append({"law_id": identifier})
+                snippet = hit.get("snippet")
+                if isinstance(snippet, str) and snippet:
+                    citation["snippet"] = snippet
+                citations.append(_enrich_citation(citation))
+        return citations
+
+    if tool_name == "get_law":
+        metadata = result.get("metadata")
+        if isinstance(metadata, dict):
+            identifier = metadata.get("identifier")
+            if isinstance(identifier, str) and identifier:
+                law_citation: dict[str, Any] = {"law_id": identifier}
+                title = metadata.get("title")
+                if isinstance(title, str) and title:
+                    law_citation["law_title"] = title
+                published = metadata.get("publication_date")
+                if published:
+                    law_citation["publication_date"] = str(published)
+                citations.append(_enrich_citation(law_citation))
+        return citations
+
+    if tool_name == "get_article":
+        number = result.get("number")
+        law_id = tool_args.get("law_id")
+        if isinstance(number, str) and number and isinstance(law_id, str) and law_id:
+            article_citation: dict[str, Any] = {"law_id": law_id, "article_number": number}
+            text = result.get("text")
+            if isinstance(text, str) and text:
+                article_citation["snippet"] = _truncate_snippet(text)
+            citations.append(_enrich_citation(article_citation))
+
     return citations
 
 
@@ -437,6 +516,8 @@ async def stream_chat_reply(
     #    identically to the pre-#195 path (one iteration, text only).
     assistant_chunks: list[str] = []
     collected_sources: list[dict[str, Any]] = []
+    stream_error: str | None = None
+    corpus_degraded = False
     tools = [ToolSpec(**spec) for spec in TOOL_SPECS]
 
     def _is_tools_unsupported(error: ChatProviderError) -> bool:
@@ -495,7 +576,7 @@ async def stream_chat_reply(
                     # request/stream for the duration. Off-load to a worker
                     # thread, same pattern as ``api/warmup.py``.
                     result = await anyio.to_thread.run_sync(_run_tool_call, call)
-                    for citation in _extract_citations(result):
+                    for citation in _extract_citations(result, tool_name=call.name, tool_args=call.arguments):
                         collected_sources.append(citation)
                         yield format_sse(SseEvent.SOURCE, citation)
                     await anyio.to_thread.run_sync(_persist_tool_turn, session, thread, call, result)
@@ -506,6 +587,8 @@ async def stream_chat_reply(
                 # Degrade to a tool-less chat for this turn and start over.
                 logger.info("Model %s rejected tools; retrying without tools", repr(model_name))
                 assistant_chunks.clear()
+                corpus_degraded = True
+                yield format_sse(SseEvent.DEGRADED, {"reason": "tools_unsupported"})
                 attempt_tools = []
                 retry_without_tools = True
             else:
@@ -516,7 +599,8 @@ async def stream_chat_reply(
                 logger.info("Provider %s stream failed: %s", repr(provider_key), repr(exc))
                 # ``str(exc)`` is the message we constructed ourselves; safe
                 # to surface so the user knows whether to retry vs reauth.
-                yield format_sse(SseEvent.ERROR, {"detail": str(exc)})
+                stream_error = str(exc)
+                yield format_sse(SseEvent.ERROR, {"detail": stream_error})
         except asyncio.CancelledError:
             # Sprint 6 rf-5: a CancelledError means the client disconnected
             # (Starlette propagates it through the generator). We must NOT
@@ -531,7 +615,8 @@ async def stream_chat_reply(
             # trace on the server side and emit a generic detail to the
             # client (CodeQL alert #2 — py/stack-trace-exposure).
             logger.exception("Unexpected error during chat stream")
-            yield format_sse(SseEvent.ERROR, {"detail": "Internal error during chat stream"})
+            stream_error = "Internal error during chat stream"
+            yield format_sse(SseEvent.ERROR, {"detail": stream_error})
         # One-shot retry without tools (see _is_tools_unsupported); any other
         # outcome (success, surfaced error, generic failure) ends the loop.
         if retry_without_tools:
@@ -541,13 +626,19 @@ async def stream_chat_reply(
     # 4. Persist whatever we got. Even an empty reply gets a row so the
     #    UI doesn't render a "ghost turn". Offloaded for the same reason
     #    as the user-turn persist above (#77 S1.1).
-    final_payload = {"sources": collected_sources} if collected_sources else None
+    final_payload: dict[str, Any] = {}
+    if collected_sources:
+        final_payload["sources"] = collected_sources
+    if stream_error:
+        final_payload["error"] = {"detail": stream_error}
+    if corpus_degraded:
+        final_payload["corpus_degraded"] = True
     await anyio.to_thread.run_sync(
         _persist_assistant_turn,
         session,
         thread,
         "".join(assistant_chunks),
-        final_payload,
+        final_payload or None,
     )
 
     yield format_sse(SseEvent.DONE, {})
