@@ -375,7 +375,7 @@ class WarmupStatusResponse(BaseModel):
     generic spinner.
     """
 
-    ready: bool = Field(..., description="Core warm-up stages (metadata, search, graph) complete.")
+    ready: bool = Field(..., description="Core warm-up stages (metadata, search) complete.")
     metadata_ready: bool = Field(..., description="Frontmatter preload finished.")
     search_ready: bool = Field(..., description="In-memory search index built.")
     graph_ready: bool = Field(..., description="Knowledge graph loaded/rebuilt.")
@@ -391,9 +391,13 @@ class WarmupStatusResponse(BaseModel):
             "stage of warm-up completes."
         ),
     )
+    skipped_laws: int = Field(
+        default=0,
+        description="Malformed laws skipped during metadata/search warm-up (#42).",
+    )
     error: str | None = Field(
         default=None,
-        description="Last warm-up error message, if any stage failed (the other stages can still report ready).",
+        description="Stable warm-up error code when a blocking stage fails (never raw exception text).",
     )
     durations_seconds: dict[str, float] = Field(
         default_factory=dict,

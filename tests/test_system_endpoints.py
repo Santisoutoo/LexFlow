@@ -35,6 +35,7 @@ class TestSystemWarmupEndpoint:
             "graph_ready": False,
             "semantic_ready": False,
             "drift_report": None,
+            "skipped_laws": 0,
             "error": None,
             "durations_seconds": {},
         }
@@ -151,23 +152,71 @@ class TestWarmupStateInvariants:
         assert fresh.durations_seconds == {}
         assert fresh.ready is False
 
-    def test_ready_flag_requires_all_core_stages(self) -> None:
+    def test_ready_flag_requires_metadata_and_search(self) -> None:
         state = get_warmup_state()
         state.metadata_ready = True
+        assert state.ready is False
         state.search_ready = True
-        assert state.ready is False, "graph still pending"
-        state.graph_ready = True
+        assert state.ready is True
+        state.graph_ready = False
         assert state.ready is True
 
-    def test_ready_excludes_opt_in_semantic_stage(self) -> None:
-        # Semantic is opt-in (#548): its readiness must not gate `ready`.
+    def test_ready_excludes_opt_in_graph_and_semantic_stages(self) -> None:
         state = get_warmup_state()
-        state.metadata_ready = state.search_ready = state.graph_ready = True
+        state.metadata_ready = state.search_ready = True
+        state.graph_ready = False
         state.semantic_ready = False
         assert state.ready is True
         state.metadata_ready = False
         state.semantic_ready = True
         assert state.ready is False
+
+
+class TestWarmupGraphIsolation:
+    """Graph failures must not block core warm-up (#42 R3)."""
+
+    async def test_graph_failure_still_ready(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        warmup = TestWarmupSemanticStage._stub_core_stages(monkeypatch)
+
+        def boom(_registry: object) -> None:
+            raise RuntimeError("/secret/path/graph blew up")
+
+        monkeypatch.setattr(warmup, "get_graph", boom)
+        monkeypatch.setattr(warmup, "ensure_semantic_index", lambda _registry: None)
+
+        reset_warmup_state()
+        await warmup._run_warmup()
+
+        state = warmup.get_warmup_state()
+        assert state.ready is True
+        assert state.graph_ready is False
+        assert state.error is None
+
+    async def test_metadata_failure_surfaces_stable_code(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from pathlib import Path
+        from types import SimpleNamespace
+
+        import lexflow.api.warmup as warmup
+        from lexflow.core.exceptions import DataPathError
+
+        class _Registry:
+            def reset_skipped_laws(self) -> None:
+                return None
+
+        def boom(*_args: object, **_kwargs: object) -> None:
+            raise DataPathError("/missing/corpus")
+
+        monkeypatch.setattr(warmup, "get_settings", lambda: SimpleNamespace(data_path=Path("/missing")))
+        monkeypatch.setattr(warmup, "get_law_registry", lambda: _Registry())
+        monkeypatch.setattr(warmup, "load_or_preload_metadata", boom)
+
+        reset_warmup_state()
+        await warmup._run_warmup()
+
+        state = warmup.get_warmup_state()
+        assert state.ready is False
+        assert state.error == "warmup_data_path_missing"
+        assert "/missing" not in (state.error or "")
 
 
 class TestWarmupSemanticStage:
@@ -185,8 +234,14 @@ class TestWarmupSemanticStage:
 
         import lexflow.api.warmup as warmup
 
+        class _Registry:
+            skipped_laws = 0
+
+            def reset_skipped_laws(self) -> None:
+                return None
+
         monkeypatch.setattr(warmup, "get_settings", lambda: SimpleNamespace(data_path=Path(".")))
-        monkeypatch.setattr(warmup, "get_law_registry", lambda: object())
+        monkeypatch.setattr(warmup, "get_law_registry", lambda: _Registry())
         monkeypatch.setattr(warmup, "load_or_preload_metadata", lambda *a, **k: None)
         monkeypatch.setattr(warmup, "load_or_build_search", lambda *a, **k: None)
         monkeypatch.setattr(warmup, "get_graph", lambda *a, **k: None)

@@ -124,6 +124,8 @@ export function GraphPage() {
   }, []);
 
   const { data: warmup } = useWarmup();
+  const [graphBannerDismissed, setGraphBannerDismissed] = useState(false);
+  const showGraphDegradedBanner = Boolean(warmup && !warmup.graphReady && !graphBannerDismissed);
 
   const nodeById = useMemo(() => buildNodeIndex(graph?.nodes ?? []), [graph?.nodes]);
   const neighbours = useMemo(
@@ -248,6 +250,22 @@ export function GraphPage() {
   return (
     <div className="flex h-full min-h-0">
       <div className="relative flex min-w-0 flex-1 flex-col">
+        {showGraphDegradedBanner && (
+          <div
+            className="flex items-center justify-between gap-3 border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-[12.5px] text-amber-900 dark:text-amber-100"
+            data-testid="graph-degraded-banner"
+          >
+            <p>{t('graph.degradedBanner')}</p>
+            <button
+              type="button"
+              onClick={() => setGraphBannerDismissed(true)}
+              className="shrink-0 rounded px-2 py-1 text-[11px] hover:bg-amber-500/20"
+              aria-label={t('graph.dismissBanner')}
+            >
+              {t('graph.dismissBanner')}
+            </button>
+          </div>
+        )}
         <div className="flex items-center gap-2.5 overflow-x-auto border-b border-border bg-bg px-4 py-2.5 md:flex-wrap md:overflow-visible">
           <div className="flex shrink-0 gap-1">
             <Chip active={!isGlobal} onClick={() => patchParams({ view: null })}>

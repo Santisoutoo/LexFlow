@@ -26,7 +26,7 @@ from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel
 
 from lexflow.api.dependencies import get_graph, reset_graph_cache
-from lexflow.core.corpus_revision import submodule_hash
+from lexflow.core.corpus_revision import submodule_hash, write_corpus_revision
 from lexflow.core.delta_sync import CorpusDiff, diff_corpus_since
 from lexflow.core.metadata_cache import CACHE_FILENAME as METADATA_CACHE_FILENAME
 from lexflow.core.metadata_cache import save_metadata_cache
@@ -83,7 +83,7 @@ def _run_sync(response: Response) -> dict[str, str | int]:
 
     diff = diff_corpus_since(data_path, before_commit)
     if diff is None:
-        _fallback_rebuild()
+        _fallback_rebuild(after_commit)
         return {"status": "ok", "mode": "rebuild", "output": output}
 
     _apply_incremental(registry, diff, after_commit)
@@ -202,6 +202,7 @@ def _apply_incremental(registry: LawRegistry, diff: CorpusDiff, new_commit: str)
     if registry.export_search_index().is_built:
         save_search_index(registry.export_search_index(), cache_dir / SEARCH_CACHE_FILENAME, new_commit)
     save_graph(graph, cache_dir / GRAPH_CACHE_FILENAME, new_commit)
+    write_corpus_revision(get_settings().data_path, new_commit)
     logger.info(
         "Incremental sync applied: +%d ~%d -%d laws",
         len(diff.added),
@@ -210,7 +211,7 @@ def _apply_incremental(registry: LawRegistry, diff: CorpusDiff, new_commit: str)
     )
 
 
-def _fallback_rebuild() -> None:
+def _fallback_rebuild(new_commit: str) -> None:
     """Drop in-memory singletons so the next request rebuilds from scratch.
 
     The on-disk caches still carry the old revision hash, so the next warm-up
@@ -227,4 +228,5 @@ def _fallback_rebuild() -> None:
     # otherwise the next cold request after this reset would skip kicking
     # a NEW build (the flag from the pre-sync build would still read True).
     reset_semantic_warmup_state()
+    write_corpus_revision(get_settings().data_path, new_commit)
     logger.info("Sync fell back to full rebuild (diff unavailable or too large)")

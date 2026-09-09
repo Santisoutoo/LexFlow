@@ -68,7 +68,8 @@ const queryClient = new QueryClient({
     },
   },
   queryCache: new QueryCache({
-    onError: (error) => {
+    onError: (error, query) => {
+      if (query.meta?.suppressGlobalError) return;
       const payload = toastForError(error);
       if (payload) toast(payload);
     },

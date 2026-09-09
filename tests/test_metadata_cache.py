@@ -104,6 +104,17 @@ def test_load_or_preload_hash_change_rebuilds(tmp_path: Path, monkeypatch: pytes
     assert rebuilt.preload_calls == 1  # stale cache ignored
 
 
+def test_submodule_hash_reads_revision_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from lexflow.core.corpus_revision import CORPUS_REVISION_FILENAME, submodule_hash
+
+    data_path = tmp_path / "legalize-es"
+    data_path.mkdir()
+    (tmp_path / CORPUS_REVISION_FILENAME).write_text("abc1234\n", encoding="utf-8")
+    monkeypatch.setattr("lexflow.core.corpus_revision._git_revision", lambda _p: None)
+
+    assert submodule_hash(data_path) == "abc1234"
+
+
 def test_load_or_preload_unknown_revision_bypasses(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(mc, "submodule_hash", lambda _p: UNKNOWN_REVISION)
     data_path = tmp_path / "legalize-es"
