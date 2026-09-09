@@ -683,7 +683,11 @@ export function applyChunk(message: ChatMessage | null, chunk: ChatChunk): ChatM
   }
   if (chunk.type === 'error') {
     const assistant = ensureAssistantShell(message);
-    return { ...assistant, error: { detail: chunk.detail }, toolActivity: null };
+    return {
+      ...assistant,
+      error: { detail: chunk.detail, code: chunk.code },
+      toolActivity: null,
+    };
   }
   if (chunk.type === 'degraded') {
     const assistant = ensureAssistantShell(message);

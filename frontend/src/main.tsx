@@ -25,6 +25,7 @@ import { AppUpdateProvider } from './lib/updater/use-app-update';
 import { ErrorBoundary } from './components/shell/ErrorBoundary';
 import { Toaster } from './components/shell/Toaster';
 import { ApiError } from './lib/api';
+import { errorMessage } from './lib/errors';
 import { toast } from './lib/toast';
 
 /**
@@ -44,19 +45,20 @@ function toastForError(error: unknown): { tone: 'warning' | 'danger' | 'info'; t
   if (error instanceof ApiError) {
     if (error.status === 404) return null; // pages render their own empty state
     if (error.status === 401 || error.status === 403) {
-      return { tone: 'danger', title: 'Acceso denegado', message: error.detail };
+      return { tone: 'danger', title: 'Acceso denegado', message: errorMessage(error) };
+    }
+    if (error.status === 429) {
+      return { tone: 'warning', title: 'Demasiadas peticiones', message: errorMessage(error) };
     }
     if (error.status === 422 || error.status === 400) {
-      return { tone: 'warning', title: 'Petición inválida', message: error.detail };
+      return { tone: 'warning', title: 'Petición inválida', message: errorMessage(error) };
     }
     if (error.status >= 500) {
-      return { tone: 'danger', title: `Error ${error.status}`, message: error.detail };
+      return { tone: 'danger', title: 'Error del servidor', message: errorMessage(error) };
     }
-    return { tone: 'warning', title: `Error ${error.status}`, message: error.detail };
+    return { tone: 'warning', title: `Error ${error.status}`, message: errorMessage(error) };
   }
-  // Network / abort / unknown — usually means the backend is down.
-  const message = error instanceof Error ? error.message : 'Error desconocido';
-  return { tone: 'danger', title: 'No se pudo conectar', message };
+  return { tone: 'danger', title: 'No se pudo conectar', message: errorMessage(error) };
 }
 
 const queryClient = new QueryClient({

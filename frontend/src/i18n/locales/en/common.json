@@ -301,7 +301,39 @@
       "getArticle": "Reading the article…",
       "getStats": "Fetching statistics…",
       "default": "Using tools…"
+    },
+    "errors": {
+      "ollama_not_running": "Ollama is not running. Start the service or choose another model.",
+      "ollama_error": "Ollama error. Check that the model is pulled and the daemon is running.",
+      "lmstudio_unreachable": "Cannot reach LM Studio. Check that the server is running.",
+      "openai_auth_failed": "OpenAI authentication failed. Check your API key in Settings.",
+      "openai_rate_limited": "OpenAI rate limit exceeded. Wait a moment and try again.",
+      "anthropic_auth_failed": "Anthropic authentication failed. Check your API key in Settings.",
+      "anthropic_rate_limited": "Anthropic rate limit exceeded. Wait a moment and try again.",
+      "google_error": "Google Gemini error. Check your API key and try again.",
+      "unknown_provider": "Unknown chat provider. Choose another model in Settings.",
+      "provider_error": "The AI provider failed. Try again or choose another model.",
+      "internal_error": "Internal error during the response. Try again."
     }
+  },
+  "errors": {
+    "internal_error": "An unexpected error occurred. Try again.",
+    "rate_limited": "Too many requests. Wait {{seconds}} s and try again.",
+    "rate_limited_short": "Too many requests. Wait a moment and try again.",
+    "law_not_found": "The requested law was not found.",
+    "article_not_found": "The requested article was not found.",
+    "parser_error": "Failed to parse a law file.",
+    "data_unavailable": "The legal corpus is not available.",
+    "semantic_warming": "The semantic index is warming up. Try again in a few seconds.",
+    "validation_error": "The request is not valid.",
+    "http": {
+      "400": "Invalid request.",
+      "422": "The request is not valid. Check your input and try again.",
+      "429": "Too many requests. Wait a moment and try again.",
+      "500": "Server error. Try again later."
+    },
+    "network": "Could not connect to the server.",
+    "unknown": "An unknown error occurred."
   },
   "lawDetail": {
     "tabs": {

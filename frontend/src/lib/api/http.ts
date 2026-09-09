@@ -31,6 +31,8 @@ export const API_PREFIX = '/api/v1';
 export const CSRF_HEADER_NAME = 'X-Lexflow-Client';
 export const CSRF_HEADER_VALUE = 'spa';
 
+import { looksLikeHttpPath, parseApiErrorBody } from './error-body';
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -40,13 +42,17 @@ export class ApiError extends Error {
     super(message || `API ${status}`);
   }
 
-  /** Reads FastAPI's `{ detail }` if present; falls back to the message. */
+  /** Human-readable detail from any known FastAPI error envelope. */
   get detail(): string {
-    if (this.body && typeof this.body === 'object' && 'detail' in this.body) {
-      const d = (this.body as { detail: unknown }).detail;
-      if (typeof d === 'string') return d;
-    }
-    return this.message;
+    const parsed = parseApiErrorBody(this.body);
+    if (parsed.detail) return parsed.detail;
+    if (this.message && !looksLikeHttpPath(this.message)) return this.message;
+    return '';
+  }
+
+  /** Machine-readable error code when the backend provides one. */
+  get code(): string | null {
+    return parseApiErrorBody(this.body).code;
   }
 }
 

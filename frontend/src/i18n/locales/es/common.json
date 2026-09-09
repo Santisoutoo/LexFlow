@@ -301,7 +301,39 @@
       "getArticle": "Leyendo el artículo…",
       "getStats": "Consultando estadísticas…",
       "default": "Consultando herramientas…"
+    },
+    "errors": {
+      "ollama_not_running": "Ollama no está en marcha. Arranca el servicio o elige otro modelo.",
+      "ollama_error": "Error de Ollama. Comprueba que el modelo esté descargado y el daemon activo.",
+      "lmstudio_unreachable": "No se puede conectar con LM Studio. Comprueba que el servidor esté en marcha.",
+      "openai_auth_failed": "Autenticación de OpenAI fallida. Revisa la clave API en Ajustes.",
+      "openai_rate_limited": "Límite de OpenAI alcanzado. Espera un momento e inténtalo de nuevo.",
+      "anthropic_auth_failed": "Autenticación de Anthropic fallida. Revisa la clave API en Ajustes.",
+      "anthropic_rate_limited": "Límite de Anthropic alcanzado. Espera un momento e inténtalo de nuevo.",
+      "google_error": "Error de Google Gemini. Revisa la clave API e inténtalo de nuevo.",
+      "unknown_provider": "Proveedor de chat desconocido. Elige otro modelo en Ajustes.",
+      "provider_error": "El proveedor de IA falló. Inténtalo de nuevo o elige otro modelo.",
+      "internal_error": "Error interno durante la respuesta. Inténtalo de nuevo."
     }
+  },
+  "errors": {
+    "internal_error": "Ha ocurrido un error inesperado. Inténtalo de nuevo.",
+    "rate_limited": "Demasiadas peticiones. Espera {{seconds}} s e inténtalo de nuevo.",
+    "rate_limited_short": "Demasiadas peticiones. Espera un momento e inténtalo de nuevo.",
+    "law_not_found": "No se encontró la norma solicitada.",
+    "article_not_found": "No se encontró el artículo solicitado.",
+    "parser_error": "Error al procesar un fichero legal.",
+    "data_unavailable": "El corpus legal no está disponible.",
+    "semantic_warming": "El índice semántico se está preparando. Inténtalo en unos segundos.",
+    "validation_error": "La petición no es válida.",
+    "http": {
+      "400": "Petición inválida.",
+      "422": "La petición no es válida. Revisa los datos e inténtalo de nuevo.",
+      "429": "Demasiadas peticiones. Espera un momento e inténtalo de nuevo.",
+      "500": "Error del servidor. Inténtalo de nuevo más tarde."
+    },
+    "network": "No se pudo conectar con el servidor.",
+    "unknown": "Ha ocurrido un error desconocido."
   },
   "lawDetail": {
     "tabs": {

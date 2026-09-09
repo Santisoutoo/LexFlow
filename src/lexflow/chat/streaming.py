@@ -85,6 +85,43 @@ class UnknownProviderError(ValueError):
     """Raised when the ``provider:model`` id has an unknown provider key."""
 
 
+def _classify_provider_error(exc: ChatProviderError) -> tuple[str, str]:
+    """Map a provider failure to ``(code, safe_message)`` for SSE + persistence."""
+    msg = str(exc).lower()
+
+    if "ollama" in msg:
+        if any(
+            token in msg for token in ("connection refused", "connect", "errno", "unreachable", "failed to connect")
+        ):
+            return ("ollama_not_running", "Ollama is not running or unreachable.")
+        return ("ollama_error", "Ollama reported an error. Check that the model is pulled and the daemon is running.")
+
+    if "lm studio" in msg:
+        return ("lmstudio_unreachable", "LM Studio is not reachable. Check that the server is running.")
+
+    if "openai authentication" in msg:
+        return ("openai_auth_failed", "OpenAI authentication failed. Check your API key in Settings.")
+
+    if "openai rate limit" in msg:
+        return ("openai_rate_limited", "OpenAI rate limit exceeded. Wait a moment and try again.")
+
+    if "anthropic authentication" in msg:
+        return ("anthropic_auth_failed", "Anthropic authentication failed. Check your API key in Settings.")
+
+    if "anthropic rate limit" in msg:
+        return ("anthropic_rate_limited", "Anthropic rate limit exceeded. Wait a moment and try again.")
+
+    if "google gemini" in msg:
+        return ("google_error", "Google Gemini error. Check your API key and try again.")
+
+    return ("provider_error", "The AI provider failed. Try again or choose another model.")
+
+
+def _sse_error_payload(*, detail: str, code: str) -> dict[str, str]:
+    """Build the canonical SSE error object (``detail`` + ``code``)."""
+    return {"detail": detail, "code": code}
+
+
 def split_model_id(model_id: str) -> tuple[str, str]:
     """Split ``"openai:gpt-4o"`` → ``("openai", "gpt-4o")``.
 
@@ -544,7 +581,10 @@ async def stream_chat_reply(
         provider_key, model_name = split_model_id(model_id)
         provider = _provider_for(provider_key)
     except UnknownProviderError as exc:
-        yield format_sse(SseEvent.ERROR, {"detail": str(exc)})
+        yield format_sse(
+            SseEvent.ERROR,
+            _sse_error_payload(detail=str(exc), code="unknown_provider"),
+        )
         yield format_sse(SseEvent.DONE, {})
         return
 
@@ -565,7 +605,7 @@ async def stream_chat_reply(
     #    identically to the pre-#195 path (one iteration, text only).
     assistant_chunks: list[str] = []
     collected_sources: list[dict[str, Any]] = []
-    stream_error: str | None = None
+    stream_error: dict[str, str] | None = None
     corpus_degraded = False
     tools = [ToolSpec(**spec) for spec in TOOL_SPECS]
 
@@ -649,10 +689,9 @@ async def stream_chat_reply(
                 # even though it calls repr() at runtime, so we use explicit
                 # repr() — same bytes, different static-analysis signal.
                 logger.info("Provider %s stream failed: %s", repr(provider_key), repr(exc))
-                # ``str(exc)`` is the message we constructed ourselves; safe
-                # to surface so the user knows whether to retry vs reauth.
-                stream_error = str(exc)
-                yield format_sse(SseEvent.ERROR, {"detail": stream_error})
+                error_code, error_detail = _classify_provider_error(exc)
+                stream_error = _sse_error_payload(detail=error_detail, code=error_code)
+                yield format_sse(SseEvent.ERROR, stream_error)
         except asyncio.CancelledError:
             # Sprint 6 rf-5: a CancelledError means the client disconnected
             # (Starlette propagates it through the generator). We must NOT
@@ -667,8 +706,11 @@ async def stream_chat_reply(
             # trace on the server side and emit a generic detail to the
             # client (CodeQL alert #2 — py/stack-trace-exposure).
             logger.exception("Unexpected error during chat stream")
-            stream_error = "Internal error during chat stream"
-            yield format_sse(SseEvent.ERROR, {"detail": stream_error})
+            stream_error = _sse_error_payload(
+                detail="Internal error during chat stream",
+                code="internal_error",
+            )
+            yield format_sse(SseEvent.ERROR, stream_error)
         # One-shot retry without tools (see _is_tools_unsupported); any other
         # outcome (success, surfaced error, generic failure) ends the loop.
         if retry_without_tools:
@@ -682,7 +724,7 @@ async def stream_chat_reply(
     if collected_sources:
         final_payload["sources"] = collected_sources
     if stream_error:
-        final_payload["error"] = {"detail": stream_error}
+        final_payload["error"] = stream_error
     if corpus_degraded:
         final_payload["corpus_degraded"] = True
     await anyio.to_thread.run_sync(

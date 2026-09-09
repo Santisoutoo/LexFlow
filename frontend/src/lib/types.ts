@@ -351,7 +351,7 @@ export interface AssistantMessage extends ChatMessageBase {
   /** i18n key for live tool-call activity while streaming. */
   toolActivity?: string | null;
   /** Provider error surfaced during the stream (persisted on refetch). */
-  error?: { detail: string };
+  error?: { detail: string; code?: string };
   /** True when the model could not use corpus tools for this turn. */
   corpusDegraded?: boolean;
   /** Provider model id used for this turn (from persisted payload). */
@@ -383,7 +383,7 @@ export type ChatChunk =
   | { type: 'tool_call'; name: string; args: Record<string, unknown> }
   | { type: 'tool_result'; name: string; result: string }
   | { type: 'source'; source: ChatSource }
-  | { type: 'error'; detail: string }
+  | { type: 'error'; detail: string; code?: string }
   | { type: 'degraded'; reason: string }
   | { type: 'done' };
 

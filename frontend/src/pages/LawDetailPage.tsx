@@ -16,6 +16,7 @@ import { RightRail } from '@/components/shell/RightRail';
 import { useAddUserTag, useGraph, useLaw, useRemoveUserTag, useUserTags, useVersions } from '@/lib/queries';
 import { useUi } from '@/lib/store';
 import { formatDate, cn, groupBy } from '@/lib/utils';
+import { errorMessage } from '@/lib/errors';
 import {
   buildReadingItems,
   flattenToc,
@@ -121,7 +122,7 @@ export function LawDetailPage() {
     return out;
   }, [articles, disposiciones]);
 
-  if (error) return <div className="p-10"><ErrorState description={String(error)} onRetry={() => refetch()} /></div>;
+  if (error) return <div className="p-10"><ErrorState description={errorMessage(error, t)} onRetry={() => refetch()} /></div>;
   if (!law || isLoading) return <LoadingSkeleton />;
 
   return (
@@ -320,7 +321,7 @@ function LawDetailGraphTab({
   if (error) {
     return (
       <div className="flex-1 overflow-auto p-12 text-center text-muted">
-        <ErrorState description={String(error)} />
+        <ErrorState description={errorMessage(error, t)} />
       </div>
     );
   }
