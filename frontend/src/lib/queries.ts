@@ -404,6 +404,7 @@ export function useWarmup() {
     refetchInterval: (q) => (q.state.data?.ready ? false : 2000),
     refetchIntervalInBackground: false,
     staleTime: 1000,
+    meta: { suppressGlobalError: true },
   });
 }
 

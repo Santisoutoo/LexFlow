@@ -920,6 +920,7 @@ export interface WarmupStatus {
   metadataReady: boolean;
   searchReady: boolean;
   graphReady: boolean;
+  skippedLaws: number;
   error: string | null;
   durationsSeconds: Record<string, number>;
 }

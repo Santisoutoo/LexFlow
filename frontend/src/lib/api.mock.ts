@@ -547,6 +547,7 @@ export const mockApi: ApiClient = {
         metadataReady: true,
         searchReady: true,
         graphReady: true,
+        skippedLaws: 0,
         error: null,
         durationsSeconds: { metadata: 0, search: 0, graph: 0 },
       };

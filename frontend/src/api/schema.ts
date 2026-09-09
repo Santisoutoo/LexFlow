@@ -2291,7 +2291,7 @@ export interface components {
         WarmupStatusResponse: {
             /**
              * Ready
-             * @description All warm-up stages complete.
+             * @description Core warm-up stages (metadata, search) complete.
              */
             ready: boolean;
             /**
@@ -2310,12 +2310,22 @@ export interface components {
              */
             graph_ready: boolean;
             /**
+             * Semantic Ready
+             * @description Opt-in semantic index pre-built (#548). Not part of `ready`.
+             */
+            semantic_ready?: boolean;
+            /**
              * @description Corpus data-fidelity drift snapshot (#55): unknown enum values, empty identifiers, zero-article laws. `None` until the drift stage of warm-up completes.
              */
             drift_report?: components["schemas"]["CorpusDriftReport"] | null;
             /**
+             * Skipped Laws
+             * @description Malformed laws skipped during metadata/search warm-up (#42).
+             */
+            skipped_laws?: number;
+            /**
              * Error
-             * @description Last warm-up error message, if any stage failed (the other stages can still report ready).
+             * @description Stable warm-up error code when a blocking stage fails (never raw exception text).
              */
             error?: string | null;
             /**

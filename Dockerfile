@@ -26,6 +26,9 @@ COPY data/ ./data/
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH="/app/src"
 
+# Corpus copy omits .git — persist revision for warm disk-cache hits (#42).
+RUN python -c "from pathlib import Path; from lexflow.core.corpus_revision import write_corpus_revision; write_corpus_revision(Path('data/legalize-es'))" || true
+
 EXPOSE 8000
 
 CMD ["python", "main.py"]

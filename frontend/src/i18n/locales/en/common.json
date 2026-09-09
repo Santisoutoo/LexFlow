@@ -687,6 +687,8 @@
     "retry": "Retry",
     "loading": "Loading graph…",
     "buildingFirstTime": "Building the graph for the first time. This may take a minute or two…",
+    "degradedBanner": "The reference graph is unavailable. Other features still work.",
+    "dismissBanner": "Dismiss",
     "error": {
       "title": "Couldn't load the subgraph from that law",
       "seedMissing": "The requested seed law ({{seed}}) isn't in the current graph.",
@@ -786,5 +788,24 @@
     "error": "Could not complete the update",
     "retry": "Retry",
     "notesHeading": "Release notes"
+  },
+  "splash": {
+    "preparing": "Preparing the application…",
+    "retry": "Retry",
+    "backendDown": "Could not reach the server. Retrying…",
+    "timeoutHelp": "Startup is taking longer than usual. Check that the backend is running or restart the app.",
+    "stages": {
+      "metadata": "Indexing laws…",
+      "search": "Building search index…",
+      "graph": "Loading reference graph…",
+      "graphOptional": "Optional — the app can open without the graph"
+    },
+    "errors": {
+      "generic": "Could not prepare the application.",
+      "warmup_data_path_missing": "The configured law corpus was not found.",
+      "warmup_io_error": "Could not read the corpus.",
+      "warmup_data_invalid": "The corpus contains invalid data.",
+      "warmup_failed": "Initial preparation failed."
+    }
   }
 }

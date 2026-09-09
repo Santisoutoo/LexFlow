@@ -687,6 +687,8 @@
     "retry": "Reintentar",
     "loading": "Cargando grafo…",
     "buildingFirstTime": "Construyendo el grafo por primera vez. Puede tardar uno o dos minutos…",
+    "degradedBanner": "El grafo de referencias no está disponible. Otras funciones siguen operativas.",
+    "dismissBanner": "Cerrar",
     "error": {
       "title": "No se pudo cargar el subgrafo desde esa norma",
       "seedMissing": "La norma seed pedida ({{seed}}) no está en el grafo actual.",
@@ -786,5 +788,24 @@
     "error": "No se pudo completar la actualización",
     "retry": "Reintentar",
     "notesHeading": "Notas de la versión"
+  },
+  "splash": {
+    "preparing": "Preparando la aplicación…",
+    "retry": "Reintentar",
+    "backendDown": "No se pudo conectar con el servidor. Seguimos reintentando…",
+    "timeoutHelp": "La preparación está tardando más de lo habitual. Comprueba que el backend esté en marcha o reinicia la aplicación.",
+    "stages": {
+      "metadata": "Indexando leyes…",
+      "search": "Construyendo índice de búsqueda…",
+      "graph": "Cargando grafo de referencias…",
+      "graphOptional": "Opcional — la app puede abrirse sin el grafo"
+    },
+    "errors": {
+      "generic": "No se pudo preparar la aplicación.",
+      "warmup_data_path_missing": "No se encontró el corpus de leyes configurado.",
+      "warmup_io_error": "Error de lectura del corpus.",
+      "warmup_data_invalid": "El corpus contiene datos no válidos.",
+      "warmup_failed": "La preparación inicial falló."
+    }
   }
 }

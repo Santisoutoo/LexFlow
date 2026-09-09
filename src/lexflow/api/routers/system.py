@@ -61,6 +61,7 @@ def get_warmup_status() -> WarmupStatusResponse:
         graph_ready=state.graph_ready,
         semantic_ready=state.semantic_ready,
         drift_report=state.drift_report,
+        skipped_laws=state.skipped_laws,
         error=state.error,
         durations_seconds=state.durations_seconds,
     )

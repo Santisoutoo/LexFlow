@@ -53,7 +53,7 @@ from dataclasses import dataclass, field
 
 from lexflow.api.dependencies import get_graph, get_law_registry
 from lexflow.core.corpus_drift import CorpusDriftReport, compute_drift_report
-from lexflow.core.exceptions import LexFlowError
+from lexflow.core.exceptions import DataPathError, LexFlowError
 from lexflow.core.metadata_cache import load_or_preload_metadata
 from lexflow.core.search_cache import load_or_build_search
 from lexflow.search.service import ensure_semantic_index
@@ -79,6 +79,7 @@ class WarmupState:
     graph_ready: bool = False
     semantic_ready: bool = False
     drift_report: CorpusDriftReport | None = None
+    skipped_laws: int = 0
     error: str | None = None
     started_at: float | None = None
     completed_at: float | None = None
@@ -86,14 +87,13 @@ class WarmupState:
 
     @property
     def ready(self) -> bool:
-        """Core warm-up complete (metadata + search + graph).
+        """Core warm-up complete (metadata + search).
 
-        Excludes the opt-in semantic stage on purpose: browse, full-text
-        and graph work without it, so a missing/failed embedder must not
-        keep the app reporting "not ready" (#548). ``semantic_ready`` is
-        surfaced separately.
+        Graph and semantic stages are best-effort: browse and full-text work
+        without them, so failures there must not wedge the splash (#42 R3).
+        ``graph_ready`` / ``semantic_ready`` are surfaced separately.
         """
-        return self.metadata_ready and self.search_ready and self.graph_ready
+        return self.metadata_ready and self.search_ready
 
 
 _state = WarmupState()
@@ -103,6 +103,17 @@ _state_lock = threading.Lock()
 def get_warmup_state() -> WarmupState:
     """Return the process-wide :class:`WarmupState` singleton."""
     return _state
+
+
+def _warmup_error_code(exc: BaseException) -> str:
+    """Map warm-up failures to stable client-visible codes (#42 R3)."""
+    if isinstance(exc, DataPathError):
+        return "warmup_data_path_missing"
+    if isinstance(exc, OSError):
+        return "warmup_io_error"
+    if isinstance(exc, (ValueError, LexFlowError)):
+        return "warmup_data_invalid"
+    return "warmup_failed"
 
 
 def _mark(stage: str, *, started: float) -> None:
@@ -125,18 +136,21 @@ async def _run_warmup() -> None:
     with _state_lock:
         _state.started_at = overall_started
         _state.error = None
+        _state.skipped_laws = 0
 
     data_path = get_settings().data_path
 
     try:
+        registry = get_law_registry()
+        registry.reset_skipped_laws()
         # Stage 1 — metadata. Loads the on-disk cache (<1 s) when the corpus
         # revision matches; otherwise parses every law's frontmatter (10-30 s)
         # and persists the result for the next launch (#231).
         stage_started = time.monotonic()
-        registry = get_law_registry()
         await asyncio.to_thread(load_or_preload_metadata, registry, data_path)
         with _state_lock:
             _state.metadata_ready = True
+            _state.skipped_laws = registry.skipped_laws
         _mark("metadata", started=stage_started)
         logger.info("Warmup: metadata stage complete (%.2fs)", time.monotonic() - stage_started)
 
@@ -146,32 +160,31 @@ async def _run_warmup() -> None:
         await asyncio.to_thread(load_or_build_search, registry, data_path)
         with _state_lock:
             _state.search_ready = True
+            _state.skipped_laws = registry.skipped_laws
         _mark("search", started=stage_started)
         logger.info("Warmup: search index stage complete (%.2fs)", time.monotonic() - stage_started)
 
-        # Stage 3 — graph. ``get_graph`` itself decides cache vs rebuild;
-        # we run inside ``to_thread`` so the cold path doesn't block the
-        # event loop and the warm path is just dict lookup overhead.
+        # Stage 3 — graph (best-effort). Failure must not block app entry.
         stage_started = time.monotonic()
-        await asyncio.to_thread(get_graph, registry)
-        with _state_lock:
-            _state.graph_ready = True
-        _mark("graph", started=stage_started)
-        logger.info("Warmup: graph stage complete (%.2fs)", time.monotonic() - stage_started)
+        try:
+            await asyncio.to_thread(get_graph, registry)
+            with _state_lock:
+                _state.graph_ready = True
+            _mark("graph", started=stage_started)
+            logger.info("Warmup: graph stage complete (%.2fs)", time.monotonic() - stage_started)
+        except Exception:
+            logger.exception("Warmup: graph stage failed (best-effort, app still usable)")
 
-        # Stage 4 — corpus drift report (#55). Runs AFTER the graph stage
-        # so that, on a cold start, ``get_graph`` has already parsed every
-        # law into the registry cache and ``zero_article_count`` here is a
-        # cache lookup instead of forcing its own full-corpus parse. On a
-        # warm-cache-hit graph (loaded from ``graph_cache.json``, cache
-        # untouched), ``compute_drift_report`` still forces the parses it
-        # needs itself — never gated on ``is_parsed`` (#55 review).
+        # Stage 4 — corpus drift report (#55). Best-effort like graph.
         stage_started = time.monotonic()
-        drift_report = await asyncio.to_thread(compute_drift_report, registry)
-        with _state_lock:
-            _state.drift_report = drift_report
-        _mark("drift", started=stage_started)
-        logger.info("Warmup: drift report stage complete (%.2fs)", time.monotonic() - stage_started)
+        try:
+            drift_report = await asyncio.to_thread(compute_drift_report, registry)
+            with _state_lock:
+                _state.drift_report = drift_report
+            _mark("drift", started=stage_started)
+            logger.info("Warmup: drift report stage complete (%.2fs)", time.monotonic() - stage_started)
+        except Exception:
+            logger.exception("Warmup: drift report stage failed (best-effort)")
 
         # Stage 5 — semantic index (opt-in). Pre-build so the first
         # semantic/hybrid query doesn't trigger a multi-minute cold embed
@@ -191,13 +204,11 @@ async def _run_warmup() -> None:
         except (OSError, ValueError, LexFlowError, RuntimeError, ImportError):
             logger.warning("Warmup: semantic index pre-build skipped/failed", exc_info=True)
 
-    # ``preload_all_metadata`` and ``search_text`` can raise on bad data;
-    # ``get_graph`` can raise on submodule misconfiguration. Capture the
-    # message so /system/warmup can surface it instead of failing silently.
-    except (OSError, ValueError, LexFlowError) as exc:
+    # Metadata/search failures block entry; surface stable codes only (#42 R3).
+    except Exception as exc:
         logger.exception("Warmup failed")
         with _state_lock:
-            _state.error = str(exc)
+            _state.error = _warmup_error_code(exc)
     finally:
         with _state_lock:
             _state.completed_at = time.monotonic()

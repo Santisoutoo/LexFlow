@@ -48,6 +48,7 @@ export const liveSystemApi: ApiClient['system'] = {
       metadataReady: raw.metadata_ready,
       searchReady: raw.search_ready,
       graphReady: raw.graph_ready,
+      skippedLaws: raw.skipped_laws ?? 0,
       error: raw.error ?? null,
       durationsSeconds: raw.durations_seconds ?? {},
     };

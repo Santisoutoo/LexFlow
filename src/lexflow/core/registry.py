@@ -56,6 +56,7 @@ class LawRegistry:
         # ``_forget_law``, ``_reindex_law``).
         self._sorted_ids: list[str] | None = None
         self._summaries: list[LawSummary] | None = None
+        self._skipped_law_ids: set[str] = set()
         self._build_index()
 
     def _invalidate_index_caches(self) -> None:
@@ -142,6 +143,15 @@ class LawRegistry:
         self._metadata_cache[law_id] = metadata
         return metadata
 
+    def _safe_metadata(self, law_id: str) -> LawMetadata | None:
+        """Load metadata for bulk paths, skipping malformed laws (#42 R1)."""
+        try:
+            return self._ensure_metadata(law_id)
+        except (OSError, ValueError, LexFlowError):
+            self._skipped_law_ids.add(law_id)
+            logger.warning("Skipping malformed law %s during bulk operation", law_id, exc_info=True)
+            return None
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -163,6 +173,15 @@ class LawRegistry:
     def total_count(self) -> int:
         """Total number of laws in the index."""
         return len(self._index)
+
+    @property
+    def skipped_laws(self) -> int:
+        """Distinct laws skipped during bulk metadata/search work due to parse errors."""
+        return len(self._skipped_law_ids)
+
+    def reset_skipped_laws(self) -> None:
+        """Clear the per-law skip counter (e.g. at warm-up start)."""
+        self._skipped_law_ids.clear()
 
     def get_law(self, law_id: str) -> Law:
         """Get a fully parsed law by identifier.
@@ -307,7 +326,9 @@ class LawRegistry:
         """
         counts: Counter[str] = Counter()
         for law_id in self._snapshot_law_ids():
-            meta = self._ensure_metadata(law_id)
+            meta = self._safe_metadata(law_id)
+            if meta is None:
+                continue
             counts.update(meta.tags)
         return sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
 
@@ -320,7 +341,9 @@ class LawRegistry:
         """
         counts: Counter[str] = Counter()
         for law_id in self._snapshot_law_ids():
-            meta = self._ensure_metadata(law_id)
+            meta = self._safe_metadata(law_id)
+            if meta is None:
+                continue
             if meta.department:
                 counts[meta.department] += 1
         return sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
@@ -333,15 +356,8 @@ class LawRegistry:
         """
         loaded = 0
         for law_id in self._snapshot_law_ids():
-            if law_id not in self._metadata_cache:
-                try:
-                    self._ensure_metadata(law_id)
-                    loaded += 1
-                # File I/O and parser/validation errors — what
-                # ``_ensure_metadata`` can realistically raise. A real
-                # programming bug should still escape.
-                except (OSError, ValueError, LexFlowError):
-                    logger.warning("Failed to preload metadata for %s", law_id, exc_info=True)
+            if law_id not in self._metadata_cache and self._safe_metadata(law_id) is not None:
+                loaded += 1
         logger.info("Metadata preload complete: %d laws loaded", loaded)
 
     # ------------------------------------------------------------------
@@ -466,7 +482,9 @@ class LawRegistry:
             return self._summaries
         summaries: list[LawSummary] = []
         for law_id in self._snapshot_law_ids():
-            meta = self._ensure_metadata(law_id)
+            meta = self._safe_metadata(law_id)
+            if meta is None:
+                continue
             article_count = self._cache[law_id].article_count if law_id in self._cache else 0
             summaries.append(
                 LawSummary(
@@ -500,7 +518,9 @@ class LawRegistry:
         a query term that only occurred in a Constitución preámbulo or an
         anexo table returned zero hits even though the text was parsed.
         """
-        meta = self._ensure_metadata(law_id)
+        meta = self._safe_metadata(law_id)
+        if meta is None:
+            return
         # Law-level entry (title is the primary searchable text).
         self._search_index.add_entry(
             law_id=meta.identifier,

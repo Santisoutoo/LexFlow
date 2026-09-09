@@ -9,6 +9,7 @@ import { GraphPage } from './GraphPage';
 const useGraphMock = vi.fn();
 const useGlobalGraphMock = vi.fn();
 const useGraphPathMock = vi.fn();
+const useWarmupMock = vi.fn();
 
 const graphFixture: GraphData = {
   nodes: [
@@ -31,7 +32,7 @@ vi.mock('@/lib/queries', () => ({
   useGlobalGraph: (...args: unknown[]) => useGlobalGraphMock(...args),
   useGraphPath: (...args: unknown[]) => useGraphPathMock(...args),
   useGraphTop: () => ({ data: [{ lawId: 'TOP-LAW', score: 1, title: 'Top law' }] }),
-  useWarmup: () => ({ data: { graphReady: true } }),
+  useWarmup: (...args: unknown[]) => useWarmupMock(...args),
   useLaw: () => ({ data: undefined }),
 }));
 
@@ -71,6 +72,7 @@ function mockLocalReady() {
 describe('GraphPage seed', () => {
   beforeEach(() => {
     mockLocalReady();
+    useWarmupMock.mockReturnValue({ data: { graphReady: true } });
   });
 
   it('passes ?law= query param to useGraph as seed', async () => {
@@ -182,5 +184,13 @@ describe('GraphPage path panel', () => {
     });
     expect(screen.getByRole('button', { name: 'SEED-LAW' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'OTHER-LAW' })).toBeInTheDocument();
+  });
+
+  it('shows degraded banner when graph warm-up failed', async () => {
+    useWarmupMock.mockReturnValue({ data: { graphReady: false } });
+    renderGraph('/graph?law=SEED-LAW');
+    await waitFor(() => {
+      expect(screen.getByTestId('graph-degraded-banner')).toBeInTheDocument();
+    });
   });
 });
