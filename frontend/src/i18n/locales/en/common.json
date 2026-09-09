@@ -25,7 +25,14 @@
     "toggleTheme": "Toggle theme",
     "toggleRightPanel": "Toggle right panel",
     "breadcrumb": "Breadcrumb",
-    "diff": "Diff"
+    "diff": "Diff",
+    "mockDataRibbon": "Demo data"
+  },
+  "editor": {
+    "persistErrorTitle": "Could not save to the browser",
+    "persistErrorBody": "Local storage is full. Export the document now so you do not lose your changes.",
+    "persistErrorExport": "Export Markdown",
+    "persistErrorDismiss": "Dismiss"
   },
   "model": {
     "local": "local",
@@ -333,7 +340,8 @@
       "500": "Server error. Try again later."
     },
     "network": "Could not connect to the server.",
-    "unknown": "An unknown error occurred."
+    "unknown": "An unknown error occurred.",
+    "stream_idle_timeout": "The assistant response took too long. Please try again."
   },
   "lawDetail": {
     "tabs": {

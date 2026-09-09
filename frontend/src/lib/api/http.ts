@@ -12,8 +12,8 @@
  * Error shape from server → ``ApiError.detail`` (FastAPI ``{detail}``).
  */
 
-/** Allow consumers (Settings page) to read whether we're on mock. */
-export const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false';
+/** Allow consumers (Settings page) to read whether we're on mock. Opt-in only (#44 R6). */
+export const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
 export const API_BASE = import.meta.env.VITE_API_URL || '';
 export const API_PREFIX = '/api/v1';
 

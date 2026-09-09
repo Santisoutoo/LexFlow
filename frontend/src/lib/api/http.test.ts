@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { ApiError } from './http';
+import { ApiError, USE_MOCK } from './http';
 import { parseApiErrorBody } from './error-body';
 import { errorMessage } from '../errors';
+
+describe('USE_MOCK', () => {
+  it('is opt-in — only true when VITE_USE_MOCK is the string "true"', () => {
+    expect(USE_MOCK).toBe(import.meta.env.VITE_USE_MOCK === 'true');
+  });
+});
 
 describe('parseApiErrorBody', () => {
   it.each([

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from lexflow.core.metadata_parser import parse_metadata_only
+from lexflow.core.metadata_parser import parse_metadata_only, read_frontmatter_block
 from lexflow.core.parser import parse_law_file
 
 CORPUS_PATH = Path(__file__).resolve().parent.parent / "data" / "legalize-es"
@@ -28,3 +28,24 @@ def test_parse_metadata_only_reads_oversized_frontmatter() -> None:
 
     assert metadata.identifier == "BOE-A-1968-1060"
     assert metadata.identifier == full.metadata.identifier
+
+
+def test_read_frontmatter_unterminated_returns_yaml(tmp_path: Path) -> None:
+    """Regression (#44 R9): EOF without closing ``---`` still yields YAML."""
+    law_path = tmp_path / "BOE-A-2099-9.md"
+    subjects = "\n".join(f'  - "subject-{i}"' for i in range(200))
+    law_path.write_text(f"---\ntitle: Unterminated\nsubjects:\n{subjects}\n", encoding="utf-8")
+
+    raw = read_frontmatter_block(law_path)
+    assert "subject-199" in raw
+    assert raw.strip()
+
+
+def test_parse_metadata_only_falls_back_to_path_stem(tmp_path: Path) -> None:
+    """Missing ``identifier`` in frontmatter falls back to the filename stem (#44 R9)."""
+    law_path = tmp_path / "es" / "BOE-A-2099-10.md"
+    law_path.parent.mkdir(parents=True)
+    law_path.write_text('---\ntitle: "No identifier field"\n---\n# Body\n', encoding="utf-8")
+
+    metadata = parse_metadata_only(law_path)
+    assert metadata.identifier == "BOE-A-2099-10"

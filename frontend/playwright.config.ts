@@ -3,7 +3,7 @@
  *
  * Runs against the production build served by `vite preview` so we
  * exercise the same bundle the user runs — not the dev server with HMR
- * shims. Mock mode is enabled (`VITE_USE_MOCK !== 'false'`) so the suite
+ * shims. Mock mode is enabled (`VITE_USE_MOCK=true` via `npm run test:e2e`) so the suite
  * never talks to FastAPI; that keeps CI lean and deterministic.
  *
  * Browsers: just Chromium today. Adding Firefox/WebKit is a one-line

@@ -1,7 +1,7 @@
 /**
  * Graph page golden path: global view, local/global toggle, path finder (#25).
  *
- * Mock mode (`VITE_USE_MOCK !== 'false'`) so the suite never talks to FastAPI.
+ * Mock mode (`VITE_USE_MOCK=true`, set by `npm run test:e2e`) so the suite never talks to FastAPI.
  */
 
 import { test, expect } from './fixtures';
