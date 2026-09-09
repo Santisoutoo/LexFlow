@@ -56,13 +56,15 @@ function flushPendingAutosave(
   docIdRef: MutableRefObject<string>,
   titleRef: MutableRefObject<string>,
   saveDocument: (doc: { id: string; title: string; content: ReturnType<Editor['getJSON']> }) => void,
+  /** When switching docs, pass the outgoing id — `docIdRef` may already point at the new route. */
+  docIdOverride?: string,
 ): void {
   if (autosaveTimer.current === null) return;
   clearTimeout(autosaveTimer.current);
   autosaveTimer.current = null;
   if (!editor) return;
   saveDocument({
-    id: docIdRef.current,
+    id: docIdOverride ?? docIdRef.current,
     title: titleRef.current,
     content: editor.getJSON(),
   });
@@ -111,9 +113,6 @@ export function EditorPage() {
   // (#598 review).
   const docIdRef = useRef(docId);
   const titleRef = useRef(title);
-  useEffect(() => {
-    docIdRef.current = docId;
-  }, [docId]);
   useEffect(() => {
     titleRef.current = title;
   }, [title]);
@@ -173,9 +172,14 @@ export function EditorPage() {
   // When `docId` changes (the user navigates to a different doc), load the
   // correct content and reset the title.
   useEffect(() => {
-    if (!editor) return;
-    // Save the outgoing doc before switching — refs still hold the old id/title.
-    flushPendingAutosave(autosaveTimer, editor, docIdRef, titleRef, saveDocument);
+    const outgoingDocId = docIdRef.current;
+    if (!editor) {
+      docIdRef.current = docId;
+      return;
+    }
+    // Save the outgoing doc before syncing `docIdRef` to the new route param.
+    flushPendingAutosave(autosaveTimer, editor, docIdRef, titleRef, saveDocument, outgoingDocId);
+    docIdRef.current = docId;
     const doc = getDocument(docId) ?? makeDefaultDocument(docId);
     setTitle(doc.title);
     // `setContent` resets the editor state to the new JSON document.

@@ -1,5 +1,6 @@
+import { useEffect } from 'react';
 import { render, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { saveDocumentMock } = vi.hoisted(() => ({
@@ -59,15 +60,30 @@ vi.mock('@/pages/editor/ExportMenu', () => ({ ExportMenu: () => null }));
 vi.mock('@/pages/editor/extensions/LegalCitation', () => ({ LegalCitation: {} }));
 vi.mock('@/pages/editor/extensions/CommentMark', () => ({ CommentMark: {} }));
 
-function renderEditor(initialPath = '/editor/draft') {
+/** Navigates when `docId` prop changes so doc-switch effects run inside one router. */
+function DocIdNavigator({ docId }: { docId: string }) {
+  const navigate = useNavigate();
+  useEffect(() => {
+    navigate(`/editor/${docId}`);
+  }, [docId, navigate]);
+  return null;
+}
+
+function renderEditorAtDoc(docId: string) {
   return render(
-    <MemoryRouter initialEntries={[initialPath]}>
+    <MemoryRouter initialEntries={[`/editor/${docId}`]}>
+      <DocIdNavigator docId={docId} />
       <Routes>
         <Route path="/editor/:docId" element={<EditorPage />} />
         <Route path="/editor" element={<EditorPage />} />
       </Routes>
     </MemoryRouter>,
   );
+}
+
+function renderEditor(initialPath = '/editor/draft') {
+  const docId = initialPath.replace(/^\/editor\/?/, '') || 'draft';
+  return renderEditorAtDoc(docId);
 }
 
 describe('EditorPage autosave flush', () => {
@@ -79,6 +95,39 @@ describe('EditorPage autosave flush', () => {
       content: [{ type: 'paragraph', content: [{ type: 'text', text: 'saved' }] }],
     });
     onUpdateHandler = undefined;
+  });
+
+  it('flushes pending save to outgoing doc when navigating before debounce', async () => {
+    const pendingContent = {
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'doc-a edit' }] }],
+    };
+    const view = renderEditorAtDoc('doc-a');
+    expect(onUpdateHandler).toBeDefined();
+    mockEditor.getJSON.mockReturnValue(pendingContent);
+    onUpdateHandler?.({ editor: mockEditor });
+    expect(saveDocumentMock).not.toHaveBeenCalled();
+
+    view.rerender(
+      <MemoryRouter initialEntries={['/editor/doc-a']}>
+        <DocIdNavigator docId="doc-b" />
+        <Routes>
+          <Route path="/editor/:docId" element={<EditorPage />} />
+          <Route path="/editor" element={<EditorPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(saveDocumentMock).toHaveBeenCalledWith({
+        id: 'doc-a',
+        title: 'Document doc-a',
+        content: pendingContent,
+      });
+    });
+    expect(saveDocumentMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'doc-b', content: pendingContent }),
+    );
   });
 
   it('flushes pending debounced save on unmount', async () => {
