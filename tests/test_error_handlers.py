@@ -7,6 +7,14 @@ from fastapi.testclient import TestClient
 from lexflow.api.app import app
 
 
+def _spa_catchall_index() -> int | None:
+    """Index of the SPA ``/{full_path:path}`` route, if mounted."""
+    for index, route in enumerate(app.router.routes):
+        if getattr(route, "path", None) == "/{full_path:path}":
+            return index
+    return None
+
+
 def test_unhandled_exception_returns_internal_error(client: TestClient) -> None:
     """Generic handler must not leak paths or stack traces."""
     route_path = "/api/v1/__test_unhandled_exception__"
@@ -15,9 +23,16 @@ def test_unhandled_exception_returns_internal_error(client: TestClient) -> None:
         raise RuntimeError("secret /home/user/leak")
 
     app.add_api_route(route_path, _raise, methods=["GET"])
+    catchall_index = _spa_catchall_index()
+    if catchall_index is not None:
+        # mount_spa registers the catch-all before any probe route appended here;
+        # move the probe ahead of it so prod-like runs (frontend/dist present)
+        # still hit the API route instead of index.html.
+        probe_route = app.router.routes.pop()
+        app.router.routes.insert(catchall_index, probe_route)
     try:
         # Handler returns 500 JSON; TestClient re-raises server exceptions by default.
-        probe = TestClient(app, raise_server_exceptions=False, headers={"X-Lexflow-Client": "spa"})
+        probe = TestClient(app, raise_server_exceptions=False, headers=client.headers)
         response = probe.get(route_path)
         assert response.status_code == 500
         body = response.json()
