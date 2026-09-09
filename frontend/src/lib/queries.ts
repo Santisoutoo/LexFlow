@@ -398,10 +398,20 @@ export function useDashboard(preset: 'compliance' | 'analytics') {
  * stops on the next tick.
  */
 export function useWarmup() {
+  const WARMUP_BASE_MS = 2_000;
+  const WARMUP_MAX_MS = 30_000;
+
   return useQuery<WarmupStatus>({
     queryKey: ['system', 'warmup'] as const,
     queryFn: () => api.system.warmup(),
-    refetchInterval: (q) => (q.state.data?.ready ? false : 2000),
+    refetchInterval: (q) => {
+      if (q.state.data?.ready) return false;
+      const failures = q.state.fetchFailureCount ?? 0;
+      if (failures === 0) return WARMUP_BASE_MS;
+      const backoffSteps = Math.max(0, failures - 2);
+      const interval = WARMUP_BASE_MS * 2 ** backoffSteps;
+      return Math.min(interval, WARMUP_MAX_MS);
+    },
     refetchIntervalInBackground: false,
     staleTime: 1000,
     meta: { suppressGlobalError: true },

@@ -22,6 +22,7 @@ import { useUi } from '@/lib/store';
 import { useChatStream } from '@/stores/chat-stream';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
+import { chatErrorMessage, errorMessage } from '@/lib/errors';
 import type { ChatMessage as ChatMessageT, ChatSource } from '@/lib/types';
 import { groupThreads } from './chat/group-threads';
 
@@ -165,7 +166,7 @@ export function ChatPage() {
       return;
     }
     if (stream.error?.detail) {
-      setLiveAnnouncement(stream.error.detail);
+      setLiveAnnouncement(chatErrorMessage(stream.error, t));
       return;
     }
     if (!stream.streaming && stream.content.some((p) => p.trim().length > 0)) {
@@ -182,7 +183,7 @@ export function ChatPage() {
       setDraft('');
       selectThread(created.id);
     } catch (exc) {
-      const message = exc instanceof Error ? exc.message : 'Error desconocido';
+      const message = errorMessage(exc, t);
       toast({ tone: 'danger', title: t('chat.createFailed'), message });
     }
   };
@@ -199,7 +200,7 @@ export function ChatPage() {
     try {
       await renameThread.mutateAsync({ threadId, title: trimmed });
     } catch (exc) {
-      const message = exc instanceof Error ? exc.message : 'Error desconocido';
+      const message = errorMessage(exc, t);
       toast({ tone: 'danger', title: t('chat.renameFailed'), message });
     }
   };
@@ -216,7 +217,7 @@ export function ChatPage() {
       await deleteThread.mutateAsync(threadId);
       if (activeId === threadId) navigate('/chat');
     } catch (exc) {
-      const message = exc instanceof Error ? exc.message : 'Error desconocido';
+      const message = errorMessage(exc, t);
       toast({ tone: 'danger', title: t('chat.deleteFailed'), message });
     }
   };
@@ -243,7 +244,7 @@ export function ChatPage() {
         target = created.id;
         selectThread(created.id);
       } catch (exc) {
-        const message = exc instanceof Error ? exc.message : 'Error desconocido';
+        const message = errorMessage(exc, t);
         toast({ tone: 'danger', title: t('chat.createFailed'), message });
         return;
       }
@@ -259,7 +260,7 @@ export function ChatPage() {
     } catch (exc) {
       const aborted = exc instanceof DOMException && exc.name === 'AbortError';
       if (!aborted) {
-        const message = exc instanceof Error ? exc.message : 'Error desconocido';
+        const message = errorMessage(exc, t);
         toast({ tone: 'danger', title: 'No se pudo enviar el mensaje', message });
         setDraft(content);
       }

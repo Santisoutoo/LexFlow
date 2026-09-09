@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyChunk } from './api.mock';
+import { parseSseEvent } from './api/chat';
 import type { ChatSource } from './types';
 
 const sampleSource: ChatSource = {
@@ -9,6 +10,20 @@ const sampleSource: ChatSource = {
   snippet: 'El responsable del tratamiento…',
   target: { lawId: 'BOE-A-2018-16673', articleNum: '28' },
 };
+
+describe('parseSseEvent', () => {
+  it('reads error code from SSE payload', () => {
+    const chunk = parseSseEvent(
+      'error',
+      JSON.stringify({ detail: 'Ollama is not running or unreachable.', code: 'ollama_not_running' }),
+    );
+    expect(chunk).toEqual({
+      type: 'error',
+      detail: 'Ollama is not running or unreachable.',
+      code: 'ollama_not_running',
+    });
+  });
+});
 
 describe('applyChunk', () => {
   it('sets toolActivity on tool_call and clears it on first text', () => {
@@ -40,9 +55,9 @@ describe('applyChunk', () => {
       expect(msg.toolActivity).toBe('chat.toolActivity.searchCorpus');
     }
 
-    msg = applyChunk(msg, { type: 'error', detail: 'upstream failed' });
+    msg = applyChunk(msg, { type: 'error', detail: 'upstream failed', code: 'provider_error' });
     if (msg?.role === 'assistant') {
-      expect(msg.error).toEqual({ detail: 'upstream failed' });
+      expect(msg.error).toEqual({ detail: 'upstream failed', code: 'provider_error' });
       expect(msg.toolActivity).toBeNull();
     }
     msg = applyChunk(msg, { type: 'degraded', reason: 'tools_unsupported' });

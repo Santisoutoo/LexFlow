@@ -43,6 +43,16 @@ const DEFAULT_TTL_MS = 6_000;
  *  Older toasts fall off the bottom; the store keeps the most recent N. */
 const MAX_VISIBLE = 5;
 
+/** Skip duplicate toasts within this window (backend-down spam guard). */
+const DEDUP_WINDOW_MS = 8_000;
+
+function toastKey(input: Omit<Toast, 'id'>): string {
+  return `${input.tone}::${input.title ?? ''}::${input.message}`;
+}
+
+const _recentPushTimes = new Map<string, number>();
+const _recentPushIds = new Map<string, string>();
+
 interface ToastState {
   toasts: Toast[];
   push(toast: Omit<Toast, 'id'>): string;
@@ -56,9 +66,24 @@ const _nextId = () => `t-${++_seq}-${Date.now().toString(36)}`;
 export const useToast = create<ToastState>((set, get) => ({
   toasts: [],
   push(input) {
+    const key = toastKey(input);
+    const now = Date.now();
+    const state = get();
+
+    if (state.toasts.some((t) => toastKey(t) === key)) {
+      return state.toasts.find((t) => toastKey(t) === key)!.id;
+    }
+
+    const lastAt = _recentPushTimes.get(key);
+    if (lastAt !== undefined && now - lastAt < DEDUP_WINDOW_MS) {
+      return _recentPushIds.get(key) ?? '';
+    }
+
     const id = _nextId();
     const toast: Toast = { ...input, id };
-    set((state) => ({ toasts: [...state.toasts, toast].slice(-MAX_VISIBLE) }));
+    set((s) => ({ toasts: [...s.toasts, toast].slice(-MAX_VISIBLE) }));
+    _recentPushTimes.set(key, now);
+    _recentPushIds.set(key, id);
     const ttl = input.ttlMs ?? DEFAULT_TTL_MS;
     if (ttl > 0) {
       // setTimeout is fine — toasts are short-lived and the closure

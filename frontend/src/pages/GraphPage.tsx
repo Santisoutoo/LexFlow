@@ -20,6 +20,7 @@ import {
 import { useGraphPins } from '@/lib/graph-pins';
 import type { GraphNodeKind } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { errorMessage } from '@/lib/errors';
 import { buildNodeIndex, resolveNeighbourNodes } from './graph/neighbour-utils';
 import { deriveLegendCommunities, deriveLegendEdgeKinds, deriveLegendNodeKinds } from './graph/legend-utils';
 import {
@@ -199,7 +200,7 @@ export function GraphPage() {
     if (isGlobal || suggestions.length === 0) {
       return (
         <div className="p-10">
-          <ErrorState onRetry={() => refetch()} description={String(error)} />
+          <ErrorState onRetry={() => refetch()} description={errorMessage(error, t)} />
         </div>
       );
     }

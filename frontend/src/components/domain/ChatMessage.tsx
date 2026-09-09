@@ -6,6 +6,7 @@ import { BrandMark } from '@/components/BrandMark';
 import { CitationCard } from './CitationCard';
 import { ChatMarkdown } from './ChatMarkdown';
 import { useModels } from '@/lib/queries';
+import { chatErrorMessage } from '@/lib/errors';
 import type { ChatMessage as ChatMessageT, ChatSource } from '@/lib/types';
 
 export interface ChatMessageProps {
@@ -90,7 +91,7 @@ function ChatMessageImpl({ message, onSourceClick }: ChatMessageProps) {
       </div>
       {message.error && (
         <Callout tone="danger" title={t('chat.errorTitle')} className="mt-3">
-          {message.error.detail}
+          {chatErrorMessage(message.error, t)}
         </Callout>
       )}
       {message.sources.length > 0 && (

@@ -111,12 +111,16 @@ function messageFromWire(raw: BackendChatMessageRead): ChatMessage | null {
       .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
       .map(sourceFromWire);
     const errorPayload = payload.error;
-    const error =
-      typeof errorPayload === 'object' &&
-      errorPayload !== null &&
-      typeof (errorPayload as Record<string, unknown>).detail === 'string'
-        ? { detail: (errorPayload as Record<string, unknown>).detail as string }
-        : undefined;
+    let error: { detail: string; code?: string } | undefined;
+    if (typeof errorPayload === 'object' && errorPayload !== null) {
+      const errObj = errorPayload as Record<string, unknown>;
+      if (typeof errObj.detail === 'string') {
+        error = {
+          detail: errObj.detail,
+          code: typeof errObj.code === 'string' ? errObj.code : undefined,
+        };
+      }
+    }
     const model = typeof payload.model === 'string' ? payload.model : undefined;
     return {
       id: raw.id,
@@ -146,7 +150,7 @@ function messageFromWire(raw: BackendChatMessageRead): ChatMessage | null {
  * Parse one SSE event into a SPA ``ChatChunk``. Returns ``null`` for
  * payloads the SPA can't represent so the consumer can skip cleanly.
  */
-function parseSseEvent(eventName: string, data: string): ChatChunk | null {
+export function parseSseEvent(eventName: string, data: string): ChatChunk | null {
   if (!data) return eventName === 'done' ? { type: 'done' } : null;
   let payload: unknown;
   try {
@@ -174,7 +178,8 @@ function parseSseEvent(eventName: string, data: string): ChatChunk | null {
     }
     case 'error': {
       const detail = typeof obj.detail === 'string' ? obj.detail : 'Provider error';
-      return { type: 'error', detail };
+      const code = typeof obj.code === 'string' ? obj.code : undefined;
+      return { type: 'error', detail, code };
     }
     case 'degraded': {
       const reason = typeof obj.reason === 'string' ? obj.reason : 'unknown';

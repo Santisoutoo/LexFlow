@@ -83,3 +83,14 @@ def register_error_handlers(app: FastAPI) -> None:
         # #77 S1.4: a background build was just kicked off (or is already
         # running) — retryable, not a real failure, hence 503 not 500.
         return _envelope(503, "semantic_warming", str(exc))
+
+    @app.exception_handler(Exception)
+    async def _unhandled_exception(_request: Request, exc: Exception) -> JSONResponse:
+        # Catch-all registered last so domain handlers above stay authoritative.
+        # Log the full trace for operators; never forward paths/stack to clients.
+        logger.exception("Unhandled exception: %s", repr(exc))
+        return _envelope(
+            500,
+            "internal_error",
+            "An unexpected error occurred. See server logs for details.",
+        )

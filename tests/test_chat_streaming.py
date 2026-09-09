@@ -167,7 +167,9 @@ class TestChatStreaming:
         events = _parse_sse(response.text)
         names = [name for name, _ in events]
         assert names == ["text", "error", "done"]
-        assert events[1][1] == {"detail": "upstream blew up"}
+        assert events[1][1]["code"] == "provider_error"
+        assert "detail" in events[1][1]
+        assert "upstream blew up" not in events[1][1]["detail"]
 
         # Partial assistant content still persisted so the user can see
         # what made it through before the failure.
@@ -175,7 +177,8 @@ class TestChatStreaming:
         assistant = detail["messages"][-1]
         assert assistant["role"] == "assistant"
         assert assistant["content"] == "partial "
-        assert assistant["payload"]["error"]["detail"] == "upstream blew up"
+        assert assistant["payload"]["error"]["code"] == "provider_error"
+        assert "upstream blew up" not in assistant["payload"]["error"]["detail"]
 
     def test_tools_unsupported_emits_degraded_and_persists_flag(
         self,
@@ -313,3 +316,21 @@ class TestChatStreaming:
         assistant = detail["messages"][-1]
         assert assistant["payload"]["model"] == "ollama:fake-model"
         assert detail["model"] == "ollama:fake-model"
+
+    def test_ollama_connection_failure_emits_classified_error(
+        self,
+        client: TestClient,
+        patch_provider,
+    ) -> None:
+        patch_provider([ChatProviderError("Ollama error: [Errno 111] Connection refused")])
+        thread_id = _create_thread(client)
+        response = client.post(
+            f"/api/v1/chat/threads/{thread_id}/send",
+            json={"message": "?", "model": "ollama:fake-model"},
+        )
+        assert response.status_code == 200
+        events = _parse_sse(response.text)
+        error_event = next(data for name, data in events if name == "error")
+        assert error_event["code"] == "ollama_not_running"
+        assert "Connection refused" not in error_event["detail"]
+        assert "111" not in error_event["detail"]
