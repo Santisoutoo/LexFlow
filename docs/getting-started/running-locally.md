@@ -89,7 +89,7 @@ will eventually package.
 | Variable | Default | Effect |
 |----------|---------|--------|
 | `VITE_API_URL` | `http://localhost:8000` | Proxy target for `/api/*` |
-| `VITE_USE_MOCK` | `true` | Use in-process mock API |
+| `VITE_USE_MOCK` | unset (live API) | Set to `true` for in-process mock API |
 | `VITE_DEFAULT_MODEL` | `claude-sonnet-4-5` | Default chat model id |
 
 ## Useful one-offs

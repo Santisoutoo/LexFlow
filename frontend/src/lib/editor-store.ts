@@ -20,7 +20,7 @@
  *   `/api/v1/editor/documents/:docId`.
  */
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
 import type { JSONContent } from '@tiptap/react';
 
 /** A single persisted document entry. */
@@ -39,6 +39,9 @@ interface EditorState {
   /** All persisted documents, indexed by id. */
   documents: Record<string, EditorDocument>;
 
+  /** Set when localStorage quota is exceeded; in-memory state remains authoritative. */
+  persistError: string | null;
+
   /**
    * Upsert a document. Creates it if it does not exist yet; updates
    * `content`, `title`, and `updatedAt` if it does.
@@ -47,6 +50,9 @@ interface EditorState {
 
   /** Return a document by id, or `undefined` if it has not been saved yet. */
   getDocument(id: string): EditorDocument | undefined;
+
+  /** Clear the persist-error flag after the user acknowledges it. */
+  clearPersistError(): void;
 }
 
 /**
@@ -73,13 +79,39 @@ export function makeDefaultDocument(id: string): EditorDocument {
   };
 }
 
+/** localStorage wrapper that surfaces QuotaExceededError to the store (#44 R5). */
+function createEditorStorage(): StateStorage {
+  return {
+    getItem: (name) => localStorage.getItem(name),
+    setItem: (name, value) => {
+      try {
+        localStorage.setItem(name, value);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'QuotaExceededError') {
+          // Guard avoids a setState → persist → setItem loop when quota stays exceeded.
+          if (useEditorStore.getState().persistError !== 'quota_exceeded') {
+            useEditorStore.setState({ persistError: 'quota_exceeded' });
+          }
+          return;
+        }
+        throw err;
+      }
+    },
+    removeItem: (name) => {
+      localStorage.removeItem(name);
+    },
+  };
+}
+
 export const useEditorStore = create<EditorState>()(
   persist(
     (set, get) => ({
       documents: {},
+      persistError: null,
 
       saveDocument: (doc) =>
         set((state) => ({
+          persistError: null,
           documents: {
             ...state.documents,
             [doc.id]: {
@@ -90,11 +122,14 @@ export const useEditorStore = create<EditorState>()(
         })),
 
       getDocument: (id) => get().documents[id],
+
+      clearPersistError: () => set({ persistError: null }),
     }),
     {
       name: 'lexflow.editor',
+      storage: createJSONStorage(() => createEditorStorage()),
       // Persist all documents — the store is the source of truth.
       partialize: (s) => ({ documents: s.documents }),
-    }
-  )
+    },
+  ),
 );

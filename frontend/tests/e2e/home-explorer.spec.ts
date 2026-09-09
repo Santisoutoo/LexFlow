@@ -1,7 +1,7 @@
 /**
  * Golden path #1: Home → Explorer → click row → Law detail (#91).
  *
- * Runs against the mock backend (`VITE_USE_MOCK !== 'false'`), so the
+ * Runs against the mock backend (`VITE_USE_MOCK=true`), so the
  * mock catalog (mock-data.ts) populates the Explorer table
  * deterministically.
  */

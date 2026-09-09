@@ -1,4 +1,5 @@
 import { Outlet, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Search } from 'lucide-react';
 import { LeftRail } from './LeftRail';
 import { BottomTabBar } from './BottomTabBar';
@@ -6,10 +7,12 @@ import { TopBar } from './TopBar';
 import { CommandPalette } from './CommandPalette';
 import { ConfirmProvider } from '@/components/ui';
 import { HelpDrawer } from '@/components/domain/HelpDrawer';
+import { USE_MOCK } from '@/lib/api/http';
 import { useUi } from '@/lib/store';
 import { useHotkey, useGoToHotkey } from '@/lib/hotkeys';
 
 export function AppShell() {
+  const { t } = useTranslation();
   const togglePalette = useUi((s) => s.togglePalette);
   const toggleRight = useUi((s) => s.toggleRight);
   const toggleLeft = useUi((s) => s.toggleLeft);
@@ -38,6 +41,14 @@ export function AppShell() {
       <LeftRail />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar />
+        {USE_MOCK && (
+          <div
+            className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-1.5 text-center text-[12px] text-amber-900 dark:text-amber-100"
+            data-testid="mock-data-ribbon"
+          >
+            {t('shell.mockDataRibbon')}
+          </div>
+        )}
         <main id="main" tabIndex={-1} className="min-h-0 flex-1 overflow-hidden">
           <Outlet />
         </main>

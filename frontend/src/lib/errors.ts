@@ -30,6 +30,7 @@ const FALLBACK_MESSAGES: Record<string, string> = {
   'http.500': 'Error del servidor. Inténtalo de nuevo más tarde.',
   network: 'No se pudo conectar con el servidor.',
   unknown: 'Ha ocurrido un error desconocido.',
+  stream_idle_timeout: 'La respuesta del asistente tardó demasiado. Inténtalo de nuevo.',
 };
 
 function translateKey(key: string, t?: TFunction, opts?: Record<string, unknown>): string {
@@ -72,6 +73,7 @@ export function errorMessage(err: unknown, t?: TFunction): string {
 
   if (err instanceof Error && err.message && !looksLikeHttpPath(err.message)) {
     if (NETWORK_ERROR.test(err.message)) return translateKey('network', t);
+    if (err.message === 'stream_idle_timeout') return translateKey('stream_idle_timeout', t);
     return err.message;
   }
 

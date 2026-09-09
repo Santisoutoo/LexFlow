@@ -10,6 +10,7 @@ from pathlib import Path
 
 from lexflow.core.models import LawMetadata
 from lexflow.core.parser import frontmatter_to_metadata, parse_frontmatter
+from lexflow.utils.file_discovery import law_id_from_path
 
 
 def read_frontmatter_block(file_path: Path) -> str:
@@ -29,7 +30,8 @@ def read_frontmatter_block(file_path: Path) -> str:
                 return "".join(lines)
             lines.append(line)
 
-    return ""
+    # No closing delimiter — treat EOF as end of frontmatter (#44 R9).
+    return "".join(lines)
 
 
 def parse_metadata_only(file_path: Path) -> LawMetadata:
@@ -40,4 +42,9 @@ def parse_metadata_only(file_path: Path) -> LawMetadata:
     """
     yaml_text = read_frontmatter_block(file_path)
     raw = parse_frontmatter(yaml_text)
-    return frontmatter_to_metadata(raw)
+    metadata = frontmatter_to_metadata(raw)
+    if not metadata.identifier.strip():
+        stem = law_id_from_path(file_path)
+        if stem:
+            metadata = metadata.model_copy(update={"identifier": stem})
+    return metadata

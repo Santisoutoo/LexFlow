@@ -624,119 +624,122 @@ async def stream_chat_reply(
     # RAG tools; if the model can't do tool-use we retry once with none so
     # tool-incapable models still answer (without citations) instead of
     # erroring out to an empty turn.
-    attempt_tools = tools
-    while True:
-        retry_without_tools = False
-        try:
-            for _ in range(_MAX_TOOL_ITERATIONS):
-                finish_reason: str | None = None
-                pending_calls: list[ToolCallChunk] = []
-                iteration_text: list[str] = []
-                async for typed in provider.stream_chat_typed(history, model_name, tools=attempt_tools):
-                    if isinstance(typed, TextChunk):
-                        if not typed.delta:
-                            continue
-                        assistant_chunks.append(typed.delta)
-                        iteration_text.append(typed.delta)
-                        yield format_sse(SseEvent.TEXT, {"delta": typed.delta})
-                    elif isinstance(typed, ToolCallChunk):
-                        pending_calls.append(typed)
-                        yield format_sse(
-                            SseEvent.TOOL_CALL,
-                            {"call_id": typed.call_id, "name": typed.name, "args": typed.arguments},
-                        )
-                    elif isinstance(typed, FinishChunk):
-                        finish_reason = typed.reason
-                        break
-                if not pending_calls or finish_reason == "stop":
-                    break
-                _record_assistant_tool_calls(history, pending_calls, content="".join(iteration_text))
-                await anyio.to_thread.run_sync(
-                    partial(
-                        _persist_assistant_turn,
-                        session,
-                        thread,
-                        "".join(iteration_text),
-                        _assistant_tool_calls_payload(pending_calls),
-                        model_id=model_id,
-                    ),
-                )
-                for call in pending_calls:
-                    # S4.1 (#90): tool dispatch is synchronous (SQLite scans,
-                    # sometimes a cold embedding-index build) — running it
-                    # inline on the event loop would freeze every other
-                    # request/stream for the duration. Off-load to a worker
-                    # thread, same pattern as ``api/warmup.py``.
-                    result = await anyio.to_thread.run_sync(_run_tool_call, call)
-                    for citation in _extract_citations(result, tool_name=call.name, tool_args=call.arguments):
-                        collected_sources.append(citation)
-                        yield format_sse(SseEvent.SOURCE, citation)
-                    await anyio.to_thread.run_sync(_persist_tool_turn, session, thread, call, result)
-                    _record_tool_outcome(history, call, result)
-                collected_sources[:] = _dedupe_citations(collected_sources)
-        except ChatProviderError as exc:
-            if attempt_tools and _is_tools_unsupported(exc):
-                # Degrade to a tool-less chat for this turn and start over.
-                logger.info("Model %s rejected tools; retrying without tools", repr(model_name))
-                assistant_chunks.clear()
-                corpus_degraded = True
-                yield format_sse(SseEvent.DEGRADED, {"reason": "tools_unsupported"})
-                attempt_tools = []
-                retry_without_tools = True
-            else:
-                # Both `provider_key` and `exc` are user-influenced. CodeQL's
-                # py/log-injection query doesn't recognise `%r` as a sanitiser
-                # even though it calls repr() at runtime, so we use explicit
-                # repr() — same bytes, different static-analysis signal.
-                logger.info("Provider %s stream failed: %s", repr(provider_key), repr(exc))
-                error_code, error_detail = _classify_provider_error(exc)
-                stream_error = _sse_error_payload(detail=error_detail, code=error_code)
-                yield format_sse(SseEvent.ERROR, stream_error)
-        except asyncio.CancelledError:
-            # Sprint 6 rf-5: a CancelledError means the client disconnected
-            # (Starlette propagates it through the generator). We must NOT
-            # swallow it — the generic `except Exception` below used to, which
-            # turned a normal disconnect into a synthetic SSE `error` event
-            # that no client could see anyway. Re-raise so the runtime can
-            # tear the stream down cleanly.
-            raise
-        except Exception:
-            # Generic exception path: the message can carry stack-frame
-            # context (file paths, internal SQL, model names). Log the full
-            # trace on the server side and emit a generic detail to the
-            # client (CodeQL alert #2 — py/stack-trace-exposure).
-            logger.exception("Unexpected error during chat stream")
-            stream_error = _sse_error_payload(
-                detail="Internal error during chat stream",
-                code="internal_error",
-            )
-            yield format_sse(SseEvent.ERROR, stream_error)
-        # One-shot retry without tools (see _is_tools_unsupported); any other
-        # outcome (success, surfaced error, generic failure) ends the loop.
-        if retry_without_tools:
-            continue
-        break
+    assistant_persisted = False
 
-    # 4. Persist whatever we got. Even an empty reply gets a row so the
-    #    UI doesn't render a "ghost turn". Offloaded for the same reason
-    #    as the user-turn persist above (#77 S1.1).
-    final_payload: dict[str, Any] = {}
-    if collected_sources:
-        final_payload["sources"] = collected_sources
-    if stream_error:
-        final_payload["error"] = stream_error
-    if corpus_degraded:
-        final_payload["corpus_degraded"] = True
-    await anyio.to_thread.run_sync(
-        partial(
-            _persist_assistant_turn,
+    def _finalize_assistant_turn() -> None:
+        nonlocal assistant_persisted
+        if assistant_persisted:
+            return
+        final_payload: dict[str, Any] = {}
+        if collected_sources:
+            final_payload["sources"] = collected_sources
+        if stream_error:
+            final_payload["error"] = stream_error
+        if corpus_degraded:
+            final_payload["corpus_degraded"] = True
+        _persist_assistant_turn(
             session,
             thread,
             "".join(assistant_chunks),
             final_payload or None,
             model_id=model_id,
-        ),
-    )
-    await anyio.to_thread.run_sync(_maybe_auto_title_thread, session, thread, user_message_content)
+        )
+        assistant_persisted = True
+
+    attempt_tools = tools
+    try:
+        while True:
+            retry_without_tools = False
+            try:
+                for _ in range(_MAX_TOOL_ITERATIONS):
+                    finish_reason: str | None = None
+                    pending_calls: list[ToolCallChunk] = []
+                    iteration_text: list[str] = []
+                    async for typed in provider.stream_chat_typed(history, model_name, tools=attempt_tools):
+                        if isinstance(typed, TextChunk):
+                            if not typed.delta:
+                                continue
+                            assistant_chunks.append(typed.delta)
+                            iteration_text.append(typed.delta)
+                            yield format_sse(SseEvent.TEXT, {"delta": typed.delta})
+                        elif isinstance(typed, ToolCallChunk):
+                            pending_calls.append(typed)
+                            yield format_sse(
+                                SseEvent.TOOL_CALL,
+                                {"call_id": typed.call_id, "name": typed.name, "args": typed.arguments},
+                            )
+                        elif isinstance(typed, FinishChunk):
+                            finish_reason = typed.reason
+                            break
+                    if not pending_calls or finish_reason == "stop":
+                        break
+                    _record_assistant_tool_calls(history, pending_calls, content="".join(iteration_text))
+                    await anyio.to_thread.run_sync(
+                        partial(
+                            _persist_assistant_turn,
+                            session,
+                            thread,
+                            "".join(iteration_text),
+                            _assistant_tool_calls_payload(pending_calls),
+                            model_id=model_id,
+                        ),
+                    )
+                    for call in pending_calls:
+                        # S4.1 (#90): tool dispatch is synchronous (SQLite scans,
+                        # sometimes a cold embedding-index build) — running it
+                        # inline on the event loop would freeze every other
+                        # request/stream for the duration. Off-load to a worker
+                        # thread, same pattern as ``api/warmup.py``.
+                        result = await anyio.to_thread.run_sync(_run_tool_call, call)
+                        for citation in _extract_citations(result, tool_name=call.name, tool_args=call.arguments):
+                            collected_sources.append(citation)
+                            yield format_sse(SseEvent.SOURCE, citation)
+                        await anyio.to_thread.run_sync(_persist_tool_turn, session, thread, call, result)
+                        _record_tool_outcome(history, call, result)
+                    collected_sources[:] = _dedupe_citations(collected_sources)
+            except ChatProviderError as exc:
+                if attempt_tools and _is_tools_unsupported(exc):
+                    # Degrade to a tool-less chat for this turn and start over.
+                    logger.info("Model %s rejected tools; retrying without tools", repr(model_name))
+                    assistant_chunks.clear()
+                    corpus_degraded = True
+                    yield format_sse(SseEvent.DEGRADED, {"reason": "tools_unsupported"})
+                    attempt_tools = []
+                    retry_without_tools = True
+                else:
+                    # Both `provider_key` and `exc` are user-influenced. CodeQL's
+                    # py/log-injection query doesn't recognise `%r` as a sanitiser
+                    # even though it calls repr() at runtime, so we use explicit
+                    # repr() — same bytes, different static-analysis signal.
+                    logger.info("Provider %s stream failed: %s", repr(provider_key), repr(exc))
+                    error_code, error_detail = _classify_provider_error(exc)
+                    stream_error = _sse_error_payload(detail=error_detail, code=error_code)
+                    yield format_sse(SseEvent.ERROR, stream_error)
+            except asyncio.CancelledError:
+                # Sprint 6 rf-5: client disconnect — persist partial content in
+                # ``finally`` below, then re-raise so Starlette tears down cleanly.
+                raise
+            except Exception:
+                # Generic exception path: the message can carry stack-frame
+                # context (file paths, internal SQL, model names). Log the full
+                # trace on the server side and emit a generic detail to the
+                # client (CodeQL alert #2 — py/stack-trace-exposure).
+                logger.exception("Unexpected error during chat stream")
+                stream_error = _sse_error_payload(
+                    detail="Internal error during chat stream",
+                    code="internal_error",
+                )
+                yield format_sse(SseEvent.ERROR, stream_error)
+            # One-shot retry without tools (see _is_tools_unsupported); any other
+            # outcome (success, surfaced error, generic failure) ends the loop.
+            if retry_without_tools:
+                continue
+            break
+    finally:
+        # 4. Persist whatever we got — even on disconnect (#44 R7). Even an
+        # empty reply gets a row so the UI doesn't render a "ghost turn".
+        # Offloaded for the same reason as the user-turn persist (#77 S1.1).
+        await anyio.to_thread.run_sync(_finalize_assistant_turn)
+        await anyio.to_thread.run_sync(_maybe_auto_title_thread, session, thread, user_message_content)
 
     yield format_sse(SseEvent.DONE, {})

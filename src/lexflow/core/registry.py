@@ -521,9 +521,12 @@ class LawRegistry:
         meta = self._safe_metadata(law_id)
         if meta is None:
             return
+        effective_id = meta.identifier.strip() or law_id
+        if not effective_id:
+            return
         # Law-level entry (title is the primary searchable text).
         self._search_index.add_entry(
-            law_id=meta.identifier,
+            law_id=effective_id,
             law_title=meta.title,
             article_number=None,
             text=meta.title,
@@ -534,16 +537,16 @@ class LawRegistry:
         law = self._cache[law_id]
         for article in law.articles:
             self._search_index.add_entry(
-                law_id=meta.identifier,
+                law_id=effective_id,
                 law_title=meta.title,
                 article_number=article.number,
                 text=article.text,
             )
-        self._index_section_prose(meta.identifier, meta.title, law.sections)
+        self._index_section_prose(effective_id, meta.title, law.sections)
         for disposicion in law.disposiciones:
             if disposicion.text.strip():
                 self._search_index.add_entry(
-                    law_id=meta.identifier,
+                    law_id=effective_id,
                     law_title=meta.title,
                     article_number=disposicion.heading,
                     text=disposicion.text,

@@ -77,14 +77,15 @@ If the backend changes a field name, fix it here — never in the components.
 ## Mock fallback — `VITE_USE_MOCK`
 
 ```ts
-export const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false';
+export const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
 export const api: ApiClient = USE_MOCK ? mockApi : liveApi;
 ```
 
-- `VITE_USE_MOCK` unset or `'true'` → mock client
+- `VITE_USE_MOCK='true'` → mock client
   ([`api.mock.ts`](../../frontend/src/lib/api.mock.ts) backed by
-  [`mock-data.ts`](../../frontend/src/lib/mock-data.ts)).
-- `VITE_USE_MOCK='false'`           → live HTTP client.
+  [`mock-data.ts`](../../frontend/src/lib/mock-data.ts)). A visible
+  **Datos de demostración** ribbon appears in the shell.
+- `VITE_USE_MOCK` unset or any other value → live HTTP client (production default).
 
 Toggle it in `.env.local` or via the Settings page. The Settings page reads
 `USE_MOCK` from this module to display the active mode.

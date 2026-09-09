@@ -51,6 +51,23 @@ import type {
 } from '../types';
 import { API_BASE, API_PREFIX, ApiError, CSRF_HEADER_NAME, CSRF_HEADER_VALUE, http } from './http';
 
+/** Raised when no SSE bytes arrive within the idle window (#44 R7). */
+export class StreamIdleTimeoutError extends Error {
+  constructor() {
+    super('stream_idle_timeout');
+    this.name = 'StreamIdleTimeoutError';
+  }
+}
+
+/** Max silence between SSE chunks before the client aborts the stream (ms). */
+export const STREAM_IDLE_TIMEOUT_MS = 90_000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
 function threadFromWire(raw: BackendChatThreadRead): ChatThread {
   return {
     id: raw.id,
@@ -197,9 +214,10 @@ export function parseSseEvent(eventName: string, data: string): ChatChunk | null
  * line event boundary, reads ``event:`` + ``data:`` lines per block,
  * and forwards parsed chunks to the caller. Terminates on ``done``.
  */
-async function* consumeSse(
+export async function* consumeSse(
   body: ReadableStream<Uint8Array>,
   signal?: AbortSignal,
+  idleTimeoutMs: number = STREAM_IDLE_TIMEOUT_MS,
 ): AsyncGenerator<ChatChunk> {
   const reader = body.getReader();
   const decoder = new TextDecoder('utf-8');
@@ -213,7 +231,15 @@ async function* consumeSse(
       if (signal?.aborted) {
         throw new DOMException('The operation was aborted.', 'AbortError');
       }
-      const { value, done } = await reader.read();
+      const readResult = await Promise.race([
+        reader.read().then((result) => ({ kind: 'read' as const, result })),
+        sleep(idleTimeoutMs).then(() => ({ kind: 'idle' as const })),
+      ]);
+      if (readResult.kind === 'idle') {
+        await reader.cancel();
+        throw new StreamIdleTimeoutError();
+      }
+      const { value, done } = readResult.result;
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
       let separator: number;

@@ -25,13 +25,16 @@
  * - Change the autosave delay → update `AUTOSAVE_DELAY_MS`.
  * - Switch from localStorage to server sync → update `useEditorStore`.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams } from 'react-router-dom';
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useTranslation } from 'react-i18next';
+import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import { useEditorStore, DEFAULT_DOC_ID, makeDefaultDocument } from '@/lib/editor-store';
+import { toast } from '@/lib/toast';
+import { exportMarkdown } from '@/pages/editor/export-utils';
 import { EditorToolbar } from '@/pages/editor/EditorToolbar';
 import { CitationPicker } from '@/pages/editor/CitationPicker';
 import { TemplatesDialog } from '@/pages/editor/TemplatesDialog';
@@ -46,14 +49,34 @@ import { cn } from '@/lib/utils';
 /** Debounce window before a content change is written to localStorage (ms). */
 const AUTOSAVE_DELAY_MS = 600;
 
+/** Cancel any pending debounce and write the latest editor state immediately (#44 R5). */
+function flushPendingAutosave(
+  autosaveTimer: MutableRefObject<ReturnType<typeof setTimeout> | null>,
+  editor: Editor | null,
+  docIdRef: MutableRefObject<string>,
+  titleRef: MutableRefObject<string>,
+  saveDocument: (doc: { id: string; title: string; content: ReturnType<Editor['getJSON']> }) => void,
+): void {
+  if (autosaveTimer.current === null) return;
+  clearTimeout(autosaveTimer.current);
+  autosaveTimer.current = null;
+  if (!editor) return;
+  saveDocument({
+    id: docIdRef.current,
+    title: titleRef.current,
+    content: editor.getJSON(),
+  });
+}
+
 /**
  * EditorPage renders the document editor for the given `docId` route param.
  * When no `docId` is provided it falls back to `DEFAULT_DOC_ID` (`'draft'`).
  */
 export function EditorPage() {
+  const { t } = useTranslation();
   const { docId = DEFAULT_DOC_ID } = useParams<{ docId?: string }>();
 
-  const { getDocument, saveDocument } = useEditorStore();
+  const { getDocument, saveDocument, persistError, clearPersistError } = useEditorStore();
 
   // Resolve the document from the store; create a default stub if new.
   const stored = getDocument(docId);
@@ -129,31 +152,35 @@ export function EditorPage() {
     },
   });
 
-  // Cancel any pending autosave when the component unmounts.
+  // Flush pending edits on unmount so keystrokes inside the debounce window survive (#44 R5).
   useEffect(() => {
     return () => {
-      if (autosaveTimer.current !== null) {
-        clearTimeout(autosaveTimer.current);
-      }
+      flushPendingAutosave(autosaveTimer, editor, docIdRef, titleRef, saveDocument);
     };
-  }, []);
+  }, [editor, saveDocument]);
+
+  // Sticky warning when localStorage quota is exceeded — export is the escape hatch.
+  useEffect(() => {
+    if (!persistError) return;
+    toast({
+      tone: 'warning',
+      title: t('editor.persistErrorTitle'),
+      message: t('editor.persistErrorBody'),
+      ttlMs: 0,
+    });
+  }, [persistError, t]);
 
   // When `docId` changes (the user navigates to a different doc), load the
   // correct content and reset the title.
   useEffect(() => {
     if (!editor) return;
-    // A queued autosave from the previous doc must not fire after the switch —
-    // it would write the old content under the new id (#598 review).
-    if (autosaveTimer.current !== null) {
-      clearTimeout(autosaveTimer.current);
-      autosaveTimer.current = null;
-    }
+    // Save the outgoing doc before switching — refs still hold the old id/title.
+    flushPendingAutosave(autosaveTimer, editor, docIdRef, titleRef, saveDocument);
     const doc = getDocument(docId) ?? makeDefaultDocument(docId);
     setTitle(doc.title);
     // `setContent` resets the editor state to the new JSON document.
     editor.commands.setContent(doc.content);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [docId]);
+  }, [docId, editor, getDocument, saveDocument]);
 
   // Sync the `editable` flag whenever the toggle changes.
   useEffect(() => {
@@ -197,8 +224,38 @@ export function EditorPage() {
     setCommentsOpen(true);
   }, [editor, docId, addComment]);
 
+  const handleEmergencyExport = useCallback(() => {
+    if (!editor) return;
+    exportMarkdown(editor.getJSON(), title);
+  }, [editor, title]);
+
   return (
     <div className="flex h-full flex-col gap-4 overflow-auto p-6">
+      {persistError && (
+        <div
+          className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-[12.5px] text-amber-900 dark:text-amber-100"
+          data-testid="editor-persist-error-banner"
+        >
+          <p>{t('editor.persistErrorBody')}</p>
+          <div className="flex shrink-0 gap-2">
+            <button
+              type="button"
+              onClick={handleEmergencyExport}
+              className="rounded px-2 py-1 text-[11px] font-medium hover:bg-amber-500/20"
+            >
+              {t('editor.persistErrorExport')}
+            </button>
+            <button
+              type="button"
+              onClick={clearPersistError}
+              className="rounded px-2 py-1 text-[11px] hover:bg-amber-500/20"
+              aria-label={t('editor.persistErrorDismiss')}
+            >
+              {t('editor.persistErrorDismiss')}
+            </button>
+          </div>
+        </div>
+      )}
       {/* Page header: editable title + doc id breadcrumb, export on the right */}
       <header className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-1 flex-col gap-1">

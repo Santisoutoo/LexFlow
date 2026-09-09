@@ -93,7 +93,7 @@ class TestComputeDriftReport:
         assert report.zero_article_count == 1
         assert report.zero_article_sample_ids == ["BOE-A-2099-2"]
 
-    def test_missing_identifier_is_counted(self, tmp_path: Path) -> None:
+    def test_missing_identifier_falls_back_to_path_stem(self, tmp_path: Path) -> None:
         law_path = tmp_path / "es" / "BOE-A-2099-3.md"
         law_path.parent.mkdir(parents=True, exist_ok=True)
         law_path.write_text(
@@ -103,5 +103,5 @@ class TestComputeDriftReport:
         registry = LawRegistry(tmp_path)
         report = compute_drift_report(registry)
 
-        assert report.empty_identifier_count == 1
-        assert report.empty_identifier_sample_ids == ["BOE-A-2099-3"]
+        assert registry.get_metadata("BOE-A-2099-3").identifier == "BOE-A-2099-3"
+        assert report.empty_identifier_count == 0

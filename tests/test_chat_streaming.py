@@ -13,15 +13,19 @@ Ollama / cloud creds. Verifies:
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import AsyncIterator
 
 import pytest
 from fastapi.testclient import TestClient
 from pytest import MonkeyPatch
+from sqlmodel import Session
 
-from lexflow.chat.base import ChatProvider, ChatProviderError
-from lexflow.chat.storage_models import DEFAULT_THREAD_TITLE
+from lexflow.chat.base import ChatProvider, ChatProviderError, TextChunk
+from lexflow.chat.db import get_engine
+from lexflow.chat.storage_models import DEFAULT_THREAD_TITLE, ChatThread
+from lexflow.chat.streaming import stream_chat_reply
 
 
 class _FakeProvider(ChatProvider):
@@ -334,3 +338,47 @@ class TestChatStreaming:
         assert error_event["code"] == "ollama_not_running"
         assert "Connection refused" not in error_event["detail"]
         assert "111" not in error_event["detail"]
+
+    @pytest.mark.asyncio
+    async def test_disconnect_persists_partial_assistant(
+        self,
+        client: TestClient,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        """Client disconnect (CancelledError) still persists accumulated text (#44 R7)."""
+
+        class _DisconnectProvider:
+            async def stream_chat_typed(self, messages: object, model: str, tools: object = None) -> object:
+                yield TextChunk(delta="partial ")
+                raise asyncio.CancelledError()
+
+        from lexflow.chat import provider_registry as registry_mod
+
+        ollama_spec = registry_mod.PROVIDERS_BY_KEY["ollama"]
+        patched = registry_mod.ProviderSpec(
+            key=ollama_spec.key,
+            local=ollama_spec.local,
+            factory=lambda: _DisconnectProvider(),
+            default_context=ollama_spec.default_context,
+            env_key=ollama_spec.env_key,
+        )
+        monkeypatch.setitem(registry_mod.PROVIDERS_BY_KEY, "ollama", patched)
+
+        thread_id = _create_thread(client)
+        with Session(get_engine()) as session:
+            thread = session.get(ChatThread, thread_id)
+            assert thread is not None
+            stream = stream_chat_reply(
+                session=session,
+                thread=thread,
+                user_message_content="?",
+                model_id="ollama:fake-model",
+            )
+            with pytest.raises(asyncio.CancelledError):
+                async for _ in stream:
+                    pass
+
+        detail = client.get(f"/api/v1/chat/threads/{thread_id}").json()
+        assistant = detail["messages"][-1]
+        assert assistant["role"] == "assistant"
+        assert assistant["content"] == "partial "

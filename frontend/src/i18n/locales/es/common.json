@@ -25,7 +25,14 @@
     "toggleTheme": "Cambiar tema",
     "toggleRightPanel": "Alternar panel derecho",
     "breadcrumb": "Migas",
-    "diff": "Diff"
+    "diff": "Diff",
+    "mockDataRibbon": "Datos de demostración"
+  },
+  "editor": {
+    "persistErrorTitle": "No se pudo guardar en el navegador",
+    "persistErrorBody": "El almacenamiento local está lleno. Exporta el documento ahora para no perder cambios.",
+    "persistErrorExport": "Exportar Markdown",
+    "persistErrorDismiss": "Cerrar"
   },
   "model": {
     "local": "local",
@@ -333,7 +340,8 @@
       "500": "Error del servidor. Inténtalo de nuevo más tarde."
     },
     "network": "No se pudo conectar con el servidor.",
-    "unknown": "Ha ocurrido un error desconocido."
+    "unknown": "Ha ocurrido un error desconocido.",
+    "stream_idle_timeout": "La respuesta del asistente tardó demasiado. Inténtalo de nuevo."
   },
   "lawDetail": {
     "tabs": {
