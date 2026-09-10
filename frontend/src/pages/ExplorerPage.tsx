@@ -4,9 +4,12 @@ import { useTranslation } from 'react-i18next';
 import { Search, Download, ChevronRight, BookOpenText, Hash, SlidersHorizontal, X, FileText } from 'lucide-react';
 import { Badge, Button, Callout, Chip, Input, Tabs } from '@/components/ui';
 import { EmptyState } from '@/components/domain/EmptyState';
+import { HighlightedSnippet } from '@/components/domain/HighlightedSnippet';
+import { SearchInterpretationBanner } from '@/components/domain/SearchInterpretationBanner';
 import { Skeleton } from '@/components/domain/Skeleton';
 import { FilterRail } from '@/pages/explorer/FilterRail';
 import { applyClientFilterSort, type LawSort } from '@/pages/explorer/client-filter-sort';
+import { buildExplorerFilterSummary } from '@/pages/explorer/empty-hints';
 import { useLawsList, useTags, useDepartments, useSearch, useUserTagVocab, useUserTagLaws } from '@/lib/queries';
 import { useUi } from '@/lib/store';
 import { cn, formatDate, formatNumber, statusLabel } from '@/lib/utils';
@@ -170,6 +173,40 @@ export function ExplorerPage() {
     searchFacets,
   );
   const searchHits = useMemo(() => searchData?.hits ?? [], [searchData]);
+  const emptyDescription = useMemo(() => {
+    const summary = buildExplorerFilterSummary({
+      plainQ,
+      status: [...status],
+      rango: [...rango],
+      ambito: [...ambito],
+      tags: [...allTags],
+      jurisdiction,
+      yearFrom,
+      yearTo,
+      department: activeDepartment,
+      userTag: activeUserTag,
+    });
+    if (summary.hasFilters) {
+      return t('explorer.empty.withFilters', {
+        query: plainQ,
+        filters: summary.filterLabels.join(', '),
+        suggestion: summary.suggestion,
+      });
+    }
+    return t('explorer.empty.description');
+  }, [
+    plainQ,
+    status,
+    rango,
+    ambito,
+    allTags,
+    jurisdiction,
+    yearFrom,
+    yearTo,
+    activeDepartment,
+    activeUserTag,
+    t,
+  ]);
 
   // Unified loading flag for the current mode.
   const isLoading = isSearchMode ? searchLoading : browseLoading;
@@ -399,6 +436,9 @@ export function ExplorerPage() {
               </span>
             )}
           </div>
+          {isSearchMode && (
+            <SearchInterpretationBanner aliasExpansions={searchData?.aliasExpansions} className="mt-2 px-8" />
+          )}
         </div>
 
         {/* Table / Search results */}
@@ -409,7 +449,7 @@ export function ExplorerPage() {
               <div className="p-8">
                 <EmptyState
                   title={t('explorer.empty.title')}
-                  description={t('explorer.empty.description')}
+                  description={emptyDescription}
                   primaryAction={{ label: t('explorer.clearFilters'), onClick: () => { setQ(''); setStatus(new Set()); setRango(new Set()); setAmbito(new Set()); setYearFrom(''); setYearTo(''); setJurisdiction(undefined); setTags(new Set()); setActiveUserTag(null); setActiveDepartment(undefined); } }}
                   secondaryAction={{ label: t('explorer.howToSearch'), onClick: () => setShowSearchHelp((v) => !v) }}
                 />
@@ -467,7 +507,7 @@ export function ExplorerPage() {
                           </div>
                           {hit.snippet && (
                             <HighlightedSnippet
-                              snippet={hit.snippet}
+                              text={hit.snippet}
                               match={hit.match ?? null}
                               className="mt-1 line-clamp-2 text-[12.5px] text-muted"
                             />
@@ -635,40 +675,6 @@ function Th({ children, className }: { children?: React.ReactNode; className?: s
     <th className={cn('label-caps whitespace-nowrap px-3 py-2.5 text-left', className)}>
       <span className="inline-flex items-center gap-1">{children}</span>
     </th>
-  );
-}
-
-/**
- * Renders a search snippet with the matched substring highlighted.
- *
- * `match` carries the character offsets returned by the backend
- * (`match_start` / `match_end` on `SearchResult`). When `match` is null
- * the snippet is shown as plain text — the hit was title-only or the
- * offset fell outside the trimmed window.
- */
-function HighlightedSnippet({
-  snippet,
-  match,
-  className,
-}: {
-  snippet: string;
-  match: { start: number; end: number } | null;
-  className?: string;
-}) {
-  if (!match || match.start < 0 || match.end <= match.start || match.end > snippet.length) {
-    return <p className={className}>{snippet}</p>;
-  }
-  const before = snippet.slice(0, match.start);
-  const highlighted = snippet.slice(match.start, match.end);
-  const after = snippet.slice(match.end);
-  return (
-    <p className={className}>
-      {before}
-      <mark className="rounded-[2px] bg-amber-200/70 px-px text-inherit dark:bg-amber-500/30">
-        {highlighted}
-      </mark>
-      {after}
-    </p>
   );
 }
 

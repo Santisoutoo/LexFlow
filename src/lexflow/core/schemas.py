@@ -125,6 +125,20 @@ class ArticleResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class MatchRange(BaseModel):
+    """Character offsets of one highlighted substring within a snippet."""
+
+    start: int = Field(ge=0)
+    end: int = Field(ge=0)
+
+
+class AliasExpansion(BaseModel):
+    """One token-wise acronym expansion applied before search (#47)."""
+
+    token: str
+    expansion: str
+
+
 class SearchResult(BaseModel):
     """A single search hit.
 
@@ -149,6 +163,10 @@ class SearchResult(BaseModel):
         ge=0,
         description="Exclusive end offset of the match within ``snippet``. Null when not locatable.",
     )
+    match_ranges: list[MatchRange] = Field(
+        default_factory=list,
+        description="All query-token ranges within ``snippet`` for multi-term highlighting.",
+    )
     score: float = Field(ge=0.0)
 
 
@@ -160,6 +178,10 @@ class SearchResponse(BaseModel):
     items: list[SearchResult]
     page: int
     page_size: int
+    alias_expansions: list[AliasExpansion] = Field(
+        default_factory=list,
+        description="Acronym tokens expanded before matching; ``query`` stays the raw user input.",
+    )
 
 
 class SemanticSearchHit(BaseModel):

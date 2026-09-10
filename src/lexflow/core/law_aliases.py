@@ -1,45 +1,21 @@
 """Acronym-to-title expansion for Spanish law short names (#671, gap A).
 
 Users search by the popular acronym of a law ("LOPD", "LGT", "ET") far more
-often than by its official title or BOE number. The existing full-text index
-(:mod:`lexflow.core.search`) already matches on title/article text, so the
-number ("39/2015") is findable today — but a bare acronym is not, because no
-indexed text contains the acronym itself.
+often than by its official title or BOE number. The full-text index
+(:mod:`lexflow.core.search`) tokenizes queries and matches with accent-insensitive
+AND semantics per token. Acronyms rarely appear in indexed text, so known
+tokens are expanded to distinctive title phrases before search runs.
 
-This module closes that gap without inventing BOE identifiers: each acronym
-maps to a phrase that genuinely appears in the law's official title.
-Expanding the query to that phrase before it reaches the search index lets
-the *existing* title match do the work, with zero risk of pointing a user at
-the wrong law.
-
-IMPORTANT — the underlying engine (``SearchIndex.search`` in
-``core/search.py``) matches with ``text_lower.count(query_lower)``: a literal,
-whole-string substring count with no per-word tokenization and no accent
-folding (only ``.lower()`` is applied). Two consequences shape every value in
-this map:
-
-1. **Values must be exact, contiguous, correctly-accented substrings of the
-   real title** — not just "words that occur somewhere in it". A phrase that
-   drops a connector ("y", "de los") or skips a word is a substring of
-   nothing and silently matches zero entries.
-2. **Values must skip the "Ley N/YYYY, de DD de <month>," clause.** Spanish
-   law titles are typically "Ley [Orgánica] N/YYYY, de DD de <month>,
-   <subject>." — the number/date clause breaks contiguity with anything
-   before it, so every expansion below is the <subject> tail only (e.g. for
-   "Ley 58/2003, de 17 de diciembre, General Tributaria" the safe value is
-   "general tributaria", never "ley ... general tributaria").
-
-Invariant: every value is a real, verified substring of the title, never a
-fabricated BOE id. When an acronym-to-title mapping (or its exact wording)
-cannot be confirmed with confidence, it is left out — a smaller, correct map
-beats a larger, wrong one.
-
-Seed list: curated from general legal knowledge, covering ~35 of the most
-commonly cited Spanish laws. Meant to be expanded and verified against the
-real legalize-es corpus over time, not treated as exhaustive.
+Invariant: every expansion value is a real, verified substring of the law's
+title, never a fabricated BOE id. When an acronym-to-title mapping (or its
+exact wording) cannot be confirmed with confidence, it is left out — a smaller,
+correct map beats a larger, wrong one.
 """
 
 from __future__ import annotations
+
+from lexflow.core.schemas import AliasExpansion
+from lexflow.core.search import tokenize_query
 
 LAW_ALIASES: dict[str, str] = {
     "CE": "constitución española",
@@ -104,3 +80,40 @@ def expand_alias(query: str) -> str | None:
         acronym.
     """
     return LAW_ALIASES.get(_normalise(query))
+
+
+def expand_aliases_in_query(query: str) -> tuple[str, list[AliasExpansion]]:
+    """Expand known acronym tokens inside a multi-word *query* (#47).
+
+    Each whitespace-separated token is looked up individually. Known acronyms
+    are replaced by their title phrase; the returned ``expanded_query`` is
+    rejoined for the search index, which tokenizes it into AND terms.
+
+    Args:
+        query: Raw user search text.
+
+    Returns:
+        ``(expanded_query, expansions)`` where ``expansions`` lists each
+        acronym token that was replaced.
+    """
+    tokens = tokenize_query(query)
+    if not tokens:
+        return query, []
+
+    if len(tokens) == 1:
+        whole = expand_alias(query)
+        if whole is not None:
+            return whole, [AliasExpansion(token=tokens[0], expansion=whole)]
+        return query, []
+
+    expansions: list[AliasExpansion] = []
+    expanded_tokens: list[str] = []
+    for token in tokens:
+        expansion = LAW_ALIASES.get(_normalise(token))
+        if expansion is not None:
+            expansions.append(AliasExpansion(token=token, expansion=expansion))
+            expanded_tokens.append(expansion)
+        else:
+            expanded_tokens.append(token)
+
+    return " ".join(expanded_tokens), expansions

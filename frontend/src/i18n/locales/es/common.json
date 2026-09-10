@@ -402,9 +402,12 @@
     "indexing": "Indexando el corpus por primera vez. Los resultados aparecerán en breve…",
     "searching": "Buscando…",
     "resultsFor": "{{n}} resultados para \"{{q}}\"",
+    "interpretation": {
+      "alias": "Mostrando resultados para «{{expansion}}» ({{token}})"
+    },
     "empty": {
       "title": "Sin resultados",
-      "description": "Prueba a reducir el número de palabras o eliminar acentos."
+      "description": "Prueba con menos palabras, revisa la ortografía o usa términos más generales. Los acentos son opcionales."
     },
     "groups": {
       "law": "Leyes",
@@ -641,7 +644,8 @@
     },
     "empty": {
       "title": "Sin resultados para esa búsqueda",
-      "description": "Prueba con menos filtros o explora el grafo de referencias para encontrar normas relacionadas."
+      "description": "Amplía los términos, prueba con #etiqueta o quita filtros para ver más normas.",
+      "withFilters": "Sin resultados para «{{query}}» con filtros: {{filters}}. Prueba a quitar {{suggestion}}."
     },
     "cols": {
       "law": "Norma",

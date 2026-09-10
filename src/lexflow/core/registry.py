@@ -16,7 +16,7 @@ from threading import Lock
 from lexflow.core.delta_sync import CorpusDiff
 from lexflow.core.enums import LawRank, LawStatus, Scope
 from lexflow.core.exceptions import DataPathError, LawNotFoundError, LexFlowError
-from lexflow.core.law_aliases import expand_alias
+from lexflow.core.law_aliases import expand_aliases_in_query
 from lexflow.core.metadata_parser import parse_metadata_only
 from lexflow.core.models import Law, LawMetadata, Section
 from lexflow.core.parser import parse_law_file
@@ -262,13 +262,11 @@ class LawRegistry:
         search the whole corpus AND narrow by community/rank/status/year/tag/
         department with a single, consistent contract.
 
-        A bare popular acronym ("LOPD", "LEC", "LGT"…) is expanded to a
-        distinctive substring of the law's real title (#671, ``law_aliases``)
-        before hitting the index — the full-text scorer does a literal
-        substring count, so acronyms match nothing on their own. Non-acronym
-        queries pass through unchanged.
+        A bare popular acronym ("LOPD", "LEC", "LGT"…) is expanded token-wise
+        to a distinctive substring of the law's real title (#671, ``law_aliases``)
+        before hitting the index. Non-acronym tokens pass through unchanged.
         """
-        query = expand_alias(query) or query
+        expanded_query, alias_expansions = expand_aliases_in_query(query)
         if not self._search_index.is_built:
             self._build_search_index()
         law_filter = self._build_facet_filter(
@@ -281,7 +279,13 @@ class LawRegistry:
             tags=tags,
             department=department,
         )
-        return self._search_index.search(query, page=page, page_size=page_size, law_filter=law_filter)
+        response = self._search_index.search(
+            expanded_query,
+            page=page,
+            page_size=page_size,
+            law_filter=law_filter,
+        )
+        return response.model_copy(update={"query": query, "alias_expansions": alias_expansions})
 
     def _build_facet_filter(
         self,

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lexflow.core.law_aliases import LAW_ALIASES, expand_alias
+from lexflow.core.law_aliases import LAW_ALIASES, expand_alias, expand_aliases_in_query
 
 
 class TestExpandAlias:
@@ -35,6 +35,29 @@ class TestExpandAlias:
         for acronym, expansion in LAW_ALIASES.items():
             assert expand_alias(acronym) == expansion
             assert expand_alias(acronym.lower()) == expansion
+
+
+class TestExpandAliasesInQuery:
+    def test_lopd_sanciones_expands_token(self) -> None:
+        expanded, expansions = expand_aliases_in_query("LOPD sanciones")
+        assert "protección de datos personales" in expanded
+        assert "sanciones" in expanded
+        assert any(e.token.upper() == "LOPD" for e in expansions)
+
+    def test_whole_query_backward_compatible(self) -> None:
+        expanded, expansions = expand_aliases_in_query("LOPD")
+        assert expanded == "protección de datos personales"
+        assert len(expansions) == 1
+
+    def test_phrase_with_article_words_expands_lopd_token(self) -> None:
+        expanded, expansions = expand_aliases_in_query("el lopd de 2018")
+        assert "protección de datos personales" in expanded
+        assert any(e.token.lower() == "lopd" for e in expansions)
+
+    def test_case_insensitive_token_expansion(self) -> None:
+        expanded, expansions = expand_aliases_in_query("lopd Sanciones")
+        assert "protección de datos personales" in expanded
+        assert expansions
 
 
 class TestAliasMapIntegrity:

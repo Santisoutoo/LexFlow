@@ -48,4 +48,20 @@ describe('HighlightedSnippet', () => {
     render(<HighlightedSnippet text="empty match" match={{ start: 5, end: 5 }} />);
     expect(document.querySelector('mark')).toBeNull();
   });
+
+  it('highlights multiple non-overlapping ranges', () => {
+    render(
+      <HighlightedSnippet
+        text="Las sanciones en protección de datos"
+        match={[
+          { start: 4, end: 13 },
+          { start: 17, end: 27 },
+        ]}
+      />,
+    );
+    const marks = document.querySelectorAll('mark');
+    expect(marks).toHaveLength(2);
+    expect(marks[0]?.textContent).toBe('sanciones');
+    expect(marks[1]?.textContent).toBe('protección');
+  });
 });

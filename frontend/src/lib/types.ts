@@ -513,13 +513,20 @@ export interface SearchHit {
    * substring in a highlight without re-scanning. Null when the match was
    * outside the trimmed window or the hit was title-only.
    */
-  match?: { start: number; end: number } | null;
+  match?: { start: number; end: number } | Array<{ start: number; end: number }> | null;
   /** Optional opaque payload used by the consumer to navigate. */
   payload?: Record<string, unknown>;
 }
+
+export interface AliasExpansion {
+  token: string;
+  expansion: string;
+}
+
 export interface SearchResults {
   hits: SearchHit[];
   total: number;
+  aliasExpansions?: AliasExpansion[];
 }
 
 /**
