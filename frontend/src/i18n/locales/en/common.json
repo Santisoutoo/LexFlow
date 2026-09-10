@@ -402,9 +402,12 @@
     "indexing": "Indexing the corpus for the first time. Results will appear shortly…",
     "searching": "Searching…",
     "resultsFor": "{{n}} results for \"{{q}}\"",
+    "interpretation": {
+      "alias": "Showing results for \"{{expansion}}\" ({{token}})"
+    },
     "empty": {
       "title": "No results",
-      "description": "Try using fewer words or removing accents."
+      "description": "Try fewer words, check spelling, or use broader terms. Accents are optional."
     },
     "groups": {
       "law": "Laws",
@@ -641,7 +644,8 @@
     },
     "empty": {
       "title": "No results for that search",
-      "description": "Try fewer filters or explore the reference graph to find related laws."
+      "description": "Broaden your terms, try a #tag, or clear filters to see more laws.",
+      "withFilters": "No results for \"{{query}}\" with filters: {{filters}}. Try removing {{suggestion}}."
     },
     "cols": {
       "law": "Law",

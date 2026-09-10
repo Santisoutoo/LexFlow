@@ -1958,6 +1958,26 @@ export interface components {
          */
         Scope: "Estatal" | "Autonómico" | "Local";
         /**
+         * AliasExpansion
+         * @description One token-wise acronym expansion applied before search (#47).
+         */
+        AliasExpansion: {
+            /** Token */
+            token: string;
+            /** Expansion */
+            expansion: string;
+        };
+        /**
+         * MatchRange
+         * @description Character offsets of one highlighted substring within a snippet.
+         */
+        MatchRange: {
+            /** Start */
+            start: number;
+            /** End */
+            end: number;
+        };
+        /**
          * SearchResponse
          * @description Search results wrapper.
          */
@@ -1972,6 +1992,8 @@ export interface components {
             page: number;
             /** Page Size */
             page_size: number;
+            /** Alias Expansions */
+            alias_expansions?: components["schemas"]["AliasExpansion"][];
         };
         /**
          * SearchResult
@@ -2005,6 +2027,8 @@ export interface components {
              * @description Exclusive end offset of the match within ``snippet``. Null when not locatable.
              */
             match_end?: number | null;
+            /** Match Ranges */
+            match_ranges?: components["schemas"]["MatchRange"][];
             /** Score */
             score: number;
         };

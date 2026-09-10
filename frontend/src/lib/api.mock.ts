@@ -15,20 +15,21 @@ import {
   LAWS, LAW_DETAIL, ARTICLES, VERSIONS, DIFF_BY_LAW, GRAPH, CHAT_THREADS,
   CHAT_MESSAGES, MODELS, SYNC, COMPLIANCE_DASH,
 } from './mock-data';
+import {
+  expandAliasesInQuery,
+  locateAllTokens,
+  matchesAllTokens,
+  prepareSearchTokens,
+  scoreTokens,
+} from './search-match';
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/**
- * Locate the first case-insensitive occurrence of `query` in `text` and
- * return its offsets — mirrors the backend's `_locate_match` so the mock
- * exercises the same `match` shape as the live API.
- */
-function locateInMock(text: string, query: string): { start: number; end: number } | null {
-  const q = query.trim();
-  if (!q || !text) return null;
-  const idx = text.toLowerCase().indexOf(q.toLowerCase());
-  if (idx === -1) return null;
-  return { start: idx, end: idx + q.length };
+function matchFromTokens(text: string, tokens: string[]) {
+  const ranges = locateAllTokens(text, tokens);
+  if (ranges.length === 0) return null;
+  if (ranges.length === 1) return ranges[0];
+  return ranges;
 }
 
 function filterLaws(params: ListLawsParams = {}): Law[] {
@@ -301,60 +302,69 @@ export const mockApi: ApiClient = {
       await delay(120);
       const ql = q.toLowerCase().trim();
 
-      // `#tag` (or starts with #) → return all laws that carry that tag.
-      // Multiple #tags AND together; free-text after #tags also narrows by text.
       const tokens = ql.split(/\s+/).filter(Boolean);
       const inlineTags = tokens.filter((t) => t.startsWith('#')).map((t) => t.slice(1));
       const textTokens = tokens.filter((t) => !t.startsWith('#'));
-      // Live callers pass their `#tag` selection via `facets.tags` (already
-      // stripped from `q`); mock-direct callers may still inline `#tag` in the
-      // query. Union both so both paths filter identically (#671).
       const tagTokens = [...new Set([...inlineTags, ...(facets?.tags ?? [])])];
       const tagged = tagTokens.length > 0;
 
+      const userText = textTokens.join(' ').trim();
+      const { expandedQuery, aliasExpansions } = expandAliasesInQuery(userText || ql);
+      const searchTokens = prepareSearchTokens(expandedQuery);
+
       const lawsMatching = LAWS.filter((l) => {
         if (tagged && !tagTokens.every((t) => l.tags?.some((lt) => lt.includes(t)))) return false;
-        if (textTokens.length) {
-          const hay = `${l.short} ${l.title} ${l.id}`.toLowerCase();
-          if (!textTokens.every((t) => hay.includes(t))) return false;
+        if (searchTokens.length) {
+          const hay = `${l.short} ${l.title} ${l.id}`;
+          if (!matchesAllTokens(hay, searchTokens)) return false;
         }
         return true;
       });
 
-      const userText = textTokens.join(' ').trim();
-
-      const lawHits = lawsMatching.slice(0, 8).map((l) => {
-        const snippet = `${l.title} (${l.status} · ${l.versiones} versiones)`;
-        return {
-          kind: 'law' as const,
-          id: l.id,
-          title: `${l.id} · ${l.short}`,
-          snippet,
-          match: locateInMock(snippet, userText),
-          payload: { lawId: l.id },
-        };
-      });
-
-      const articleHits = ARTICLES.filter((a) =>
-        `art ${a.num} ${a.titulo}`.toLowerCase().includes(userText || ql),
-      )
-        .slice(0, 5)
-        .map((a) => {
-          const parentShort = LAWS.find((l) => l.id === a.lawId)?.short ?? '';
-          const snippet = `${a.titulo}${parentShort ? ` — ${parentShort}` : ''}`;
+      const lawHits = lawsMatching
+        .map((l) => {
+          const snippet = `${l.title} (${l.status} · ${l.versiones} versiones)`;
+          const score = scoreTokens(`${l.short} ${l.title} ${l.id}`, l.title, searchTokens);
           return {
-            kind: 'article' as const,
-            id: a.id,
-            title: `Art. ${a.num} — ${a.titulo}`,
+            kind: 'law' as const,
+            id: l.id,
+            title: `${l.id} · ${l.short}`,
             snippet,
-            articleNumber: a.num,
-            match: locateInMock(snippet, userText),
-            payload: { lawId: a.lawId, articleNum: a.num },
+            score,
+            match: matchFromTokens(snippet, searchTokens),
+            payload: { lawId: l.id },
           };
-        });
+        })
+        .filter((hit) => hit.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 8);
+
+      const articleHits = ARTICLES.map((a) => {
+        const parent = LAWS.find((l) => l.id === a.lawId);
+        const parentShort = parent?.short ?? '';
+        const parentTitle = parent?.title ?? '';
+        const body = a.body.map((c) => c.text).join(' ');
+        const hay = `${a.titulo} ${body} ${parentShort} ${parentTitle}`;
+        const score = scoreTokens(hay, parentTitle, searchTokens);
+        if (score <= 0) return null;
+        const snippet = `${a.titulo}${parentShort ? ` — ${parentShort}` : ''}`;
+        return {
+          kind: 'article' as const,
+          id: a.id,
+          title: `Art. ${a.num} — ${a.titulo}`,
+          snippet,
+          articleNumber: a.num,
+          score,
+          match: matchFromTokens(snippet, searchTokens),
+          payload: { lawId: a.lawId, articleNum: a.num },
+        };
+      })
+        .filter((hit): hit is NonNullable<typeof hit> => hit !== null)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5);
 
       const hits = [...lawHits, ...articleHits];
-      return { hits, total: hits.length };
+      return { hits, total: hits.length, aliasExpansions };
     },
     async semantic(q, opts = {}) {
       await delay(180);

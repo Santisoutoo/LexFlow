@@ -6,6 +6,7 @@ import { useSearch, useSemanticSearch, useHybridSearch, useWarmup } from '@/lib/
 import { groupBy } from '@/lib/utils';
 import { EmptyState } from '@/components/domain/EmptyState';
 import { HighlightedSnippet } from '@/components/domain/HighlightedSnippet';
+import { SearchInterpretationBanner } from '@/components/domain/SearchInterpretationBanner';
 import { SkeletonRows } from '@/components/domain/Skeleton';
 
 type SearchMode = 'fulltext' | 'semantic' | 'hybrid';
@@ -89,6 +90,7 @@ function FullTextResults({ q, navigate }: { q: string; navigate: (to: string) =>
             ? t('search.searching')
             : t('search.resultsFor', { n: data?.total ?? 0, q })}
       </p>
+      <SearchInterpretationBanner aliasExpansions={data?.aliasExpansions} className="mt-2" />
       {isLoading && q && <SkeletonRows className="mt-6" count={5} />}
       {!isLoading && data && data.total === 0 && (
         <EmptyState

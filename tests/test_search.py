@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lexflow.core.search import SearchIndex, _extract_snippet, _locate_match
+from lexflow.core.search import SearchIndex, _extract_snippet, _locate_match, fold_for_search
 
 
 class TestSearchIndex:
@@ -26,8 +26,47 @@ class TestSearchIndex:
             article_number="1",
             text="La presente ley tiene por objeto garantizar los derechos digitales.",
         )
+        idx.add_entry(
+            law_id="BOE-A-1978-31229",
+            law_title="Constitución Española",
+            article_number=None,
+            text="Constitución Española",
+        )
+        idx.add_entry(
+            law_id="BOE-A-1978-31229",
+            law_title="Constitución Española",
+            article_number="1",
+            text="España se constituye en un Estado social y democrático de Derecho.",
+        )
+        idx.add_entry(
+            law_id="BOE-A-2015-11430",
+            law_title="Real Decreto Legislativo 2/2015, Estatuto de los Trabajadores",
+            article_number="56",
+            text="El despido procedente no da derecho a indemnización.",
+        )
         idx.mark_built()
         return idx
+
+    def test_accent_fold_matches_unaccented_query(self) -> None:
+        idx = self._build_index()
+        result = idx.search("constitucion")
+        assert result.total > 0
+        assert any(r.law_id == "BOE-A-1978-31229" for r in result.items)
+
+    def test_token_and_order_independent(self) -> None:
+        idx = self._build_index()
+        forward = idx.search("española constitucion")
+        backward = idx.search("constitucion española")
+        assert forward.total > 0
+        assert backward.total > 0
+        assert {r.law_id for r in forward.items} & {"BOE-A-1978-31229"}
+        assert {r.law_id for r in backward.items} & {"BOE-A-1978-31229"}
+
+    def test_multi_token_article_match(self) -> None:
+        idx = self._build_index()
+        result = idx.search("despido indemnización")
+        assert result.total > 0
+        assert any(r.law_id == "BOE-A-2015-11430" for r in result.items)
 
     def test_finds_matching_title(self) -> None:
         idx = self._build_index()
@@ -133,6 +172,20 @@ class TestSearchResultMatchOffsets:
         assert hit.match_start is not None
         assert hit.match_end is not None
         assert hit.snippet[hit.match_start : hit.match_end].lower() == "tribunales"
+        assert len(hit.match_ranges) >= 1
+
+    def test_multi_token_match_ranges(self) -> None:
+        idx = SearchIndex()
+        idx.add_entry(
+            law_id="BOE-A-2018-16673",
+            law_title="Ley Orgánica de Protección de Datos",
+            article_number="72",
+            text="Las sanciones por infracciones graves en materia de protección de datos personales.",
+        )
+        idx.mark_built()
+        result = idx.search("protección sanciones")
+        hit = result.items[0]
+        assert len(hit.match_ranges) >= 2
 
     def test_offsets_preserve_case_of_snippet(self) -> None:
         # The query is lowercase but the snippet keeps the original case —
@@ -143,3 +196,8 @@ class TestSearchResultMatchOffsets:
         assert hit.match_start is not None
         assert hit.match_end is not None
         assert hit.snippet[hit.match_start : hit.match_end] == "tribunales"
+
+
+class TestFoldForSearch:
+    def test_strips_accents(self) -> None:
+        assert fold_for_search("Constitución") == "constitucion"

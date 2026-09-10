@@ -30,7 +30,9 @@ logger = logging.getLogger(__name__)
 # and disposiciones (preambulo, anexo prose), not just articles — a v1 cache
 # with a matching corpus hash would load and hide that new content until the
 # cache file was deleted by hand.
-CACHE_VERSION = "2"
+# v3 (#47): SearchEntry now stores accent-folded fields and matching uses
+# per-token AND semantics instead of contiguous substring count.
+CACHE_VERSION = "3"
 CACHE_FILENAME = "search_index.json"
 
 

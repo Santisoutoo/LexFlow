@@ -52,12 +52,21 @@ export const liveSearchApi: ApiClient['search'] = {
       snippet: h.snippet,
       articleNumber: h.article_number ?? undefined,
       match:
-        h.match_start != null && h.match_end != null
-          ? { start: h.match_start, end: h.match_end }
-          : null,
+        h.match_ranges && h.match_ranges.length > 0
+          ? h.match_ranges.map((range) => ({ start: range.start, end: range.end }))
+          : h.match_start != null && h.match_end != null
+            ? { start: h.match_start, end: h.match_end }
+            : null,
       payload: { lawId: h.law_id, articleNum: h.article_number ?? undefined },
     }));
-    return { hits, total: raw.total };
+    return {
+      hits,
+      total: raw.total,
+      aliasExpansions: raw.alias_expansions?.map((item) => ({
+        token: item.token,
+        expansion: item.expansion,
+      })),
+    };
   },
   /**
    * Audit #477 — semantic search wire-up. Routes to the dedicated
