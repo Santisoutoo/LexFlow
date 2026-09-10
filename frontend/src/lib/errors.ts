@@ -71,6 +71,10 @@ export function errorMessage(err: unknown, t?: TFunction): string {
     return statusFallback(err.status, t, parsed.retryAfterS);
   }
 
+  if (err instanceof DOMException && err.name === 'TimeoutError') {
+    return translateKey('network', t);
+  }
+
   if (err instanceof Error && err.message && !looksLikeHttpPath(err.message)) {
     if (NETWORK_ERROR.test(err.message)) return translateKey('network', t);
     if (err.message === 'stream_idle_timeout') return translateKey('stream_idle_timeout', t);

@@ -17,6 +17,9 @@ export const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
 export const API_BASE = import.meta.env.VITE_API_URL || '';
 export const API_PREFIX = '/api/v1';
 
+/** Default HTTP timeout for ``http()`` — hung backend must not wedge the UI (#45 R8). */
+export const HTTP_TIMEOUT_MS = 30_000;
+
 /**
  * CSRF boundary contract (issue #87, S1.2 — backend counterpart in
  * `lexflow.api.csrf_boundary`). A handful of spawn/state-triggering
@@ -65,6 +68,12 @@ export class ApiError extends Error {
  * fails to parse the boundary. Same logic applies to ``URLSearchParams``
  * and ``Blob`` bodies.
  */
+function buildFetchSignal(callerSignal?: AbortSignal | null): AbortSignal {
+  const timeoutSignal = AbortSignal.timeout(HTTP_TIMEOUT_MS);
+  if (!callerSignal) return timeoutSignal;
+  return AbortSignal.any([callerSignal, timeoutSignal]);
+}
+
 export async function http<T>(path: string, init: RequestInit = {}): Promise<T> {
   const full = path.startsWith('http') ? path : `${API_BASE}${API_PREFIX}${path}`;
   const body = init.body;
@@ -76,6 +85,7 @@ export async function http<T>(path: string, init: RequestInit = {}): Promise<T> 
   if (!isStructured) baseHeaders['Content-Type'] = 'application/json';
   const res = await fetch(full, {
     ...init,
+    signal: buildFetchSignal(init.signal),
     headers: {
       ...baseHeaders,
       ...(init.headers || {}),

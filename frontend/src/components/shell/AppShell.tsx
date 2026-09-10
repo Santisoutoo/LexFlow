@@ -1,4 +1,4 @@
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Search } from 'lucide-react';
 import { LeftRail } from './LeftRail';
@@ -7,12 +7,14 @@ import { TopBar } from './TopBar';
 import { CommandPalette } from './CommandPalette';
 import { ConfirmProvider } from '@/components/ui';
 import { HelpDrawer } from '@/components/domain/HelpDrawer';
+import { ErrorBoundary } from './ErrorBoundary';
 import { USE_MOCK } from '@/lib/api/http';
 import { useUi } from '@/lib/store';
 import { useHotkey, useGoToHotkey } from '@/lib/hotkeys';
 
 export function AppShell() {
   const { t } = useTranslation();
+  const location = useLocation();
   const togglePalette = useUi((s) => s.togglePalette);
   const toggleRight = useUi((s) => s.toggleRight);
   const toggleLeft = useUi((s) => s.toggleLeft);
@@ -50,7 +52,9 @@ export function AppShell() {
           </div>
         )}
         <main id="main" tabIndex={-1} className="min-h-0 flex-1 overflow-hidden">
-          <Outlet />
+          <ErrorBoundary key={location.pathname}>
+            <Outlet />
+          </ErrorBoundary>
         </main>
         {/* Mobile primary nav — in-flow so `main` shrinks above it. */}
         <BottomTabBar />

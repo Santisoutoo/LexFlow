@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ApiError, USE_MOCK } from './http';
+import { ApiError, HTTP_TIMEOUT_MS, http, USE_MOCK } from './http';
 import { parseApiErrorBody } from './error-body';
 import { errorMessage } from '../errors';
 
@@ -45,6 +45,69 @@ describe('ApiError readers', () => {
     );
     expect(err.detail).toBe('Slow down');
     expect(err.code).toBe('rate_limited');
+  });
+});
+
+function abortAwareFetch(): typeof fetch {
+  return vi.fn((_url: RequestInfo | URL, init?: RequestInit) =>
+    new Promise((_resolve, reject) => {
+      const signal = init?.signal;
+      if (!signal) return;
+      if (signal.aborted) {
+        reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+        return;
+      }
+      signal.addEventListener(
+        'abort',
+        () => reject(signal.reason ?? new DOMException('Aborted', 'AbortError')),
+        { once: true },
+      );
+    }),
+  ) as typeof fetch;
+}
+
+function combineSignals(signals: AbortSignal[]): AbortSignal {
+  const controller = new AbortController();
+  for (const signal of signals) {
+    if (signal.aborted) {
+      controller.abort(signal.reason);
+      return controller.signal;
+    }
+    signal.addEventListener('abort', () => controller.abort(signal.reason), { once: true });
+  }
+  return controller.signal;
+}
+
+describe('http timeout', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('rejects when fetch hangs past the default timeout', async () => {
+    const timeoutController = new AbortController();
+    vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeoutController.signal);
+    vi.spyOn(AbortSignal, 'any').mockImplementation((signals) => combineSignals([...signals]));
+    vi.stubGlobal('fetch', abortAwareFetch());
+
+    const pending = http('/slow').catch((err: unknown) => err);
+    timeoutController.abort(new DOMException('Timed out', 'TimeoutError'));
+    const err = await pending;
+    expect((err as DOMException).name).toBe('TimeoutError');
+    expect(AbortSignal.timeout).toHaveBeenCalledWith(HTTP_TIMEOUT_MS);
+  });
+
+  it('honours an earlier caller abort signal', async () => {
+    const caller = new AbortController();
+    const timeout = new AbortController();
+    vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeout.signal);
+    vi.spyOn(AbortSignal, 'any').mockImplementation((signals) => combineSignals([...signals]));
+    vi.stubGlobal('fetch', abortAwareFetch());
+
+    const pending = http('/slow', { signal: caller.signal }).catch((err: unknown) => err);
+    caller.abort();
+    const err = await pending;
+    expect((err as DOMException).name).toBe('AbortError');
   });
 });
 

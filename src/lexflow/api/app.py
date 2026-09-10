@@ -33,7 +33,7 @@ from lexflow.api.routers import (
 )
 from lexflow.api.routers.graph import router as graph_router
 from lexflow.api.spa import mount_spa
-from lexflow.api.warmup import schedule_background_warmup
+from lexflow.api.warmup import bind_warmup_loop, schedule_background_warmup
 from lexflow.chat.db import init_db
 from lexflow.core.exceptions import LexFlowError
 from lexflow.core.registry import get_registry
@@ -101,6 +101,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             # instead of failing at lifespan time.
             logger.exception("Eager registry index failed; routes will lazy-load")
 
+        bind_warmup_loop(asyncio.get_running_loop())
         warmup_task = schedule_background_warmup()
 
     try:

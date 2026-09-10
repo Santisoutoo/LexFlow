@@ -1,17 +1,17 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react';
+import { withTranslation, type WithTranslation } from 'react-i18next';
+
+import { isChunkLoadError } from '@/lib/chunk-error';
 
 /**
- * Global error boundary (issue #88).
+ * Route-level error boundary (issue #88, #45 R8).
  *
- * Catches uncaught render-time errors anywhere below it and renders a
- * recovery screen with the error detail + a "Reload" button. Without
- * this the app would crash to a blank page on any thrown render error
- * (a stale state shape, a `.map` on undefined, etc.).
+ * Catches uncaught render-time errors in the outlet and renders a
+ * recovery screen. Chunk-load failures after a deploy get a reload-only
+ * UX — resetting React state cannot fix a stale hashed asset URL.
  *
- * **Not** for API errors — those are caught by TanStack Query's global
- * `onError` and surface as toasts. This boundary is the safety net for
- * the few cases where the React tree itself throws.
+ * **Not** for API errors — those surface via TanStack Query toasts.
  *
  * --- WHERE TO CHANGE IF X CHANGES ---
  * * Fallback UI            → ``renderFallback`` below
@@ -22,11 +22,11 @@ interface State {
   error: Error | null;
 }
 
-interface Props {
+interface Props extends WithTranslation {
   children: ReactNode;
 }
 
-export class ErrorBoundary extends Component<Props, State> {
+class ErrorBoundaryInner extends Component<Props, State> {
   state: State = { error: null };
 
   static getDerivedStateFromError(error: Error): State {
@@ -34,10 +34,6 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
-    // No external logger wired yet (Sentry / similar is opt-in per
-    // CLAUDE.md). For now we log to the console so the error survives
-    // a recovery click. When the logger lands, replace this with the
-    // real client call.
     console.error('[ErrorBoundary] uncaught render error', error, info.componentStack);
   }
 
@@ -50,35 +46,44 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   render(): ReactNode {
-    if (this.state.error) {
+    const error = this.state.error;
+    if (error) {
+      const { t } = this.props;
+      const chunkError = isChunkLoadError(error);
+      const title = chunkError ? t('errors.chunkLoadTitle') : t('errors.renderErrorTitle');
+      const description = chunkError
+        ? t('errors.chunkLoadDescription')
+        : t('errors.renderErrorDescription');
+
       return (
-        <div className="grid h-dvh place-items-center bg-bg p-6">
+        <div className="grid h-full place-items-center bg-bg p-6">
           <div className="max-w-md rounded-xl border border-border bg-surface p-6 shadow-lg">
             <div className="flex items-center gap-2 text-danger">
               <AlertTriangle className="size-5" />
-              <span className="text-base font-semibold">Algo ha fallado</span>
+              <span className="text-base font-semibold">{title}</span>
             </div>
-            <p className="mt-3 text-[13.5px] leading-relaxed text-muted">
-              La aplicación ha encontrado un error inesperado al renderizar la pantalla. Puedes
-              intentar volver atrás o recargar.
-            </p>
-            <pre className="mt-3 max-h-40 overflow-auto rounded-md border border-border bg-bg p-2 font-mono text-[11.5px] text-fg">
-              {this.state.error.message}
-            </pre>
+            <p className="mt-3 text-[13.5px] leading-relaxed text-muted">{description}</p>
+            {!chunkError && (
+              <pre className="mt-3 max-h-40 overflow-auto rounded-md border border-border bg-bg p-2 font-mono text-[11.5px] text-fg">
+                {error.message}
+              </pre>
+            )}
             <div className="mt-4 flex gap-2">
-              <button
-                type="button"
-                onClick={this.reset}
-                className="rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm hover:bg-surface-2"
-              >
-                Reintentar
-              </button>
+              {!chunkError && (
+                <button
+                  type="button"
+                  onClick={this.reset}
+                  className="rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm hover:bg-surface-2"
+                >
+                  {t('errors.retry')}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={this.reload}
                 className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500"
               >
-                Recargar página
+                {t('errors.reload')}
               </button>
             </div>
           </div>
@@ -88,3 +93,5 @@ export class ErrorBoundary extends Component<Props, State> {
     return this.props.children;
   }
 }
+
+export const ErrorBoundary = withTranslation()(ErrorBoundaryInner);

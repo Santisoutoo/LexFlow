@@ -59,6 +59,18 @@ def test_save_load_roundtrip(tmp_path: Path) -> None:
     assert index.entry_count == 2
 
 
+def test_save_load_roundtrip_non_ascii_utf8(tmp_path: Path) -> None:
+    cache_path = tmp_path / "search_index.json"
+    sc.save_search_index(_sample_index(), cache_path, "abc123")
+    raw = cache_path.read_text(encoding="utf-8")
+    assert "€." in raw
+
+    loaded = sc.load_search_index(cache_path)
+    assert loaded is not None
+    index, _ = loaded
+    assert index.search("€").total >= 1
+
+
 def test_load_missing_returns_none(tmp_path: Path) -> None:
     assert sc.load_search_index(tmp_path / "nope.json") is None
 

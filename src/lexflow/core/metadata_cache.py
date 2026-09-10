@@ -32,7 +32,7 @@ def save_metadata_cache(metadata: dict[str, LawMetadata], cache_path: Path, data
     """Write the metadata snapshot to *cache_path* as JSON."""
     payload = {law_id: meta.model_dump(mode="json") for law_id, meta in metadata.items()}
     data = {"version": CACHE_VERSION, "hash": data_hash, "payload": payload}
-    cache_path.write_text(json.dumps(data))
+    cache_path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     logger.info("Metadata cache saved to %s (%d laws)", cache_path, len(payload))
 
 
@@ -41,7 +41,7 @@ def load_metadata_cache(cache_path: Path) -> tuple[dict[str, LawMetadata], str] 
     if not cache_path.exists():
         return None
     try:
-        data = json.loads(cache_path.read_text())
+        data = json.loads(cache_path.read_text(encoding="utf-8"))
         if data.get("version") != CACHE_VERSION:
             return None
         payload = data["payload"]

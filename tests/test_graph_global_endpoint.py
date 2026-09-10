@@ -57,6 +57,16 @@ class TestGlobalGraphShape:
         body = client.get("/api/v1/graph").json()
         assert len(body["nodes"]) == graph_from_fixture.node_count()
         assert body["total_available"] == graph_from_fixture.node_count()
+        assert body["limit_applied"] == 500
+        assert body["truncated"] is False
+
+    def test_default_limit_applied_when_param_omitted(
+        self,
+        client: TestClient,
+        graph_from_fixture: LegalGraph,
+    ) -> None:
+        body = client.get("/api/v1/graph").json()
+        assert body["limit_applied"] == 500
 
     def test_nodes_carry_pagerank_and_community(
         self,

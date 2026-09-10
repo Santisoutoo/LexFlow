@@ -2383,8 +2383,8 @@ export interface components {
         };
         /** _DiskProbe */
         _DiskProbe: {
-            /** Path */
-            path: string;
+            /** Mount */
+            mount: string;
             /** Total Gb */
             total_gb: number;
             /** Used Gb */
@@ -2771,8 +2771,8 @@ export interface operations {
                 scope?: components["schemas"]["Scope"] | null;
                 /** @description Filter by jurisdiction code (e.g. es-md) */
                 jurisdiction?: string | null;
-                /** @description Return only the top-N matching nodes by PageRank. Omit to return everything. */
-                limit?: number | null;
+                /** @description Return only the top-N matching nodes by PageRank. Defaults to 500. */
+                limit?: number;
             };
             header?: never;
             path?: never;

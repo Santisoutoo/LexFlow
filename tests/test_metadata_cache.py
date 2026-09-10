@@ -62,6 +62,21 @@ def test_save_load_roundtrip(tmp_path: Path) -> None:
     assert metadata == original  # frozen pydantic models compare by value
 
 
+def test_save_load_roundtrip_non_ascii_utf8(tmp_path: Path) -> None:
+    """Legal corpus text includes accents and symbols — cache must round-trip as UTF-8."""
+    cache_path = tmp_path / "metadata_cache.json"
+    original = _sample_metadata()
+
+    mc.save_metadata_cache(original, cache_path, "abc123")
+    raw = cache_path.read_text(encoding="utf-8")
+    assert "€uro test" in raw
+
+    loaded = mc.load_metadata_cache(cache_path)
+    assert loaded is not None
+    metadata, _ = loaded
+    assert metadata["BOE-A-2018-16673"].title.endswith("€uro test")
+
+
 def test_load_missing_returns_none(tmp_path: Path) -> None:
     assert mc.load_metadata_cache(tmp_path / "nope.json") is None
 

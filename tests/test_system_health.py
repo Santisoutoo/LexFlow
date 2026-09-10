@@ -42,6 +42,8 @@ class TestExtendedHealth:
         assert "total_gb" in payload["disk"]
         assert "free_gb" in payload["disk"]
         assert "used_percent" in payload["disk"]
+        assert "mount" in payload["disk"]
+        assert "path" not in payload["disk"]
         assert "submodule_present" in payload["corpus"]
         assert "laws_indexed" in payload["corpus"]
         assert "reachable" in payload["chat_db"]

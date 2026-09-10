@@ -710,7 +710,12 @@
     "home": "Inicio",
     "somethingWrong": "Algo ha ido mal",
     "retry": "Reintentar",
-    "reportBug": "Reportar bug"
+    "reportBug": "Reportar bug",
+    "chunkLoadTitle": "Nueva versión disponible",
+    "chunkLoadDescription": "La aplicación se actualizó. Recarga para continuar.",
+    "renderErrorTitle": "Algo ha fallado",
+    "renderErrorDescription": "La aplicación ha encontrado un error inesperado al renderizar la pantalla. Puedes intentar volver atrás o recargar.",
+    "reload": "Recargar"
   },
   "graph": {
     "searchPlaceholder": "Buscar en el grafo…",

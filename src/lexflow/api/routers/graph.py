@@ -39,6 +39,8 @@ router = APIRouter(prefix="/graph", tags=["Graph"])
 # serialise the universe. legalize-es is at ~12k today; 50k is the next
 # decade's headroom. Hit this and the client should narrow with filters.
 _GLOBAL_GRAPH_HARD_CAP = 50_000
+# Matches the SPA default in ``frontend/src/pages/graph/graph-constants.ts``.
+_DEFAULT_GLOBAL_GRAPH_LIMIT = 500
 
 
 def _node_matches_filters(
@@ -71,11 +73,11 @@ def get_global_graph(
     rank: LawRank | None = Query(None, description="Filter by hierarchical rank"),
     scope: Scope | None = Query(None, description="Filter by territorial scope"),
     jurisdiction: str | None = Query(None, description="Filter by jurisdiction code (e.g. es-md)"),
-    limit: int | None = Query(
-        None,
+    limit: int = Query(
+        _DEFAULT_GLOBAL_GRAPH_LIMIT,
         ge=1,
         le=_GLOBAL_GRAPH_HARD_CAP,
-        description="Return only the top-N matching nodes by PageRank. Omit to return everything.",
+        description="Return only the top-N matching nodes by PageRank. Defaults to 500.",
     ),
 ) -> GraphGlobalResponse:
     """Return the whole graph (no seed) — Obsidian-style corpus view (#146).
@@ -91,7 +93,7 @@ def get_global_graph(
         if _node_matches_filters(g.nodes[n], status=status, rank=rank, scope=scope, jurisdiction=jurisdiction)
     ]
     total_available = len(matching)
-    if limit is not None and total_available > limit:
+    if total_available > limit:
         matching.sort(key=lambda nid: _pagerank_attr(g, nid), reverse=True)
         matching = matching[:limit]
     selected = set(matching)

@@ -37,7 +37,7 @@ CACHE_FILENAME = "search_index.json"
 def save_search_index(index: SearchIndex, cache_path: Path, data_hash: str) -> None:
     """Write the search index to *cache_path* as JSON."""
     data = {"version": CACHE_VERSION, "hash": data_hash, "payload": index.to_dict()}
-    cache_path.write_text(json.dumps(data))
+    cache_path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     logger.info("Search index cache saved to %s (%d entries)", cache_path, index.entry_count)
 
 
@@ -46,7 +46,7 @@ def load_search_index(cache_path: Path) -> tuple[SearchIndex, str] | None:
     if not cache_path.exists():
         return None
     try:
-        data = json.loads(cache_path.read_text())
+        data = json.loads(cache_path.read_text(encoding="utf-8"))
         if data.get("version") != CACHE_VERSION:
             return None
         index = SearchIndex.from_dict(data["payload"])
