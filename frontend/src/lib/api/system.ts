@@ -30,7 +30,7 @@ interface BackendHealthSnapshot {
   uptime_seconds: number;
   memory: { rss_mb: number; system_used_percent: number };
   disk: {
-    path: string;
+    mount: string;
     total_gb: number;
     used_gb: number;
     free_gb: number;
@@ -92,7 +92,7 @@ export const liveSystemApi: ApiClient['system'] = {
         systemUsedPercent: raw.memory.system_used_percent,
       },
       disk: {
-        path: raw.disk.path,
+        mount: raw.disk.mount,
         totalGb: raw.disk.total_gb,
         usedGb: raw.disk.used_gb,
         freeGb: raw.disk.free_gb,

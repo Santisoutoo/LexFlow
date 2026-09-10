@@ -163,6 +163,23 @@ class TestSecretsEndpoints:
         assert response.text == ""
         assert "sk-secret" not in response.text
 
+    def test_post_keyring_failure_returns_503(self, client: TestClient, monkeypatch: MonkeyPatch) -> None:
+        from keyring.errors import KeyringError
+
+        def _boom_set_password(*_args: object, **_kwargs: object) -> None:
+            raise KeyringError("secure store unavailable")
+
+        monkeypatch.setattr(keyring, "set_password", _boom_set_password)
+
+        response = client.post(
+            "/api/v1/secrets",
+            json={"provider": "openai", "api_key": "sk-secret"},
+        )
+        assert response.status_code == 503
+        detail = response.json()["detail"]
+        assert detail["code"] == "keyring_unavailable"
+        assert "sk-secret" not in response.text
+
     def test_post_unknown_provider_returns_400(self, client: TestClient) -> None:
         response = client.post(
             "/api/v1/secrets",

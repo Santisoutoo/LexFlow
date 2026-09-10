@@ -23,6 +23,7 @@ from __future__ import annotations
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, status
+from keyring.errors import KeyringError
 from pydantic import BaseModel, Field
 
 from lexflow.chat.secrets import (
@@ -138,6 +139,14 @@ def create_secret(body: SecretCreateRequest) -> None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"code": "empty_api_key", "message": str(exc)},
+        ) from exc
+    except KeyringError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "keyring_unavailable",
+                "message": ("The OS secure store is unavailable. Set the API key via environment variable instead."),
+            },
         ) from exc
 
 

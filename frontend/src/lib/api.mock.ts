@@ -590,7 +590,7 @@ export const mockApi: ApiClient = {
         uptimeSeconds: 12_345,
         memory: { rssMb: 184.3, systemUsedPercent: 38.7 },
         disk: {
-          path: '/data/legalize-es',
+          mount: '/',
           totalGb: 512,
           usedGb: 96,
           freeGb: 416,

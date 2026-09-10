@@ -79,6 +79,8 @@ def test_sync_incremental_applies_diff(
     mock_save_graph.assert_called_once()
 
 
+@patch("lexflow.api.routers.sync.request_background_warmup")
+@patch("lexflow.api.routers.sync.reset_warmup_state")
 @patch("lexflow.api.routers.sync.reset_graph_cache")
 @patch("lexflow.api.routers.sync.diff_corpus_since")
 @patch("lexflow.api.routers.sync.subprocess.run")
@@ -88,6 +90,8 @@ def test_sync_falls_back_to_rebuild(
     mock_run: MagicMock,
     mock_diff: MagicMock,
     mock_reset: MagicMock,
+    mock_reset_warmup: MagicMock,
+    mock_request_warmup: MagicMock,
     client: TestClient,
 ) -> None:
     """An untrustworthy diff (None) drops caches for a full rebuild."""
@@ -103,6 +107,8 @@ def test_sync_falls_back_to_rebuild(
     assert response.json()["mode"] == "rebuild"
     mock_reset.assert_called_once()
     mock_get_registry.cache_clear.assert_called_once()
+    mock_reset_warmup.assert_called_once()
+    mock_request_warmup.assert_called_once()
 
 
 @patch("lexflow.api.routers.sync.subprocess.run")

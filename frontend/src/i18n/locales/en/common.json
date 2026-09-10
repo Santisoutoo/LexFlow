@@ -710,7 +710,12 @@
     "home": "Home",
     "somethingWrong": "Something went wrong",
     "retry": "Retry",
-    "reportBug": "Report bug"
+    "reportBug": "Report bug",
+    "chunkLoadTitle": "New version available",
+    "chunkLoadDescription": "The app was updated. Reload to continue.",
+    "renderErrorTitle": "Something went wrong",
+    "renderErrorDescription": "The app hit an unexpected error while rendering this screen. You can go back or reload.",
+    "reload": "Reload"
   },
   "graph": {
     "searchPlaceholder": "Search the graph…",

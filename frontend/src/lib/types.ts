@@ -859,7 +859,7 @@ export interface HealthSnapshot {
     systemUsedPercent: number;
   };
   disk: {
-    path: string;
+    mount: string;
     totalGb: number;
     usedGb: number;
     freeGb: number;

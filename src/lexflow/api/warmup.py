@@ -98,6 +98,8 @@ class WarmupState:
 
 _state = WarmupState()
 _state_lock = threading.Lock()
+_warmup_loop: asyncio.AbstractEventLoop | None = None
+_warmup_task: asyncio.Task[None] | None = None
 
 
 def get_warmup_state() -> WarmupState:
@@ -215,13 +217,43 @@ async def _run_warmup() -> None:
         logger.info("Warmup finished in %.2fs", time.monotonic() - overall_started)
 
 
+def bind_warmup_loop(loop: asyncio.AbstractEventLoop) -> None:
+    """Remember the running event loop so sync code can re-schedule warm-up."""
+    global _warmup_loop
+    _warmup_loop = loop
+
+
 def schedule_background_warmup() -> asyncio.Task[None]:
     """Spawn :func:`_run_warmup` as a background task, returning the task.
 
     Caller is responsible for cancelling on shutdown — the lifespan
     context manager does that via ``task.cancel()`` after ``yield``.
     """
-    return asyncio.create_task(_run_warmup())
+    global _warmup_task
+    _warmup_task = asyncio.create_task(_run_warmup())
+    return _warmup_task
+
+
+def request_background_warmup() -> None:
+    """Re-schedule warm-up from a sync context (e.g. the sync threadpool).
+
+    After a full corpus rebuild the in-memory caches are dropped but
+    :class:`WarmupState` may still read ``ready: true`` — this kicks off
+    a fresh background pass on the main event loop without calling
+    :func:`asyncio.create_task` from a worker thread.
+    """
+    loop = _warmup_loop
+    if loop is None:
+        logger.warning("Warm-up re-schedule skipped: event loop not bound")
+        return
+
+    def _start() -> None:
+        global _warmup_task
+        if _warmup_task is not None and not _warmup_task.done():
+            return
+        schedule_background_warmup()
+
+    loop.call_soon_threadsafe(_start)
 
 
 def reset_warmup_state() -> None:

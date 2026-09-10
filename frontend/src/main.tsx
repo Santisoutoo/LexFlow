@@ -22,7 +22,6 @@ import { DeferredTutorial } from './components/domain/DeferredTutorial';
 import { SplashGate } from './components/domain/SplashGate';
 import { WelcomeFlow } from './components/domain/WelcomeFlow';
 import { AppUpdateProvider } from './lib/updater/use-app-update';
-import { ErrorBoundary } from './components/shell/ErrorBoundary';
 import { Toaster } from './components/shell/Toaster';
 import { ApiError } from './lib/api';
 import { errorMessage } from './lib/errors';
@@ -90,28 +89,26 @@ const basename = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter basename={basename}>
-          <SplashGate>
-            <WelcomeFlow>
-              <ModelWizardGate>
-                <AppUpdateProvider>
-                  <App />
-                  <AppUpdateNotice />
-                </AppUpdateProvider>
-                <WizardOverlay />
-                {/* The tour mounts lazily on idle as a sibling overlay — not a
-                    wrapper — so @reactour/tour stays out of the entry chunk
-                    (#712). Kept inside the router: `beforeClose` navigates to
-                    /chat. */}
-                <DeferredTutorial />
-              </ModelWizardGate>
-            </WelcomeFlow>
-          </SplashGate>
-        </BrowserRouter>
-        <Toaster />
-      </QueryClientProvider>
-    </ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter basename={basename}>
+        <SplashGate>
+          <WelcomeFlow>
+            <ModelWizardGate>
+              <AppUpdateProvider>
+                <App />
+                <AppUpdateNotice />
+              </AppUpdateProvider>
+              <WizardOverlay />
+              {/* The tour mounts lazily on idle as a sibling overlay — not a
+                  wrapper — so @reactour/tour stays out of the entry chunk
+                  (#712). Kept inside the router: `beforeClose` navigates to
+                  /chat. */}
+              <DeferredTutorial />
+            </ModelWizardGate>
+          </WelcomeFlow>
+        </SplashGate>
+      </BrowserRouter>
+      <Toaster />
+    </QueryClientProvider>
   </React.StrictMode>,
 );

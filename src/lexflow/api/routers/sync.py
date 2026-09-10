@@ -26,6 +26,7 @@ from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel
 
 from lexflow.api.dependencies import get_graph, reset_graph_cache
+from lexflow.api.warmup import request_background_warmup, reset_warmup_state
 from lexflow.core.corpus_revision import submodule_hash, write_corpus_revision
 from lexflow.core.delta_sync import CorpusDiff, diff_corpus_since
 from lexflow.core.metadata_cache import CACHE_FILENAME as METADATA_CACHE_FILENAME
@@ -228,5 +229,7 @@ def _fallback_rebuild(new_commit: str) -> None:
     # otherwise the next cold request after this reset would skip kicking
     # a NEW build (the flag from the pre-sync build would still read True).
     reset_semantic_warmup_state()
+    reset_warmup_state()
+    request_background_warmup()
     write_corpus_revision(get_settings().data_path, new_commit)
     logger.info("Sync fell back to full rebuild (diff unavailable or too large)")

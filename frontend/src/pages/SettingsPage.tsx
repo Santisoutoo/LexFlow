@@ -1027,7 +1027,7 @@ function DiagnosticsSection() {
             </span>
             <Badge tone={diskTone}>{health.disk.usedPercent.toFixed(1)}%</Badge>
           </div>
-          <div className="break-all text-[11.5px] text-muted">{health.disk.path}</div>
+          <div className="break-all text-[11.5px] text-muted">{health.disk.mount}</div>
         </Card>
 
         <Card className="p-3.5">
