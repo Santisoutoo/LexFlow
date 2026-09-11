@@ -1582,6 +1582,18 @@ export interface components {
             category?: string | null;
         };
         /**
+         * LawListSort
+         * @description Sort keys for ``GET /api/v1/laws``.
+         *
+         *     ``relevance`` preserves registry index order (sorted law ids). ``date``
+         *     ranks by ``publication_date`` descending (missing dates last). ``title``
+         *     is case-insensitive ascending. ``refs`` is intentionally absent: law
+         *     summaries have no ``reference_count``, so Explorer's refs sort stays
+         *     page-scoped on the client.
+         * @enum {string}
+         */
+        LawListSort: "relevance" | "date" | "title";
+        /**
          * LawRank
          * @description Hierarchical rank of a legal norm.
          *
@@ -2547,6 +2559,19 @@ export interface operations {
                 scope?: components["schemas"]["Scope"] | null;
                 /** @description Filter by jurisdiction code (e.g. es-md) */
                 jurisdiction?: string | null;
+                /** @description Earliest publication year (inclusive) */
+                year_from?: number | null;
+                /** @description Latest publication year (inclusive) */
+                year_to?: number | null;
+                /** @description AND-filter by official topic tag slug (repeatable) */
+                tags?: string[] | null;
+                /** @description Filter by issuing department (ministerio), exact match */
+                department?: string | null;
+                /**
+                 * @description Order of results: relevance (registry id order), date (newest publication first), or title
+                 * @default relevance
+                 */
+                sort?: components["schemas"]["LawListSort"];
                 /** @description Page number */
                 page?: number;
                 /** @description Items per page */

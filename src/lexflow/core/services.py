@@ -14,6 +14,7 @@ registry can stay focused on storage and lookup.
 --- WHERE TO CHANGE IF X CHANGES ---
 * Article number normalisation rules → :func:`_normalise_article_number`.
 * Law filter axes (rank/status/scope/jurisdiction) → :func:`apply_law_filters`.
+* List ordering → :func:`sort_summaries`.
 * Pagination shape → :func:`paginate_summaries`.
 * New shared lookup → add a function here, NOT a second copy under
   ``api/routers`` or ``chat/mcp_server``.
@@ -21,7 +22,7 @@ registry can stay focused on storage and lookup.
 
 from __future__ import annotations
 
-from lexflow.core.enums import LawRank, LawStatus, Scope
+from lexflow.core.enums import LawListSort, LawRank, LawStatus, Scope
 from lexflow.core.models import Article, Law
 from lexflow.core.parser import normalize_tag
 from lexflow.core.schemas import LawSummary, PaginatedResponse
@@ -140,6 +141,31 @@ def apply_law_filters(
         return required_tags.issubset(summary.tags)
 
     return [s for s in summaries if keep(s)]
+
+
+def _date_sort_key(summary: LawSummary) -> tuple[bool, int]:
+    """None dates last; otherwise newest ``publication_date`` first."""
+    published = summary.publication_date
+    if published is None:
+        return (True, 0)
+    return (False, -published.toordinal())
+
+
+def sort_summaries(summaries: list[LawSummary], sort: LawListSort) -> list[LawSummary]:
+    """Return *summaries* ordered by *sort*.
+
+    ``relevance`` is a no-op (preserves the incoming registry order).
+    ``date`` sorts by ``publication_date`` descending; laws with no date
+    sink to the end (stable relative to each other). ``title`` is
+    case-insensitive ascending on ``title``.
+    """
+    if sort is LawListSort.RELEVANCE:
+        return summaries
+    if sort is LawListSort.DATE:
+        return sorted(summaries, key=_date_sort_key)
+    if sort is LawListSort.TITLE:
+        return sorted(summaries, key=lambda s: s.title.casefold())
+    return summaries
 
 
 def paginate_summaries(

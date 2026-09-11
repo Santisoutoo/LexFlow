@@ -528,5 +528,10 @@ export function listLawsQuery(params: ListLawsParams): Record<string, unknown> {
     // #671 gap B — issuing department (ministerio), exact match. Passed
     // straight through, same shape as `jurisdiction`.
     department: params.department,
+    // Home's "Qué ha cambiado" and `/explorer?sort=date` need the corpus
+    // ordered by publication date. `refs` is explorer-only: LawSummary has
+    // no reference_count, so that key stays page-scoped in
+    // `applyClientFilterSort` and is never sent.
+    sort: params.sort === 'date' || params.sort === 'title' ? params.sort : undefined,
   };
 }

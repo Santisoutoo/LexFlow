@@ -63,6 +63,21 @@ class Scope(StrEnum):
     LOCAL = "Local"
 
 
+class LawListSort(StrEnum):
+    """Sort keys for ``GET /api/v1/laws``.
+
+    ``relevance`` preserves registry index order (sorted law ids). ``date``
+    ranks by ``publication_date`` descending (missing dates last). ``title``
+    is case-insensitive ascending. ``refs`` is intentionally absent: law
+    summaries have no ``reference_count``, so Explorer's refs sort stays
+    page-scoped on the client.
+    """
+
+    RELEVANCE = "relevance"
+    DATE = "date"
+    TITLE = "title"
+
+
 class ReferenceKind(StrEnum):
     """How one law relates to another via a cross-reference (#144).
 

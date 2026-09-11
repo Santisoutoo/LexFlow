@@ -7,8 +7,11 @@
  * across pages.
  *
  * WHERE TO CHANGE IF X CHANGES: when the backend list endpoint accepts
- * `q`/`sort`/`tags`, move this back into `listLawsQuery`
- * (lib/api/transformers.ts) and delete this module.
+ * `q`/`tags`, move those filters into `listLawsQuery`
+ * (lib/api/transformers.ts). `sort=date` and `sort=title` already go to
+ * `GET /api/v1/laws`; this module still re-sorts the loaded page as a
+ * fallback. `refs` CANNOT move server-side until LawSummary grows a
+ * `reference_count` — Explorer's refs option stays page-scoped here.
  */
 import type { Law } from '@/lib/types';
 

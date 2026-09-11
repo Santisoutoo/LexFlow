@@ -14,7 +14,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 
 from lexflow.api.dependencies import PaginationParams, get_law_registry
-from lexflow.core.enums import LawRank, LawStatus, Scope
+from lexflow.core.enums import LawListSort, LawRank, LawStatus, Scope
 from lexflow.core.registry import LawRegistry
 from lexflow.core.schemas import LawDetail, LawReferencesResponse, LawSummary, PaginatedResponse
 
@@ -37,6 +37,10 @@ def list_laws(
     year_to: int | None = Query(None, ge=0, description="Latest publication year (inclusive)"),
     tags: list[str] | None = Query(None, description="AND-filter by official topic tag slug (repeatable)"),
     department: str | None = Query(None, description="Filter by issuing department (ministerio), exact match"),
+    sort: LawListSort = Query(
+        LawListSort.RELEVANCE,
+        description="Order of results: relevance (registry id order), date (newest publication first), or title",
+    ),
 ) -> PaginatedResponse[LawSummary]:
     """Return a paginated list of laws.  All filters are optional."""
     return registry.list_laws(
@@ -50,6 +54,7 @@ def list_laws(
         year_to=year_to,
         tags=tags,
         department=department,
+        sort=sort,
     )
 
 

@@ -306,7 +306,7 @@ describe('listLawsQuery', () => {
     expect(listLawsQuery({}).tags).toBeUndefined();
   });
 
-  it('sends every active filter together — none is dropped when combined', () => {
+    it('sends every active filter together — none is dropped when combined', () => {
     const q = listLawsQuery({
       rango: ['Ley Orgánica'],
       status: ['vigente'],
@@ -325,6 +325,17 @@ describe('listLawsQuery', () => {
       page: 2,
       page_size: 30,
     });
+  });
+
+  it('sends sort=date and sort=title to the backend', () => {
+    expect(listLawsQuery({ sort: 'date' }).sort).toBe('date');
+    expect(listLawsQuery({ sort: 'title' }).sort).toBe('title');
+  });
+
+  it('omits relevance and refs (refs is client-only)', () => {
+    expect(listLawsQuery({ sort: 'relevance' }).sort).toBeUndefined();
+    expect(listLawsQuery({ sort: 'refs' }).sort).toBeUndefined();
+    expect(listLawsQuery({}).sort).toBeUndefined();
   });
 });
 
