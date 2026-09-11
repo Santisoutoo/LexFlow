@@ -28,6 +28,7 @@ const RANGOS = new Set<RangoNormativo>([
   'Ley',
   'Ley Foral',
   'Real Decreto',
+  'Real Decreto-ley',
   'RD Legislativo',
   'Decreto',
   'Decreto-ley',

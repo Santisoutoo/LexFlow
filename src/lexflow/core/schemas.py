@@ -168,6 +168,22 @@ class SearchResult(BaseModel):
         description="All query-token ranges within ``snippet`` for multi-term highlighting.",
     )
     score: float = Field(ge=0.0)
+    status: LawStatus | None = Field(
+        default=None,
+        description="Law status at search time (vigente, derogada, …).",
+    )
+    rank: LawRank | None = Field(
+        default=None,
+        description="Normative rank of the parent law.",
+    )
+    publication_date: date | None = Field(
+        default=None,
+        description="Publication date of the parent law.",
+    )
+    article_title: str | None = Field(
+        default=None,
+        description="Article or disposición heading when ``article_number`` is set.",
+    )
 
 
 class SearchResponse(BaseModel):

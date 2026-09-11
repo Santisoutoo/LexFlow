@@ -103,6 +103,9 @@ describe('transformLaw', () => {
     expect(rangoFor('orden')).toBe('Orden'); // 2.4k laws used to show "Otro"
     expect(rangoFor('resolucion')).toBe('Resolución');
     expect(rangoFor('decreto_ley')).toBe('Decreto-ley');
+    expect(rangoFor('real_decreto_ley')).toBe('Real Decreto-ley');
+    expect(rangoFor('real_decreto')).toBe('Real Decreto');
+    expect(rangoFor('real_decreto_ley')).not.toBe(rangoFor('real_decreto'));
     expect(rangoFor('ley_foral')).toBe('Ley Foral');
     expect(rangoFor('constitucion')).toBe('Norma constitucional');
   });

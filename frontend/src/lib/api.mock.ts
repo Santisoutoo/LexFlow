@@ -129,8 +129,13 @@ export const mockApi: ApiClient = {
   laws: {
     async list(params = {}): Promise<Paginated<Law>> {
       await delay(160);
-      const items = filterLaws(params);
-      return { items, total: items.length, cursor: null };
+      const all = filterLaws(params);
+      const page = params.cursor ? Number(params.cursor) : 1;
+      const pageSize = params.limit ?? 20;
+      const start = (page - 1) * pageSize;
+      const items = all.slice(start, start + pageSize);
+      const hasMore = start + pageSize < all.length;
+      return { items, total: all.length, cursor: hasMore ? String(page + 1) : null };
     },
     async get(id) {
       await delay(180);
@@ -363,8 +368,25 @@ export const mockApi: ApiClient = {
         .sort((a, b) => b.score - a.score)
         .slice(0, 5);
 
-      const hits = [...lawHits, ...articleHits];
-      return { hits, total: hits.length, aliasExpansions };
+      const allHits = [...lawHits, ...articleHits].map((hit) => {
+        const lawId = (hit.payload?.lawId as string | undefined) ?? hit.id;
+        const law = LAWS.find((l) => l.id === lawId);
+        const article = hit.kind === 'article'
+          ? ARTICLES.find((a) => a.id === hit.id)
+          : undefined;
+        return {
+          ...hit,
+          status: law?.status,
+          rango: law?.rango,
+          publicada: law?.publicada,
+          articleTitle: article?.titulo,
+        };
+      });
+      const page = facets?.page ?? 1;
+      const pageSize = facets?.page_size ?? 20;
+      const start = (page - 1) * pageSize;
+      const hits = allHits.slice(start, start + pageSize);
+      return { hits, total: allHits.length, page, pageSize, aliasExpansions };
     },
     async semantic(q, opts = {}) {
       await delay(180);

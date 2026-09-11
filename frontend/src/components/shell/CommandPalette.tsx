@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Search, BookOpenText, FileText, Moon, Network, MessagesSquare, BarChart3, Download, Hash } from 'lucide-react';
-import { Kbd } from '@/components/ui';
+import { Button, Kbd } from '@/components/ui';
+import { errorMessage } from '@/lib/errors';
 import { useUi } from '@/lib/store';
 import { useSearch, useTags, useUserTagVocab } from '@/lib/queries';
 import { useFocusTrap } from '@/lib/useFocusTrap';
@@ -51,7 +52,8 @@ export function CommandPalette() {
     setActive(0);
   }, [q]);
 
-  const { data: searchData } = useSearch(q);
+  const trimmedQ = q.trim();
+  const { data: searchData, isFetching: searchFetching, isError: searchIsError, error: searchError, refetch: refetchSearch } = useSearch(q);
   const { data: vocab = [] } = useTags();
   const { data: userTagVocab = [] } = useUserTagVocab();
 
@@ -180,7 +182,16 @@ export function CommandPalette() {
         </div>
 
         <div role="listbox" aria-label={t('commandPalette.resultsAria')} className="max-h-[420px] overflow-auto p-2 scrollbar-thin">
-          {items.length === 0 && (
+          {trimmedQ.length >= 2 && searchFetching && (
+            <div className="px-6 py-6 text-center text-sm text-muted">{t('search.searching')}</div>
+          )}
+          {trimmedQ.length >= 2 && searchIsError && (
+            <div className="mx-2 mb-2 rounded-lg border border-danger/30 bg-danger-soft/40 px-4 py-3 text-center">
+              <p className="font-mono text-[12px] text-muted">{errorMessage(searchError, t)}</p>
+              <Button size="sm" className="mt-2" onClick={() => refetchSearch()}>{t('errors.retry')}</Button>
+            </div>
+          )}
+          {items.length === 0 && !(trimmedQ.length >= 2 && (searchFetching || searchIsError)) && (
             <div className="px-6 py-10 text-center text-sm text-muted">
               {t('commandPalette.noResults', { query: q })}
             </div>

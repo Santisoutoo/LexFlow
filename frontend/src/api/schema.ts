@@ -2043,6 +2043,20 @@ export interface components {
             match_ranges?: components["schemas"]["MatchRange"][];
             /** Score */
             score: number;
+            /** Status */
+            status?: components["schemas"]["LawStatus"] | null;
+            /** Rank */
+            rank?: components["schemas"]["LawRank"] | null;
+            /**
+             * Publication Date
+             * @description Publication date of the parent law.
+             */
+            publication_date?: string | null;
+            /**
+             * Article Title
+             * @description Article or disposición heading when ``article_number`` is set.
+             */
+            article_title?: string | null;
         };
         /**
          * SecretCreateRequest

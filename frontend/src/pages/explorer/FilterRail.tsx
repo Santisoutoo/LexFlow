@@ -9,7 +9,7 @@
 
 import { useTranslation } from 'react-i18next';
 import { Hash } from 'lucide-react';
-import { Checkbox, Input } from '@/components/ui';
+import { Input } from '@/components/ui';
 import { cn, statusLabel } from '@/lib/utils';
 import type { Ambito, DepartmentCount, JurisdictionCode, LawStatus, RangoNormativo, UserTagCount } from '@/lib/types';
 import { COMMUNITIES } from '@/lib/types';
@@ -25,6 +25,7 @@ const RANGOS: RangoNormativo[] = [
   'Ley',
   'Ley Foral',
   'Real Decreto',
+  'Real Decreto-ley',
   'RD Legislativo',
   'Decreto',
   'Decreto-ley',
@@ -97,6 +98,8 @@ interface FilterRailProps {
    * filter sheet where the parent owns the dialog wrapper.
    */
   inline?: boolean;
+  /** Browse-only — user tags do not filter corpus search (#49 S13). */
+  isSearchMode?: boolean;
 }
 
 export function FilterRail({
@@ -122,6 +125,7 @@ export function FilterRail({
   activeDepartment,
   onSelectDepartment,
   inline = false,
+  isSearchMode = false,
 }: FilterRailProps) {
   const { t } = useTranslation();
   const body = (
@@ -147,6 +151,7 @@ export function FilterRail({
       departments={departments}
       activeDepartment={activeDepartment}
       onSelectDepartment={onSelectDepartment}
+      isSearchMode={isSearchMode}
     />
   );
   if (inline) {
@@ -184,43 +189,88 @@ function FilterRailBody({
   departments,
   activeDepartment,
   onSelectDepartment,
+  isSearchMode = false,
 }: Omit<FilterRailProps, 'inline'>) {
   const { t } = useTranslation();
+
+  const selectSingle = <T,>(current: Set<T>, value: T, setter: (next: Set<T>) => void) => {
+    setter(current.has(value) ? new Set() : new Set([value]));
+  };
+
   return (
     <>
       <div className="label-caps mb-2.5">{t('explorer.filters')}</div>
 
       <FilterGroup title={t('explorer.groups.status')}>
-        {STATUSES.map((s) => (
-          <Checkbox
-            key={s}
-            checked={status.has(s)}
-            onChange={() => setStatus(toggle(status, s))}
-            label={statusLabel(s)}
-          />
-        ))}
+        <div className="flex flex-wrap gap-1.5">
+          {STATUSES.map((s) => {
+            const active = status.has(s);
+            return (
+              <button
+                key={s}
+                type="button"
+                onClick={() => selectSingle(status, s, setStatus)}
+                className={cn(
+                  'rounded-full border px-2 py-px text-[11.5px] font-medium transition-colors',
+                  active
+                    ? 'border-transparent bg-indigo-600 text-white'
+                    : 'border-border-strong bg-surface text-fg hover:bg-surface-2',
+                )}
+                aria-pressed={active}
+              >
+                {statusLabel(s)}
+              </button>
+            );
+          })}
+        </div>
       </FilterGroup>
 
       <FilterGroup title={t('explorer.groups.rango')}>
-        {RANGOS.map((r) => (
-          <Checkbox
-            key={r}
-            checked={rango.has(r)}
-            onChange={() => setRango(toggle(rango, r))}
-            label={r}
-          />
-        ))}
+        <div className="flex flex-wrap gap-1.5">
+          {RANGOS.map((r) => {
+            const active = rango.has(r);
+            return (
+              <button
+                key={r}
+                type="button"
+                onClick={() => selectSingle(rango, r, setRango)}
+                className={cn(
+                  'rounded-full border px-2 py-px text-[11.5px] font-medium transition-colors',
+                  active
+                    ? 'border-transparent bg-indigo-600 text-white'
+                    : 'border-border-strong bg-surface text-fg hover:bg-surface-2',
+                )}
+                aria-pressed={active}
+              >
+                {r}
+              </button>
+            );
+          })}
+        </div>
       </FilterGroup>
 
       <FilterGroup title={t('explorer.groups.ambito')}>
-        {AMBITOS.map((a) => (
-          <Checkbox
-            key={a}
-            checked={ambito.has(a)}
-            onChange={() => setAmbito(toggle(ambito, a))}
-            label={a}
-          />
-        ))}
+        <div className="flex flex-wrap gap-1.5">
+          {AMBITOS.map((a) => {
+            const active = ambito.has(a);
+            return (
+              <button
+                key={a}
+                type="button"
+                onClick={() => selectSingle(ambito, a, setAmbito)}
+                className={cn(
+                  'rounded-full border px-2 py-px text-[11.5px] font-medium transition-colors',
+                  active
+                    ? 'border-transparent bg-indigo-600 text-white'
+                    : 'border-border-strong bg-surface text-fg hover:bg-surface-2',
+                )}
+                aria-pressed={active}
+              >
+                {a}
+              </button>
+            );
+          })}
+        </div>
       </FilterGroup>
 
       {/* Comunidad autónoma — single-select. Clicking the active chip
@@ -332,9 +382,8 @@ function FilterRailBody({
         </div>
       </FilterGroup>
 
-      {/* Custom user tags (#670) — single-select, kept in its own group so
-          it never visually blends with the official tag cloud above. */}
-      {userTagVocab && userTagVocab.length > 0 && (
+      {/* Custom user tags (#670) — browse-only; corpus search ignores them (#49 S13). */}
+      {!isSearchMode && userTagVocab && userTagVocab.length > 0 && (
         <FilterGroup title={t('explorer.groups.userTags', 'Mis tags')}>
           <div className="flex flex-wrap gap-1.5">
             {userTagVocab.map(({ tag, label, count }) => {

@@ -5,6 +5,9 @@ import { Search } from 'lucide-react';
 import { useSearch, useSemanticSearch, useHybridSearch, useWarmup } from '@/lib/queries';
 import { groupBy } from '@/lib/utils';
 import { EmptyState } from '@/components/domain/EmptyState';
+import { ErrorState } from '@/components/domain/ErrorState';
+import { errorMessage } from '@/lib/errors';
+import { formatDate, statusLabel } from '@/lib/utils';
 import { HighlightedSnippet } from '@/components/domain/HighlightedSnippet';
 import { SearchInterpretationBanner } from '@/components/domain/SearchInterpretationBanner';
 import { SkeletonRows } from '@/components/domain/Skeleton';
@@ -77,7 +80,7 @@ export function SearchResultsPage() {
 
 function FullTextResults({ q, navigate }: { q: string; navigate: (to: string) => void }) {
   const { t } = useTranslation();
-  const { data, isLoading } = useSearch(q);
+  const { data, isLoading, isError, error, refetch } = useSearch(q);
   const { data: warmup } = useWarmup();
   const searchWarming = warmup && !warmup.searchReady;
   const grouped = groupBy(data?.hits ?? [], (h) => h.kind);
@@ -93,14 +96,17 @@ function FullTextResults({ q, navigate }: { q: string; navigate: (to: string) =>
       </p>
       <SearchInterpretationBanner aliasExpansions={data?.aliasExpansions} className="mt-2" />
       {isLoading && q && <SkeletonRows className="mt-6" count={5} />}
-      {!isLoading && data && data.total === 0 && (
+      {isError && (
+        <ErrorState className="mt-8" onRetry={() => refetch()} description={errorMessage(error, t)} />
+      )}
+      {!isLoading && !isError && data && data.total === 0 && (
         <EmptyState
           className="mt-8"
           title={t('search.empty.title')}
           description={t('search.empty.description')}
         />
       )}
-      {Object.entries(grouped).map(([kind, hits]) => (
+      {!isError && Object.entries(grouped).map(([kind, hits]) => (
         <section key={kind} className="mt-6">
           <div className="label-caps mb-2 flex items-baseline justify-between">
             <span>{kind === 'law' ? t('search.groups.law') : kind === 'article' ? t('search.groups.article') : kind}</span>
@@ -118,7 +124,20 @@ function FullTextResults({ q, navigate }: { q: string; navigate: (to: string) =>
               >
                 <Badge tone={h.kind === 'law' ? 'primary' : 'amber'}>{h.kind}</Badge>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate font-semibold">{h.title}</div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="truncate font-semibold">{h.articleTitle ?? h.title}</span>
+                    {h.status && (
+                      <Badge tone={h.status === 'vigente' ? 'success' : h.status === 'derogada' ? 'danger' : 'amber'}>
+                        {statusLabel(h.status)}
+                      </Badge>
+                    )}
+                  </div>
+                  {h.articleTitle && <div className="truncate text-[12px] text-muted">{h.title}</div>}
+                  {(h.rango || h.publicada) && (
+                    <div className="font-mono text-[11px] text-muted">
+                      {[h.rango, h.publicada ? formatDate(h.publicada) : null].filter(Boolean).join(' · ')}
+                    </div>
+                  )}
                   {h.snippet ? (
                     <div className="truncate text-[12.5px] text-muted">
                       <HighlightedSnippet
@@ -148,7 +167,7 @@ function FullTextResults({ q, navigate }: { q: string; navigate: (to: string) =>
  */
 function SemanticResults({ q, navigate }: { q: string; navigate: (to: string) => void }) {
   const { t } = useTranslation();
-  const { data, isLoading } = useSemanticSearch(q);
+  const { data, isLoading, isError, error, refetch } = useSemanticSearch(q);
   const hits = data?.hits ?? [];
 
   if (!q.trim()) {
@@ -157,6 +176,9 @@ function SemanticResults({ q, navigate }: { q: string; navigate: (to: string) =>
     );
   }
   if (isLoading) return <SkeletonRows className="mt-6" count={5} />;
+  if (isError) {
+    return <ErrorState className="mt-8" onRetry={() => refetch()} description={errorMessage(error, t)} />;
+  }
   if (hits.length === 0) {
     return (
       <EmptyState
@@ -201,13 +223,16 @@ function SemanticResults({ q, navigate }: { q: string; navigate: (to: string) =>
  */
 function HybridResults({ q, navigate }: { q: string; navigate: (to: string) => void }) {
   const { t } = useTranslation();
-  const { data, isLoading } = useHybridSearch(q);
+  const { data, isLoading, isError, error, refetch } = useHybridSearch(q);
   const hits = data?.hits ?? [];
 
   if (!q.trim()) {
     return <p className="mt-6 text-[13px] text-muted">{t('search.semanticEmptyQuery')}</p>;
   }
   if (isLoading) return <SkeletonRows className="mt-6" count={5} />;
+  if (isError) {
+    return <ErrorState className="mt-8" onRetry={() => refetch()} description={errorMessage(error, t)} />;
+  }
   if (hits.length === 0) {
     return (
       <EmptyState

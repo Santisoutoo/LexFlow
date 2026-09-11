@@ -20,7 +20,7 @@ from lexflow.core.law_aliases import expand_aliases_in_query
 from lexflow.core.metadata_parser import parse_metadata_only
 from lexflow.core.models import Law, LawMetadata, Section
 from lexflow.core.parser import parse_law_file
-from lexflow.core.schemas import LawSummary, PaginatedResponse, SearchResponse
+from lexflow.core.schemas import LawSummary, PaginatedResponse, SearchResponse, SearchResult
 from lexflow.core.search import SearchIndex
 from lexflow.core.services import apply_law_filters, paginate_summaries, sort_summaries
 from lexflow.utils.config import get_settings
@@ -287,7 +287,40 @@ class LawRegistry:
             page_size=page_size,
             law_filter=law_filter,
         )
-        return response.model_copy(update={"query": query, "alias_expansions": alias_expansions})
+        enriched = self._enrich_search_results(response)
+        return enriched.model_copy(update={"query": query, "alias_expansions": alias_expansions})
+
+    def _enrich_search_results(self, response: SearchResponse) -> SearchResponse:
+        """Attach law metadata and article headings to each search hit (#49 S11)."""
+        return response.model_copy(
+            update={"items": [self._enrich_search_hit(hit) for hit in response.items]},
+        )
+
+    def _enrich_search_hit(self, hit: SearchResult) -> SearchResult:
+        """Fill status, rank, publication date, and article title from the registry cache."""
+        meta = self._safe_metadata(hit.law_id)
+        if meta is None:
+            return hit
+        return hit.model_copy(
+            update={
+                "status": meta.status,
+                "rank": meta.rank,
+                "publication_date": meta.publication_date,
+                "article_title": self._resolve_article_title(hit.law_id, hit.article_number),
+            },
+        )
+
+    def _resolve_article_title(self, law_id: str, article_number: str | None) -> str | None:
+        """Return the article title, or the disposición/section heading for non-article hits."""
+        if article_number is None:
+            return None
+        if law_id not in self._cache:
+            return article_number
+        law = self._cache[law_id]
+        for article in law.articles:
+            if article.number == article_number:
+                return article.title or None
+        return article_number
 
     def _build_facet_filter(
         self,
