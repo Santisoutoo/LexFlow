@@ -35,6 +35,7 @@ export function CitationPicker({ editor, onClose }: CitationPickerProps) {
   const [active, setActive] = useState(0);
 
   const { data, isFetching } = useSearch(q);
+  const searchPending = isFetching && !data;
 
   // Keep only hits that resolve to a citation, paired with their attributes —
   // `citationFromHit` is the single source of truth for "can this be cited?".
@@ -118,7 +119,7 @@ export function CitationPicker({ editor, onClose }: CitationPickerProps) {
           )}
           {!showHint && resolvable.length === 0 && (
             <div className="px-6 py-10 text-center text-sm text-muted">
-              {isFetching ? 'Buscando…' : `Sin resultados para "${q}".`}
+              {searchPending ? 'Buscando…' : `Sin resultados para "${q}".`}
             </div>
           )}
           {resolvable.map(({ hit }, idx) => (

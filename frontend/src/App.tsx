@@ -10,13 +10,13 @@ import { useUi } from '@/lib/store';
 // bundle stays small (it previously dragged the chat stack, react-flow, the
 // model wizard, the dashboards charts AND four eager pages — incl.
 // react-markdown via LawDetailPage — into the entry chunk). The four most
-// common landing surfaces (Home, Explorer, LawDetail, Search) are PREFETCHED
+// common landing surfaces (Home, Explorer, LawDetail) are PREFETCHED
 // the moment the command palette opens (see the effect in `App`), so Cmd-K
 // navigation still feels instant despite being lazy.
 const HomePage = lazy(() => import('@/pages/HomePage').then((m) => ({ default: m.HomePage })));
 const ExplorerPage = lazy(() => import('@/pages/ExplorerPage').then((m) => ({ default: m.ExplorerPage })));
 const LawDetailPage = lazy(() => import('@/pages/LawDetailPage').then((m) => ({ default: m.LawDetailPage })));
-const SearchResultsPage = lazy(() => import('@/pages/SearchResultsPage').then((m) => ({ default: m.SearchResultsPage })));
+const SearchRedirect = lazy(() => import('@/pages/SearchRedirect').then((m) => ({ default: m.SearchRedirect })));
 const DiffPage = lazy(() => import('@/pages/DiffPage').then((m) => ({ default: m.DiffPage })));
 const GraphPage = lazy(() => import('@/pages/GraphPage').then((m) => ({ default: m.GraphPage })));
 const ChatPage = lazy(() => import('@/pages/ChatPage').then((m) => ({ default: m.ChatPage })));
@@ -53,7 +53,6 @@ export function App() {
     if (!paletteOpen) return;
     void import('@/pages/ExplorerPage');
     void import('@/pages/LawDetailPage');
-    void import('@/pages/SearchResultsPage');
   }, [paletteOpen]);
   return (
     <Suspense fallback={<PageFallback />}>
@@ -71,7 +70,7 @@ export function App() {
           <Route path="chat/:threadId" element={<ChatPage />} />
           <Route path="dashboards" element={<DashboardPage />} />
           <Route path="dashboards/:preset" element={<DashboardPage />} />
-          <Route path="search" element={<SearchResultsPage />} />
+          <Route path="search" element={<SearchRedirect />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="settings/:section" element={<SettingsPage />} />
           <Route path="editor" element={<EditorPage />} />

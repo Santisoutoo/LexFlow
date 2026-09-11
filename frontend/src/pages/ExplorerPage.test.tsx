@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
@@ -16,7 +16,7 @@ vi.mock('@/lib/queries', async (importOriginal) => {
     useLawsListInfinite: (...args: unknown[]) => useLawsListInfiniteMock(...args),
     useSearchInfinite: (...args: unknown[]) => useSearchInfiniteMock(...args),
     useWarmup: (...args: unknown[]) => useWarmupMock(...args),
-    useTags: () => ({ data: [] }),
+    useTags: () => ({ data: [{ tag: 'laboral', count: 3 }] }),
     useDepartments: () => ({ data: [] }),
     useUserTagVocab: () => ({ data: [] }),
     useUserTagLaws: () => ({ data: [] }),
@@ -122,6 +122,17 @@ describe('ExplorerPage pagination and states', () => {
     renderExplorer('/explorer?q=ley');
 
     expect(screen.getByText(/indexando/i)).toBeInTheDocument();
+  });
+
+  it('completes a tag suggestion with Enter', () => {
+    mockBrowse([{ items: [], total: 0, cursor: null }]);
+    renderExplorer('/explorer?q=%23lab');
+
+    const input = screen.getByPlaceholderText(/buscar|search/i);
+    fireEvent.focus(input);
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(input).toHaveValue('#laboral ');
   });
 
   it('renders derogada badge on repealed search hit', () => {

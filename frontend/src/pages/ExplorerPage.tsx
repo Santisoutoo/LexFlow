@@ -29,6 +29,7 @@ import {
   useWarmup,
 } from '@/lib/queries';
 import { errorMessage } from '@/lib/errors';
+import { parseSearchInput } from '@/lib/search-query';
 import { useUi } from '@/lib/store';
 import { cn, formatDate, statusLabel } from '@/lib/utils';
 import { RANK_MAP, STATUS_MAP, SCOPE_MAP } from '@/lib/api/transformers';
@@ -76,17 +77,8 @@ export function ExplorerPage() {
   // inline help panel explaining the search syntax instead of a no-op.
   const [showSearchHelp, setShowSearchHelp] = useState(false);
 
-  /**
-   * Pull `#tag` tokens out of the free-text input so users can type
-   * `#laboral despido` and have it Just Work — Obsidian-style.
-   * Inline tags merge with the chip-driven set.
-   */
-  const { plainQ, allTags } = useMemo(() => {
-    const tokens = q.split(/\s+/).filter(Boolean);
-    const inline = tokens.filter((t) => t.startsWith('#')).map((t) => t.slice(1).toLowerCase());
-    const plain = tokens.filter((t) => !t.startsWith('#')).join(' ');
-    return { plainQ: plain, allTags: new Set<string>([...tags, ...inline]) };
-  }, [q, tags]);
+  /** Inline `#tag` tokens merge with chip-driven tags (Obsidian-style). */
+  const { plainQ, allTags, tagFragment } = useMemo(() => parseSearchInput(q, tags), [q, tags]);
 
   const params = useMemo(() => {
     const from = Number.parseInt(yearFrom, 10);
@@ -250,20 +242,27 @@ export function ExplorerPage() {
   // live vocabulary so the documented "escribe #tag" hint is discoverable
   // instead of showing nothing.
   const [searchFocused, setSearchFocused] = useState(false);
+  const [tagActiveIndex, setTagActiveIndex] = useState(0);
+  const [tagDismissed, setTagDismissed] = useState(false);
   const tagSuggestions = useMemo(() => {
-    const lastToken = q.split(/\s+/).pop() ?? '';
-    if (!lastToken.startsWith('#')) return null;
-    const frag = lastToken.slice(1).toLowerCase();
+    if (tagFragment === null) return null;
+    const frag = tagFragment.toLowerCase();
     const matches = vocab
       .filter((v) => v.tag.toLowerCase().includes(frag) && !allTags.has(v.tag))
       .slice(0, 8);
     return matches.length ? matches : null;
-  }, [q, vocab, allTags]);
+  }, [tagFragment, vocab, allTags]);
+  useEffect(() => {
+    setTagActiveIndex(0);
+    setTagDismissed(false);
+  }, [tagSuggestions]);
   const completeTag = (tag: string) => {
     const words = q.split(/\s+/);
     words[words.length - 1] = `#${tag}`;
     setQ(words.join(' ') + ' ');
+    setTagDismissed(false);
   };
+  const showTagDropdown = searchFocused && tagSuggestions && !tagDismissed;
 
   const rowH = density === 'compact' ? 40 : density === 'cozy' ? 64 : 52;
   const toggle = <T,>(set: Set<T>, v: T) => {
@@ -369,12 +368,35 @@ export function ExplorerPage() {
                 onChange={(e) => setQ(e.target.value)}
                 onFocus={() => setSearchFocused(true)}
                 onBlur={() => setSearchFocused(false)}
+                aria-activedescendant={
+                  showTagDropdown ? `explorer-tag-suggestion-${tagSuggestions[tagActiveIndex]?.tag}` : undefined
+                }
+                onKeyDown={(e) => {
+                  if (!showTagDropdown || !tagSuggestions) return;
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setTagActiveIndex((i) => (i + 1) % tagSuggestions.length);
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setTagActiveIndex((i) => (i - 1 + tagSuggestions.length) % tagSuggestions.length);
+                  } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    completeTag(tagSuggestions[tagActiveIndex].tag);
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    setTagDismissed(true);
+                  }
+                }}
                 className="w-full"
               />
-              {searchFocused && tagSuggestions && (
-                <ul className="absolute left-0 right-0 top-full z-dropdown mt-1 max-h-64 overflow-auto rounded-lg border border-border-strong bg-surface p-1 shadow-lg">
-                  {tagSuggestions.map(({ tag, count }) => (
-                    <li key={tag}>
+              {showTagDropdown && (
+                <ul
+                  role="listbox"
+                  aria-label={t('explorer.tagSuggestions')}
+                  className="absolute left-0 right-0 top-full z-dropdown mt-1 max-h-64 overflow-auto rounded-lg border border-border-strong bg-surface p-1 shadow-lg"
+                >
+                  {tagSuggestions.map(({ tag, count }, idx) => (
+                    <li key={tag} id={`explorer-tag-suggestion-${tag}`} role="option" aria-selected={idx === tagActiveIndex}>
                       <button
                         type="button"
                         // onMouseDown (not onClick) + preventDefault keeps the
@@ -383,7 +405,11 @@ export function ExplorerPage() {
                           e.preventDefault();
                           completeTag(tag);
                         }}
-                        className="flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-left text-[13px] hover:bg-surface-2"
+                        onMouseEnter={() => setTagActiveIndex(idx)}
+                        className={cn(
+                          'flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-left text-[13px]',
+                          idx === tagActiveIndex ? 'bg-primary-soft text-indigo-700 dark:text-indigo-200' : 'hover:bg-surface-2',
+                        )}
                       >
                         <Hash className="size-3 text-muted" />
                         {tag}
@@ -513,7 +539,7 @@ export function ExplorerPage() {
             ) : (
               <div className="divide-y divide-border">
                 {/* Skeleton rows while search is loading */}
-                {isLoading &&
+                {isLoading && !searchData &&
                   Array.from({ length: 6 }).map((_, i) => (
                     <div key={i} className="flex flex-col gap-2 px-8 py-4">
                       <Skeleton className="h-3.5 w-1/3" />

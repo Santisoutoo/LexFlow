@@ -12,10 +12,12 @@ import {
   useInfiniteQuery,
   useMutation,
   useQueryClient,
+  keepPreviousData,
   type InfiniteData,
   type UseInfiniteQueryOptions,
   type UseQueryOptions,
 } from '@tanstack/react-query';
+import { useDebouncedValue } from './use-debounced-value';
 import { EXPLORER_PAGE_SIZE } from '@/pages/explorer/constants';
 import { api } from './api';
 import { liveTelemetryApi, type TelemetryStatus } from './api/telemetry';
@@ -275,12 +277,14 @@ export function useGraphPath(from: string | undefined, to: string | undefined) {
  * `useLawsList`.
  */
 export function useSearch(q: string, facets?: SearchFacets) {
-  const trimmed = q.trim();
+  const debouncedQ = useDebouncedValue(q, 200);
+  const trimmed = debouncedQ.trim();
   return useQuery<SearchResults>({
     queryKey: qk.search(trimmed, facets),
     queryFn: () => api.search.universal(trimmed, facets),
     enabled: trimmed.length >= 2,
     staleTime: 10_000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -292,7 +296,8 @@ export function useSearchInfinite(
     UseInfiniteQueryOptions<SearchResults, Error, InfiniteData<SearchResults>, readonly unknown[], number>
   >,
 ) {
-  const trimmed = q.trim();
+  const debouncedQ = useDebouncedValue(q, 200);
+  const trimmed = debouncedQ.trim();
   return useInfiniteQuery<SearchResults, Error, InfiniteData<SearchResults>, readonly unknown[], number>({
     queryKey: ['search', 'infinite', trimmed, facets ?? {}] as const,
     queryFn: ({ pageParam }) =>
@@ -310,6 +315,7 @@ export function useSearchInfinite(
     },
     enabled: trimmed.length >= 2,
     staleTime: 10_000,
+    placeholderData: keepPreviousData,
     ...options,
   });
 }
@@ -321,12 +327,14 @@ export function useSearchInfinite(
  * coexist in the cache.
  */
 export function useSemanticSearch(q: string, limit = 10) {
-  const trimmed = q.trim();
+  const debouncedQ = useDebouncedValue(q, 200);
+  const trimmed = debouncedQ.trim();
   return useQuery<SemanticSearchResults>({
     queryKey: ['search', 'semantic', trimmed, limit] as const,
     queryFn: () => api.search.semantic(trimmed, { limit }),
     enabled: trimmed.length >= 2,
     staleTime: 10_000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -335,12 +343,14 @@ export function useSemanticSearch(q: string, limit = 10) {
  * the other search hooks (min 2 chars); ``limit`` is part of the key.
  */
 export function useHybridSearch(q: string, limit = 10) {
-  const trimmed = q.trim();
+  const debouncedQ = useDebouncedValue(q, 200);
+  const trimmed = debouncedQ.trim();
   return useQuery<HybridSearchResults>({
     queryKey: ['search', 'hybrid', trimmed, limit] as const,
     queryFn: () => api.search.hybrid(trimmed, { limit }),
     enabled: trimmed.length >= 2,
     staleTime: 10_000,
+    placeholderData: keepPreviousData,
   });
 }
 

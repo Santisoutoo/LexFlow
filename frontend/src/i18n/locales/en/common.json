@@ -640,6 +640,7 @@
     "clearFilters": "Clear filters",
     "removeUserTagFilter": "remove tag filter",
     "howToSearch": "How to search",
+    "tagSuggestions": "Tag suggestions",
     "searchHelp": {
       "title": "How to search the Explorer",
       "freetext": "Type words from the title or the BOE identifier to filter by text.",
@@ -805,6 +806,7 @@
     "footerNavigate": "navigate",
     "footerOpen": "open",
     "resultCount": "{{count}} results",
+    "viewAllResults": "View all results",
     "groups": {
       "tags": "Tags",
       "userTags": "My tags",
