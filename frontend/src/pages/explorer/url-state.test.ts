@@ -86,4 +86,12 @@ describe('explorer URL round-trip', () => {
   it('default state survives serialize → parse', () => {
     expectStateEqual(roundTrip(defaultExplorerState()), defaultExplorerState());
   });
+
+  it('Real Decreto-ley rango survives serialize → parse', () => {
+    const state: ExplorerUrlState = {
+      ...defaultExplorerState(),
+      rango: new Set(['Real Decreto-ley']),
+    };
+    expectStateEqual(roundTrip(state), state);
+  });
 });
