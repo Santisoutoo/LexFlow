@@ -14,7 +14,7 @@ from pathlib import Path
 from threading import Lock
 
 from lexflow.core.delta_sync import CorpusDiff
-from lexflow.core.enums import LawRank, LawStatus, Scope
+from lexflow.core.enums import LawListSort, LawRank, LawStatus, Scope
 from lexflow.core.exceptions import DataPathError, LawNotFoundError, LexFlowError
 from lexflow.core.law_aliases import expand_aliases_in_query
 from lexflow.core.metadata_parser import parse_metadata_only
@@ -22,7 +22,7 @@ from lexflow.core.models import Law, LawMetadata, Section
 from lexflow.core.parser import parse_law_file
 from lexflow.core.schemas import LawSummary, PaginatedResponse, SearchResponse
 from lexflow.core.search import SearchIndex
-from lexflow.core.services import apply_law_filters, paginate_summaries
+from lexflow.core.services import apply_law_filters, paginate_summaries, sort_summaries
 from lexflow.utils.config import get_settings
 from lexflow.utils.file_discovery import law_id_from_path, list_law_files
 
@@ -219,6 +219,7 @@ class LawRegistry:
         year_to: int | None = None,
         tags: list[str] | None = None,
         department: str | None = None,
+        sort: LawListSort = LawListSort.RELEVANCE,
     ) -> PaginatedResponse[LawSummary]:
         """Return a paginated, optionally filtered list of law summaries.
 
@@ -238,7 +239,8 @@ class LawRegistry:
             tags=tags,
             department=department,
         )
-        return paginate_summaries(filtered, page=page, page_size=page_size)
+        ordered = sort_summaries(filtered, sort)
+        return paginate_summaries(ordered, page=page, page_size=page_size)
 
     def search_text(
         self,

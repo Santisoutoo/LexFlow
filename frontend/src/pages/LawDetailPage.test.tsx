@@ -4,7 +4,7 @@
 
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes, useSearchParams } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useNavigate, useSearchParams } from 'react-router-dom';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { LawDetailPage } from './LawDetailPage';
@@ -69,13 +69,30 @@ function DiffProbe() {
   return <div data-testid="diff-search">{params.toString()}</div>;
 }
 
-function renderPage(initialEntry: string) {
+function HashNavButton({ to }: { to: string }) {
+  const navigate = useNavigate();
+  return (
+    <button type="button" onClick={() => navigate(to)}>
+      go-hash
+    </button>
+  );
+}
+
+function renderPage(initialEntry: string, hashNavTo?: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[initialEntry]}>
         <Routes>
-          <Route path="/laws/:lawId" element={<LawDetailPage />} />
+          <Route
+            path="/laws/:lawId"
+            element={
+              <>
+                <LawDetailPage />
+                {hashNavTo ? <HashNavButton to={hashNavTo} /> : null}
+              </>
+            }
+          />
           <Route path="/laws/:lawId/diff" element={<DiffProbe />} />
         </Routes>
       </MemoryRouter>
@@ -132,6 +149,45 @@ describe('LawDetailPage', () => {
     const block = articleEl.closest('article');
     await waitFor(() => {
       expect(block).toHaveClass('ring-2');
+    });
+  });
+
+  it('highlights article after in-page hash change (SPA nav)', async () => {
+    mockLawData = {
+      ...mockLawData,
+      articulos: 2,
+      hierarchy: [
+        {
+          id: 'root-0::2-TÍTULO I',
+          kind: 'titulo',
+          label: 'TÍTULO I',
+          heading: 'TÍTULO I',
+          children: [
+            { id: 'art-14', kind: 'articulo', label: 'Art. 14' },
+            { id: 'art-15', kind: 'articulo', label: 'Art. 15' },
+          ],
+        },
+      ],
+      articles: [
+        ...mockLawData.articles,
+        {
+          id: 'CE-1978::15',
+          lawId: 'CE-1978',
+          num: '15',
+          titulo: 'Derecho a la vida',
+          body: [{ marker: null, text: 'Todos tienen derecho a la vida.', depth: 0, citations: [] }],
+          refs: [],
+        },
+      ],
+    };
+
+    renderPage('/laws/CE-1978', '/laws/CE-1978#art-15');
+    const art15 = await screen.findByText('Todos tienen derecho a la vida.');
+    const block15 = art15.closest('article');
+    expect(block15).not.toHaveClass('ring-2');
+    await userEvent.click(screen.getByRole('button', { name: 'go-hash' }));
+    await waitFor(() => {
+      expect(block15).toHaveClass('ring-2');
     });
   });
 

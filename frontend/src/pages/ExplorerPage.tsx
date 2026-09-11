@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Search, Download, ChevronRight, BookOpenText, Hash, SlidersHorizontal, X, FileText } from 'lucide-react';
@@ -10,6 +10,13 @@ import { Skeleton } from '@/components/domain/Skeleton';
 import { FilterRail } from '@/pages/explorer/FilterRail';
 import { applyClientFilterSort, type LawSort } from '@/pages/explorer/client-filter-sort';
 import { buildExplorerFilterSummary } from '@/pages/explorer/empty-hints';
+import {
+  clearedExplorerState,
+  parseExplorerParams,
+  serializeExplorerParams,
+  type ExplorerUrlState,
+} from '@/pages/explorer/url-state';
+import { lawDetailHref } from '@/lib/law-reading';
 import { useLawsList, useTags, useDepartments, useSearch, useUserTagVocab, useUserTagLaws } from '@/lib/queries';
 import { useUi } from '@/lib/store';
 import { cn, formatDate, formatNumber, statusLabel } from '@/lib/utils';
@@ -22,59 +29,41 @@ export function ExplorerPage() {
   const { t } = useTranslation();
   const density = useUi((s) => s.density);
   const setDensity = useUi((s) => s.setDensity);
-  const [q, setQ] = useState('');
-  const [status, setStatus] = useState<Set<LawStatus>>(new Set(['vigente']));
-  const [rango, setRango] = useState<Set<RangoNormativo>>(new Set());
-  const [ambito, setAmbito] = useState<Set<Ambito>>(new Set(['Estatal']));
-  const [tags, setTags] = useState<Set<string>>(new Set());
-  // #563 — publication-year range. Kept as strings (the inputs are text);
-  // converted to numbers in `params`, dropped when empty/invalid.
-  const [yearFrom, setYearFrom] = useState('');
-  const [yearTo, setYearTo] = useState('');
-  // Single-select: one community at a time (or undefined = all).
-  const [jurisdiction, setJurisdiction] = useState<JurisdictionCode | undefined>(undefined);
-  // #671 gap B — issuing department (ministerio), single-select, same shape
-  // as `jurisdiction` above.
-  const [activeDepartment, setActiveDepartment] = useState<string | undefined>(undefined);
-  // #670 — single-select custom user-tag filter, browse-mode only (does NOT
-  // reach `searchFacets`/the corpus search endpoint — see `params`/`searchFacets` below).
-  const [activeUserTag, setActiveUserTag] = useState<string | null>(null);
-  const [sort, setSort] = useState<LawSort>('relevance');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const explorer = useMemo(() => parseExplorerParams(searchParams), [searchParams]);
+  const {
+    q,
+    tags,
+    status,
+    rango,
+    ambito,
+    yearFrom,
+    yearTo,
+    jurisdiction,
+    department: activeDepartment,
+    activeUserTag,
+    sort,
+  } = explorer;
+
+  const commitExplorer = (patch: Partial<ExplorerUrlState>, replace = false) => {
+    const next: ExplorerUrlState = { ...explorer, ...patch };
+    setSearchParams(serializeExplorerParams(next), { replace });
+  };
+  const setQ = (value: string) => commitExplorer({ q: value }, true);
+  const setStatus = (value: Set<LawStatus>) => commitExplorer({ status: value });
+  const setRango = (value: Set<RangoNormativo>) => commitExplorer({ rango: value });
+  const setAmbito = (value: Set<Ambito>) => commitExplorer({ ambito: value });
+  const setTags = (value: Set<string>) => commitExplorer({ tags: value });
+  const setYearFrom = (value: string) => commitExplorer({ yearFrom: value }, true);
+  const setYearTo = (value: string) => commitExplorer({ yearTo: value }, true);
+  const setJurisdiction = (value: JurisdictionCode | undefined) => commitExplorer({ jurisdiction: value });
+  const setActiveDepartment = (value: string | undefined) => commitExplorer({ department: value });
+  const setActiveUserTag = (value: string | null) => commitExplorer({ activeUserTag: value });
+  const setSort = (value: LawSort) => commitExplorer({ sort: value });
+  const clearFilters = () => setSearchParams(serializeExplorerParams(clearedExplorerState()));
   // Toggled by the empty-state "How to search" button (#476). Surfaces an
   // inline help panel explaining the search syntax instead of a no-op.
   const [showSearchHelp, setShowSearchHelp] = useState(false);
-
-  const [searchParams] = useSearchParams();
-  useEffect(() => {
-    const urlTags = searchParams.get('tags');
-    if (urlTags) {
-      setTags(new Set(urlTags.split(',').map((t) => t.trim()).filter(Boolean)));
-    }
-    // Seed the search box from `?q=` so Home's example chips (and any deep
-    // link) actually run a query instead of being decorative (#577).
-    const urlQ = searchParams.get('q');
-    if (urlQ) setQ(urlQ);
-    // #670 — deep link for the custom user-tag filter (CommandPalette's
-    // "Mis tags" group navigates to `/explorer?userTag=<slug>`). Mirrors
-    // `tags`/`q` above: read once on mount, subsequent UI clicks own the state.
-    const urlUserTag = searchParams.get('userTag');
-    if (urlUserTag) setActiveUserTag(urlUserTag);
-    // #671 gap B — deep link for the department facet (`?department=...`),
-    // read once on mount like `tags`/`userTag`/`jurisdiction` here.
-    const urlDepartment = searchParams.get('department');
-    if (urlDepartment) setActiveDepartment(urlDepartment);
-    // #770 — deep link for the community facet (`?jurisdiction=es-XX`), used by
-    // the Browse-by-community page and the command palette. Previously this
-    // param was produced but never consumed, so those deep links navigated
-    // without pre-selecting the filter. Validate against the known codes so a
-    // junk param doesn't set an invalid jurisdiction.
-    const urlJurisdiction = searchParams.get('jurisdiction');
-    if (urlJurisdiction && COMMUNITIES.some((c) => c.code === urlJurisdiction)) {
-      setJurisdiction(urlJurisdiction as JurisdictionCode);
-    }
-    // run once on mount; subsequent UI clicks own the state
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   /**
    * Pull `#tag` tokens out of the free-text input so users can type
@@ -410,9 +399,12 @@ export function ExplorerPage() {
                 icon={<Hash className="size-3" />}
                 dismissable
                 onDismiss={() => {
-                  // remove from both inline (free-text) and chip-driven sets
-                  setTags((prev) => { const n = new Set(prev); n.delete(t); return n; });
-                  setQ((s) => s.split(/\s+/).filter((tok) => tok.toLowerCase() !== '#' + t).join(' '));
+                  const nextTags = new Set(tags);
+                  nextTags.delete(t);
+                  commitExplorer({
+                    tags: nextTags,
+                    q: q.split(/\s+/).filter((tok) => tok.toLowerCase() !== '#' + t).join(' '),
+                  });
                 }}
               >
                 {t}
@@ -450,7 +442,7 @@ export function ExplorerPage() {
                 <EmptyState
                   title={t('explorer.empty.title')}
                   description={emptyDescription}
-                  primaryAction={{ label: t('explorer.clearFilters'), onClick: () => { setQ(''); setStatus(new Set()); setRango(new Set()); setAmbito(new Set()); setYearFrom(''); setYearTo(''); setJurisdiction(undefined); setTags(new Set()); setActiveUserTag(null); setActiveDepartment(undefined); } }}
+                  primaryAction={{ label: t('explorer.clearFilters'), onClick: clearFilters }}
                   secondaryAction={{ label: t('explorer.howToSearch'), onClick: () => setShowSearchHelp((v) => !v) }}
                 />
                 {showSearchHelp && (
@@ -477,9 +469,12 @@ export function ExplorerPage() {
                 {/* Search result rows */}
                 {!isLoading &&
                   searchHits.map((hit) => {
-                    const lawId = (hit.payload?.lawId as string | undefined) ?? hit.id;
-                    const articleNum = hit.payload?.articleNum as string | undefined;
-                    const href = `/laws/${encodeURIComponent(lawId)}`;
+                    const lawId =
+                      (typeof hit.payload?.lawId === 'string' ? hit.payload.lawId : undefined) ?? hit.id;
+                    const articleNum =
+                      hit.articleNumber
+                      ?? (typeof hit.payload?.articleNum === 'string' ? hit.payload.articleNum : undefined);
+                    const href = lawDetailHref(lawId, articleNum);
                     return (
                       <div
                         key={hit.id}
@@ -526,7 +521,7 @@ export function ExplorerPage() {
                 <EmptyState
                   title={t('explorer.empty.title')}
                   description={t('explorer.empty.description')}
-                  primaryAction={{ label: t('explorer.clearFilters'), onClick: () => { setQ(''); setStatus(new Set()); setRango(new Set()); setAmbito(new Set()); setYearFrom(''); setYearTo(''); setJurisdiction(undefined); setTags(new Set()); setActiveUserTag(null); setActiveDepartment(undefined); } }}
+                  primaryAction={{ label: t('explorer.clearFilters'), onClick: clearFilters }}
                   secondaryAction={{ label: t('explorer.howToSearch'), onClick: () => setShowSearchHelp((v) => !v) }}
                 />
                 {showSearchHelp && (
@@ -634,11 +629,9 @@ export function ExplorerPage() {
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      setTags((prev) => {
-                                        const n = new Set(prev);
-                                        n.has(t) ? n.delete(t) : n.add(t);
-                                        return n;
-                                      });
+                                      const next = new Set(tags);
+                                      next.has(t) ? next.delete(t) : next.add(t);
+                                      setTags(next);
                                     }}
                                     className="inline-flex items-center gap-0.5 rounded-full bg-primary-soft/60 px-1.5 py-px font-mono text-[10.5px] text-indigo-700 hover:bg-primary-soft dark:text-indigo-200"
                                   >

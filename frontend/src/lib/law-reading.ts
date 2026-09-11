@@ -1,9 +1,10 @@
 /**
  * Pure helpers for law-detail reading flow: ordered items, TOC flattening,
- * and deep-link hash parsing. Shared by TextoTab, LawToc, and tests.
+ * deep-link hash parsing, and article-anchor hrefs. Shared by TextoTab,
+ * LawToc, search result surfaces, and tests.
  */
 
-import type { Article, Disposicion, HierarchyNode, LawDetail } from './types';
+import type { Article, Disposicion, HierarchyNode, LawDetail, SearchHit } from './types';
 
 export type ReadingItem =
   | { kind: 'section'; node: HierarchyNode; targetId: string; depth: number }
@@ -45,6 +46,29 @@ export function parseArticleHash(hash: string): string | null {
   } catch {
     return raw;
   }
+}
+
+/** Law-detail path, with an optional `#art-N` hash (N is URI-encoded). */
+export function lawDetailHref(lawId: string, articleNum?: string | null): string {
+  const base = `/laws/${encodeURIComponent(lawId)}`;
+  if (!articleNum) return base;
+  return `${base}#art-${encodeURIComponent(articleNum)}`;
+}
+
+/**
+ * Resolve a search hit to a law-detail href.
+ *
+ * `payload.lawId` is the canonical law id. Article hits prefer
+ * `hit.articleNumber`, then `payload.articleNum`. Returns null when no law id
+ * can be resolved (the caller decides whether to no-op).
+ */
+export function searchHitHref(hit: SearchHit): string | null {
+  const payload = hit.payload;
+  const lawId = typeof payload?.lawId === 'string' && payload.lawId ? payload.lawId : null;
+  if (!lawId) return null;
+  const fromPayload = typeof payload?.articleNum === 'string' ? payload.articleNum : null;
+  const articleNum = hit.kind === 'article' ? (hit.articleNumber ?? fromPayload) : null;
+  return lawDetailHref(lawId, articleNum);
 }
 
 function walkHierarchy(

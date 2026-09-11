@@ -44,6 +44,15 @@ class TestListLaws:
         assert body["total"] == 2
         assert body["has_next"] is True
 
+    def test_sort_date_puts_newest_publication_first(self, client: TestClient, mock_registry: LawRegistry) -> None:
+        body = client.get("/api/v1/laws", params={"sort": "date", "page_size": 10}).json()
+        identifiers = [item["identifier"] for item in body["items"]]
+        assert identifiers.index("BOE-A-2018-16673") < identifiers.index("BOE-A-2000-323")
+
+    def test_invalid_sort_returns_422(self, client: TestClient, mock_registry: LawRegistry) -> None:
+        response = client.get("/api/v1/laws", params={"sort": "refs"})
+        assert response.status_code == 422
+
 
 class TestGetLaw:
     def test_found(self, client: TestClient, mock_registry: LawRegistry) -> None:

@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/domain/EmptyState';
 import { HighlightedSnippet } from '@/components/domain/HighlightedSnippet';
 import { SearchInterpretationBanner } from '@/components/domain/SearchInterpretationBanner';
 import { SkeletonRows } from '@/components/domain/Skeleton';
+import { lawDetailHref, searchHitHref } from '@/lib/law-reading';
 
 type SearchMode = 'fulltext' | 'semantic' | 'hybrid';
 
@@ -110,8 +111,8 @@ function FullTextResults({ q, navigate }: { q: string; navigate: (to: string) =>
               <button
                 key={h.id}
                 onClick={() => {
-                  const p = h.payload as { lawId?: string } | undefined;
-                  if (p?.lawId) navigate(`/laws/${encodeURIComponent(p.lawId)}`);
+                  const href = searchHitHref(h);
+                  if (href) navigate(href);
                 }}
                 className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3.5 py-2.5 text-left hover:bg-surface-2"
               >
@@ -173,7 +174,7 @@ function SemanticResults({ q, navigate }: { q: string; navigate: (to: string) =>
         {hits.map((h) => (
           <button
             key={`${h.lawId}::${h.articleNumber}`}
-            onClick={() => navigate(`/laws/${encodeURIComponent(h.lawId)}#art-${encodeURIComponent(h.articleNumber)}`)}
+            onClick={() => navigate(lawDetailHref(h.lawId, h.articleNumber))}
             className="flex items-start gap-3 rounded-lg border border-border bg-surface px-3.5 py-2.5 text-left hover:bg-surface-2"
           >
             <Badge tone="amber">art</Badge>
@@ -224,13 +225,7 @@ function HybridResults({ q, navigate }: { q: string; navigate: (to: string) => v
         {hits.map((h) => (
           <button
             key={`${h.lawId}::${h.articleNumber ?? 'law'}`}
-            onClick={() =>
-              navigate(
-                h.articleNumber
-                  ? `/laws/${encodeURIComponent(h.lawId)}#art-${encodeURIComponent(h.articleNumber)}`
-                  : `/laws/${encodeURIComponent(h.lawId)}`,
-              )
-            }
+            onClick={() => navigate(lawDetailHref(h.lawId, h.articleNumber))}
             className="flex items-start gap-3 rounded-lg border border-border bg-surface px-3.5 py-2.5 text-left hover:bg-surface-2"
           >
             <Badge tone={h.articleNumber ? 'amber' : 'primary'}>{h.articleNumber ? 'art' : 'ley'}</Badge>

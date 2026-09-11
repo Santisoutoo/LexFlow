@@ -24,15 +24,12 @@ import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import { chatErrorMessage, errorMessage } from '@/lib/errors';
 import type { ChatMessage as ChatMessageT, ChatSource } from '@/lib/types';
+import { lawDetailHref } from '@/lib/law-reading';
 import { groupThreads } from './chat/group-threads';
 
 function sourceHref(source: ChatSource): string | null {
   if (!source.target?.lawId) return null;
-  const base = `/laws/${encodeURIComponent(source.target.lawId)}`;
-  if (source.target.articleNum) {
-    return `${base}#art-${encodeURIComponent(source.target.articleNum)}`;
-  }
-  return base;
+  return lawDetailHref(source.target.lawId, source.target.articleNum);
 }
 
 const FALLBACK_THREAD_ID = 'eipd';
