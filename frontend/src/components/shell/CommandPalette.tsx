@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Search, BookOpenText, FileText, Moon, Network, MessagesSquare, BarChart3, Download, Hash } from 'lucide-react';
+import { Search, BookOpenText, FileText, Moon, Network, MessagesSquare, BarChart3, Download, Hash, List } from 'lucide-react';
 import { Button, Kbd } from '@/components/ui';
 import { errorMessage } from '@/lib/errors';
 import { useUi } from '@/lib/store';
-import { useSearch, useTags, useUserTagVocab } from '@/lib/queries';
+import { useSearch, useTags, useUserTagVocab, useWarmup } from '@/lib/queries';
+import { parseSearchInput } from '@/lib/search-query';
 import { useFocusTrap } from '@/lib/useFocusTrap';
 import { cn } from '@/lib/utils';
 import { HighlightedSnippet } from '@/components/domain/HighlightedSnippet';
 import { searchHitHref } from '@/lib/law-reading';
+import { defaultExplorerState, serializeExplorerParams } from '@/pages/explorer/url-state';
 import { STATIC_COMMANDS, filterCommands } from './command-palette/commands';
 
 type PaletteGroupId = 'tags' | 'userTags' | 'laws' | 'articles' | 'commands';
@@ -34,8 +36,20 @@ export function CommandPalette() {
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const listboxRef = useRef<HTMLDivElement>(null);
   const [q, setQ] = useState('');
   const [active, setActive] = useState(0);
+
+  const { plainQ, allTags, tagFragment } = useMemo(() => parseSearchInput(q), [q]);
+  const searchFacets = allTags.size ? { tags: [...allTags] } : undefined;
+  const { data: searchData, isFetching: searchFetching, isError: searchIsError, error: searchError, refetch: refetchSearch } = useSearch(
+    plainQ,
+    searchFacets,
+  );
+  const { data: vocab = [] } = useTags();
+  const { data: userTagVocab = [] } = useUserTagVocab();
+  const { data: warmup } = useWarmup();
+  const searchWarming = warmup && !warmup.searchReady;
 
   useFocusTrap(panelRef, paletteOpen);
 
@@ -52,11 +66,6 @@ export function CommandPalette() {
     setActive(0);
   }, [q]);
 
-  const trimmedQ = q.trim();
-  const { data: searchData, isFetching: searchFetching, isError: searchIsError, error: searchError, refetch: refetchSearch } = useSearch(q);
-  const { data: vocab = [] } = useTags();
-  const { data: userTagVocab = [] } = useUserTagVocab();
-
   const groupLabels: Record<PaletteGroupId, string> = useMemo(
     () => ({
       tags: t('commandPalette.groups.tags'),
@@ -69,8 +78,7 @@ export function CommandPalette() {
   );
 
   const items: PaletteItem[] = useMemo(() => {
-    const m = q.match(/(^|\s)#(\S*)$/);
-    const tagQuery = m ? m[2].toLowerCase() : null;
+    const tagQuery = tagFragment !== null ? tagFragment.toLowerCase() : null;
     const tagSuggestions = tagQuery !== null
       ? vocab.filter(({ tag }) => tag.toLowerCase().includes(tagQuery)).slice(0, 6)
       : (q.trim() === '' ? vocab.slice(0, 5) : []);
@@ -101,6 +109,45 @@ export function CommandPalette() {
       ...commandExtras[def.id],
     }));
 
+    const lawHits = (searchData?.hits ?? []).filter((h) => h.kind === 'law');
+    const articleHits = (searchData?.hits ?? []).filter((h) => h.kind === 'article');
+
+    const mapHit = (h: (typeof lawHits)[number]): PaletteItem => ({
+      id: h.id,
+      group: h.kind === 'law' ? 'laws' : 'articles',
+      icon: h.kind === 'law' ? <BookOpenText className="size-3.5" /> : <FileText className="size-3.5" />,
+      title: h.title,
+      subtitle: h.snippet ? (
+        <HighlightedSnippet
+          text={h.snippet}
+          match={h.match}
+          prefix={h.articleNumber ? `Art. ${h.articleNumber} — ` : undefined}
+        />
+      ) : (
+        h.subtitle
+      ),
+      run: () => {
+        const href = searchHitHref(h);
+        if (href) navigate(href);
+        setPaletteOpen(false);
+      },
+    });
+
+    const viewAllRow: PaletteItem[] =
+      plainQ.trim().length >= 2 && searchData !== undefined
+        ? [{
+            id: 'view-all-results',
+            group: 'commands',
+            icon: <List className="size-3.5" />,
+            title: t('commandPalette.viewAllResults'),
+            run: () => {
+              const params = serializeExplorerParams({ ...defaultExplorerState(), q });
+              navigate(`/explorer?${params.toString()}`);
+              setPaletteOpen(false);
+            },
+          }]
+        : [];
+
     return [
       ...tagSuggestions.map<PaletteItem>(({ tag, count }) => ({
         id: `tag-${tag}`,
@@ -118,29 +165,21 @@ export function CommandPalette() {
         subtitle: t('commandPalette.tagSubtitle', { count }),
         run: () => { navigate(`/explorer?userTag=${encodeURIComponent(tag)}`); setPaletteOpen(false); },
       })),
-      ...(searchData?.hits ?? []).map<PaletteItem>((h) => ({
-        id: h.id,
-        group: h.kind === 'law' ? 'laws' : 'articles',
-        icon: h.kind === 'law' ? <BookOpenText className="size-3.5" /> : <FileText className="size-3.5" />,
-        title: h.title,
-        subtitle: h.snippet ? (
-          <HighlightedSnippet
-            text={h.snippet}
-            match={h.match}
-            prefix={h.articleNumber ? `Art. ${h.articleNumber} — ` : undefined}
-          />
-        ) : (
-          h.subtitle
-        ),
-        run: () => {
-          const href = searchHitHref(h);
-          if (href) navigate(href);
-          setPaletteOpen(false);
-        },
-      })),
+      ...lawHits.map(mapHit),
+      ...articleHits.map(mapHit),
+      ...viewAllRow,
       ...commands,
     ];
-  }, [q, vocab, userTagVocab, searchData, navigate, toggleTheme, setPaletteOpen, t]);
+  }, [q, plainQ, tagFragment, vocab, userTagVocab, searchData, navigate, toggleTheme, setPaletteOpen, t]);
+
+  useEffect(() => {
+    setActive((a) => (items.length === 0 ? 0 : Math.min(a, items.length - 1)));
+  }, [items.length]);
+
+  useEffect(() => {
+    const selected = listboxRef.current?.querySelector('[aria-selected="true"]');
+    selected?.scrollIntoView?.({ block: 'nearest' });
+  }, [active, items]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -155,6 +194,8 @@ export function CommandPalette() {
   }, [paletteOpen, items, active, setPaletteOpen]);
 
   if (!paletteOpen) return null;
+
+  const showSearchStatus = plainQ.trim().length >= 2;
 
   return (
     <div
@@ -181,17 +222,25 @@ export function CommandPalette() {
           <Kbd>esc</Kbd>
         </div>
 
-        <div role="listbox" aria-label={t('commandPalette.resultsAria')} className="max-h-[420px] overflow-auto p-2 scrollbar-thin">
-          {trimmedQ.length >= 2 && searchFetching && (
+        <div
+          ref={listboxRef}
+          role="listbox"
+          aria-label={t('commandPalette.resultsAria')}
+          className="max-h-[420px] overflow-auto p-2 scrollbar-thin"
+        >
+          {showSearchStatus && searchWarming && (
+            <div className="px-6 py-6 text-center text-sm text-muted">{t('search.indexing')}</div>
+          )}
+          {showSearchStatus && !searchWarming && searchFetching && !searchData && (
             <div className="px-6 py-6 text-center text-sm text-muted">{t('search.searching')}</div>
           )}
-          {trimmedQ.length >= 2 && searchIsError && (
+          {showSearchStatus && searchIsError && (
             <div className="mx-2 mb-2 rounded-lg border border-danger/30 bg-danger-soft/40 px-4 py-3 text-center">
               <p className="font-mono text-[12px] text-muted">{errorMessage(searchError, t)}</p>
               <Button size="sm" className="mt-2" onClick={() => refetchSearch()}>{t('errors.retry')}</Button>
             </div>
           )}
-          {items.length === 0 && !(trimmedQ.length >= 2 && (searchFetching || searchIsError)) && (
+          {items.length === 0 && !(showSearchStatus && (searchWarming || (searchFetching && !searchData) || searchIsError)) && (
             <div className="px-6 py-10 text-center text-sm text-muted">
               {t('commandPalette.noResults', { query: q })}
             </div>
