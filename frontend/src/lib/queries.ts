@@ -7,16 +7,27 @@
  * Stable across renames thanks to the `qk` factory below.
  */
 
-import { useQuery, useMutation, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
+import {
+  useQuery,
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+  type InfiniteData,
+  type UseInfiniteQueryOptions,
+  type UseQueryOptions,
+} from '@tanstack/react-query';
+import { EXPLORER_PAGE_SIZE } from '@/pages/explorer/constants';
 import { api } from './api';
 import { liveTelemetryApi, type TelemetryStatus } from './api/telemetry';
 import { ApiError } from './api/http';
 import type {
   Law, LawDetail, Article, LawVersion, DiffResult, GraphData, ChatThread,
   ChatMessage, Model, InstalledModel, SyncStatus, DashboardData, ListLawsParams,
-  SearchResults, SemanticSearchResults, HybridSearchResults, SystemProfile, WarmupStatus, WhatsNewStatus, HealthSnapshot, SemanticStatus,
+  Paginated, SearchResults, SemanticSearchResults, HybridSearchResults, SystemProfile, WarmupStatus, WhatsNewStatus, HealthSnapshot, SemanticStatus,
   GraphGlobalFilters, GraphGlobalResult, SearchFacets, UserTag, UserTagCount, DepartmentCount,
 } from './types';
+
+type LawsListPage = Paginated<Law>;
 
 export const qk = {
   laws: {
@@ -49,6 +60,24 @@ export function useLawsList(params: ListLawsParams = {}, options?: Partial<UseQu
   return useQuery({
     queryKey: qk.laws.list(params),
     queryFn: () => api.laws.list(params),
+    staleTime: 30_000,
+    ...options,
+  });
+}
+
+/** Paginated browse list for Explorer — cursor lives in `pageParam`, not the stable key (#49 S10). */
+export function useLawsListInfinite(
+  params: Omit<ListLawsParams, 'cursor' | 'limit'> = {},
+  options?: Partial<
+    UseInfiniteQueryOptions<LawsListPage, Error, InfiniteData<LawsListPage>, readonly unknown[], string | null>
+  >,
+) {
+  return useInfiniteQuery<LawsListPage, Error, InfiniteData<LawsListPage>, readonly unknown[], string | null>({
+    queryKey: ['laws', 'list', 'infinite', params] as const,
+    queryFn: ({ pageParam }) =>
+      api.laws.list({ ...params, cursor: pageParam, limit: EXPLORER_PAGE_SIZE }),
+    initialPageParam: null,
+    getNextPageParam: (last) => last.cursor ?? undefined,
     staleTime: 30_000,
     ...options,
   });
@@ -252,6 +281,36 @@ export function useSearch(q: string, facets?: SearchFacets) {
     queryFn: () => api.search.universal(trimmed, facets),
     enabled: trimmed.length >= 2,
     staleTime: 10_000,
+  });
+}
+
+/** Paginated corpus search for Explorer — page in `pageParam` (#49 S10). */
+export function useSearchInfinite(
+  q: string,
+  facets?: Omit<SearchFacets, 'page' | 'page_size'>,
+  options?: Partial<
+    UseInfiniteQueryOptions<SearchResults, Error, InfiniteData<SearchResults>, readonly unknown[], number>
+  >,
+) {
+  const trimmed = q.trim();
+  return useInfiniteQuery<SearchResults, Error, InfiniteData<SearchResults>, readonly unknown[], number>({
+    queryKey: ['search', 'infinite', trimmed, facets ?? {}] as const,
+    queryFn: ({ pageParam }) =>
+      api.search.universal(trimmed, {
+        ...facets,
+        page: pageParam,
+        page_size: EXPLORER_PAGE_SIZE,
+      }),
+    initialPageParam: 1,
+    getNextPageParam: (last, _pages, lastPageParam) => {
+      const page = last.page ?? lastPageParam;
+      const pageSize = last.pageSize ?? EXPLORER_PAGE_SIZE;
+      if (page * pageSize < last.total) return page + 1;
+      return undefined;
+    },
+    enabled: trimmed.length >= 2,
+    staleTime: 10_000,
+    ...options,
   });
 }
 

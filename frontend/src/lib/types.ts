@@ -16,6 +16,7 @@ export type RangoNormativo =
   | 'Ley'
   | 'Ley Foral'
   | 'Real Decreto'
+  | 'Real Decreto-ley'
   | 'RD Legislativo'
   | 'Decreto'
   | 'Decreto-ley'
@@ -498,6 +499,14 @@ export interface SearchHit {
   kind: SearchHitKind;
   id: string;
   title: string;
+  /** Law status for badge rendering (#49 S11). */
+  status?: LawStatus;
+  /** Normative rank label (#49 S11). */
+  rango?: RangoNormativo;
+  /** Publication date ISO string (#49 S11). */
+  publicada?: string;
+  /** Article heading when the hit is article-scoped (#49 S11). */
+  articleTitle?: string;
   /**
    * Free-form subtitle. Prefer composing the rendered subtitle from `snippet`
    * + the article prefix at the call site so the match can be highlighted —
@@ -526,6 +535,8 @@ export interface AliasExpansion {
 export interface SearchResults {
   hits: SearchHit[];
   total: number;
+  page?: number;
+  pageSize?: number;
   aliasExpansions?: AliasExpansion[];
 }
 

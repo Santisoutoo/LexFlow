@@ -1,14 +1,16 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Search, Download, ChevronRight, BookOpenText, Hash, SlidersHorizontal, X, FileText } from 'lucide-react';
 import { Badge, Button, Callout, Chip, Input, Tabs } from '@/components/ui';
 import { EmptyState } from '@/components/domain/EmptyState';
+import { ErrorState } from '@/components/domain/ErrorState';
 import { HighlightedSnippet } from '@/components/domain/HighlightedSnippet';
 import { SearchInterpretationBanner } from '@/components/domain/SearchInterpretationBanner';
 import { Skeleton } from '@/components/domain/Skeleton';
 import { FilterRail } from '@/pages/explorer/FilterRail';
 import { applyClientFilterSort, type LawSort } from '@/pages/explorer/client-filter-sort';
+// LawSort still allows `refs` from legacy URLs; the sort dropdown no longer offers it (#49 S13).
 import { buildExplorerFilterSummary } from '@/pages/explorer/empty-hints';
 import {
   clearedExplorerState,
@@ -17,9 +19,18 @@ import {
   type ExplorerUrlState,
 } from '@/pages/explorer/url-state';
 import { lawDetailHref } from '@/lib/law-reading';
-import { useLawsList, useTags, useDepartments, useSearch, useUserTagVocab, useUserTagLaws } from '@/lib/queries';
+import {
+  useLawsListInfinite,
+  useSearchInfinite,
+  useTags,
+  useDepartments,
+  useUserTagVocab,
+  useUserTagLaws,
+  useWarmup,
+} from '@/lib/queries';
+import { errorMessage } from '@/lib/errors';
 import { useUi } from '@/lib/store';
-import { cn, formatDate, formatNumber, statusLabel } from '@/lib/utils';
+import { cn, formatDate, statusLabel } from '@/lib/utils';
 import { RANK_MAP, STATUS_MAP, SCOPE_MAP } from '@/lib/api/transformers';
 import type { LawStatus, RangoNormativo, Ambito, JurisdictionCode, SearchFacets } from '@/lib/types';
 import { COMMUNITIES } from '@/lib/types';
@@ -133,10 +144,18 @@ export function ExplorerPage() {
   }, [rango, status, ambito, jurisdiction, yearFrom, yearTo, allTags, activeDepartment]);
 
   // ── Browse mode (no query) ────────────────────────────────────────────
-  const { data: browseData, isLoading: browseLoading } = useLawsList(params, {
-    enabled: !isSearchMode,
-  });
-  const items = useMemo(() => browseData?.items ?? [], [browseData]);
+  const {
+    data: browseData,
+    isLoading: browseLoading,
+    isError: browseIsError,
+    error: browseError,
+    refetch: refetchBrowse,
+    fetchNextPage: fetchNextBrowse,
+    hasNextPage: hasNextBrowse,
+    isFetchingNextPage: isFetchingNextBrowse,
+  } = useLawsListInfinite(params, { enabled: !isSearchMode });
+  const items = useMemo(() => browseData?.pages.flatMap((p) => p.items) ?? [], [browseData]);
+  const browseTotal = browseData?.pages[0]?.total ?? 0;
 
   // #670 — custom user-tag vocabulary + the ids of laws carrying the
   // currently active one. Browse-mode-only facet: it narrows `displayed`
@@ -157,11 +176,28 @@ export function ExplorerPage() {
   );
 
   // ── Search mode (query ≥ 2 chars) ─────────────────────────────────────
-  const { data: searchData, isLoading: searchLoading } = useSearch(
-    isSearchMode ? plainQ : '',
-    searchFacets,
-  );
-  const searchHits = useMemo(() => searchData?.hits ?? [], [searchData]);
+  const {
+    data: searchData,
+    isLoading: searchLoading,
+    isError: searchIsError,
+    error: searchError,
+    refetch: refetchSearch,
+    fetchNextPage: fetchNextSearch,
+    hasNextPage: hasNextSearch,
+    isFetchingNextPage: isFetchingNextSearch,
+  } = useSearchInfinite(isSearchMode ? plainQ : '', searchFacets);
+  const searchHits = useMemo(() => searchData?.pages.flatMap((p) => p.hits) ?? [], [searchData]);
+  const searchTotal = searchData?.pages[0]?.total ?? 0;
+  const searchAliasExpansions = searchData?.pages[0]?.aliasExpansions;
+
+  const { data: warmup } = useWarmup();
+  const searchWarming = isSearchMode && warmup && !warmup.searchReady;
+
+  useEffect(() => {
+    if (isSearchMode && activeUserTag) setActiveUserTag(null);
+    // setActiveUserTag is re-created each render; only react to mode/tag changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- browse-only facet cleanup (#49 S13)
+  }, [isSearchMode, activeUserTag]);
   const emptyDescription = useMemo(() => {
     const summary = buildExplorerFilterSummary({
       plainQ,
@@ -197,8 +233,13 @@ export function ExplorerPage() {
     t,
   ]);
 
-  // Unified loading flag for the current mode.
   const isLoading = isSearchMode ? searchLoading : browseLoading;
+  const isError = isSearchMode ? searchIsError : browseIsError;
+  const queryError = isSearchMode ? searchError : browseError;
+  const refetchResults = isSearchMode ? refetchSearch : refetchBrowse;
+  const hasNextPage = isSearchMode ? hasNextSearch : hasNextBrowse;
+  const fetchNextPage = isSearchMode ? fetchNextSearch : fetchNextBrowse;
+  const isFetchingNextPage = isSearchMode ? isFetchingNextSearch : isFetchingNextBrowse;
 
   const { data: vocab = [] } = useTags();
   // #671 gap B — issuing department (ministerio) vocabulary for the filter rail.
@@ -257,6 +298,7 @@ export function ExplorerPage() {
         departments={departments}
         activeDepartment={activeDepartment}
         onSelectDepartment={setActiveDepartment}
+        isSearchMode={isSearchMode}
       />
 
       {/* Mobile filter sheet — same FilterRail wrapped in a slide-in panel
@@ -305,6 +347,7 @@ export function ExplorerPage() {
                 departments={departments}
                 activeDepartment={activeDepartment}
                 onSelectDepartment={setActiveDepartment}
+                isSearchMode={isSearchMode}
                 inline
               />
             </div>
@@ -359,22 +402,30 @@ export function ExplorerPage() {
             >
               {t('explorer.filters')}
             </Button>
-            <SortButton sort={sort} setSort={setSort} />
-            <Tabs variant="segmented" value={density} onChange={(v) => setDensity(v as 'compact' | 'comfortable' | 'cozy')} tabs={[
-              { id: 'compact', label: '≡' },
-              { id: 'comfortable', label: '≣' },
-              { id: 'cozy', label: '☰' },
-            ]} />
+            {!isSearchMode && <SortButton sort={sort} setSort={setSort} />}
+            {!isSearchMode && (
+              <Tabs variant="segmented" value={density} onChange={(v) => setDensity(v as 'compact' | 'comfortable' | 'cozy')} tabs={[
+                { id: 'compact', label: '≡' },
+                { id: 'comfortable', label: '≣' },
+                { id: 'cozy', label: '☰' },
+              ]} />
+            )}
             <Button variant="secondary" icon={<Download className="size-3.5" />} className="hidden sm:inline-flex">{t('explorer.export')}</Button>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[12.5px] text-muted">
             {isSearchMode ? (
-              <>
-                <span className="font-mono text-fg">{searchHits.length}</span> {t('explorer.countOf')} <span className="font-mono">{searchData?.total ?? 0}</span> {t('explorer.countUnit')}
-              </>
+              searchWarming ? (
+                t('search.indexing')
+              ) : (
+                <>
+                  <span className="font-mono text-fg">{searchHits.length}</span> {t('explorer.countOf')}{' '}
+                  <span className="font-mono">{searchTotal}</span> {t('explorer.countUnitResults')}
+                </>
+              )
             ) : (
               <>
-                <span className="font-mono text-fg">{displayed.length}</span> {t('explorer.countOf')} <span className="font-mono">{browseData?.total ?? 0}</span> {t('explorer.countUnit')}
+                <span className="font-mono text-fg">{displayed.length}</span> {t('explorer.countOf')}{' '}
+                <span className="font-mono">{browseTotal}</span> {t('explorer.countUnit')}
               </>
             )} ·
             {[...status].map((s) => (
@@ -410,7 +461,7 @@ export function ExplorerPage() {
                 {t}
               </Chip>
             ))}
-            {activeUserTag && (
+            {!isSearchMode && activeUserTag && (
               // Custom user-tag filter (#670) — rendered outside the shared
               // `Chip` component (which only styles an indigo `active` tone)
               // so it stays visually distinct amber, matching the LawHeader
@@ -429,13 +480,17 @@ export function ExplorerPage() {
             )}
           </div>
           {isSearchMode && (
-            <SearchInterpretationBanner aliasExpansions={searchData?.aliasExpansions} className="mt-2 px-8" />
+            <SearchInterpretationBanner aliasExpansions={searchAliasExpansions} className="mt-2 px-8" />
           )}
         </div>
 
         {/* Table / Search results */}
         <div className="flex-1 overflow-auto scrollbar-thin">
-          {isSearchMode ? (
+          {isError ? (
+            <div className="p-8">
+              <ErrorState onRetry={() => refetchResults()} description={errorMessage(queryError, t)} />
+            </div>
+          ) : isSearchMode ? (
             /* ── Search mode ────────────────────────────────────────── */
             !isLoading && searchHits.length === 0 ? (
               <div className="p-8">
@@ -475,6 +530,8 @@ export function ExplorerPage() {
                       hit.articleNumber
                       ?? (typeof hit.payload?.articleNum === 'string' ? hit.payload.articleNum : undefined);
                     const href = lawDetailHref(lawId, articleNum);
+                    const primaryHeading = hit.articleTitle ?? hit.title;
+                    const showLawTitle = hit.articleTitle != null;
                     return (
                       <div
                         key={hit.id}
@@ -492,14 +549,27 @@ export function ExplorerPage() {
                           )}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                            <span className="truncate font-semibold leading-snug">{hit.title}</span>
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            <span className="truncate font-semibold leading-snug">{primaryHeading}</span>
+                            {hit.status && (
+                              <Badge tone={hit.status === 'vigente' ? 'success' : hit.status === 'derogada' ? 'danger' : 'amber'}>
+                                {statusLabel(hit.status)}
+                              </Badge>
+                            )}
                             {articleNum && (
                               <span className="shrink-0 font-mono text-[11px] text-muted">
                                 Art.&nbsp;{articleNum}
                               </span>
                             )}
                           </div>
+                          {showLawTitle && (
+                            <div className="truncate text-[12px] text-muted">{hit.title}</div>
+                          )}
+                          {(hit.rango || hit.publicada) && (
+                            <div className="mt-0.5 font-mono text-[11px] text-muted">
+                              {[hit.rango, hit.publicada ? formatDate(hit.publicada) : null].filter(Boolean).join(' · ')}
+                            </div>
+                          )}
                           {hit.snippet && (
                             <HighlightedSnippet
                               text={hit.snippet}
@@ -512,6 +582,9 @@ export function ExplorerPage() {
                       </div>
                     );
                   })}
+                {hasNextPage && (
+                  <LoadMoreButton loading={isFetchingNextPage} onClick={() => fetchNextPage()} />
+                )}
               </div>
             )
           ) : (
@@ -572,7 +645,6 @@ export function ExplorerPage() {
                     <Th>{t('explorer.cols.rango')}</Th>
                     <Th className="hidden lg:table-cell">{t('explorer.cols.published')}</Th>
                     <Th className="text-right">{t('explorer.cols.articles')}</Th>
-                    <Th className="hidden text-right xl:table-cell">{t('explorer.cols.refs')}</Th>
                     <Th className="w-10" />
                   </tr>
                 </thead>
@@ -597,7 +669,6 @@ export function ExplorerPage() {
                         <td><Skeleton className="h-3 w-20" /></td>
                         <td className="hidden lg:table-cell"><Skeleton className="h-3 w-16" /></td>
                         <td className="text-right"><Skeleton className="ml-auto h-3 w-8" /></td>
-                        <td className="hidden text-right xl:table-cell"><Skeleton className="ml-auto h-3 w-10" /></td>
                         <td />
                       </tr>
                     ))}
@@ -647,13 +718,15 @@ export function ExplorerPage() {
                       <td className="text-muted">{l.rango}</td>
                       <td className="hidden font-mono text-[12px] text-muted lg:table-cell">{formatDate(l.publicada)}</td>
                       <td className="pr-4 text-right font-mono">{l.articulos}</td>
-                      <td className="hidden pr-4 text-right font-mono text-muted xl:table-cell">{formatNumber(l.referencias)}</td>
                       <td className="pr-5"><ChevronRight className="size-3.5 text-muted" /></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
               </div>
+              {hasNextPage && (
+                <LoadMoreButton loading={isFetchingNextPage} onClick={() => fetchNextPage()} />
+              )}
               </>
             )
           )}
@@ -677,14 +750,26 @@ function Th({ children, className }: { children?: React.ReactNode; className?: s
 // a runtime "unknown sort" bug. The pre-refactor signature was
 // ``setSort: (v: any) => void`` — proper typing now. Labels resolve via
 // `explorer.sort.<key>` in the locale files.
-type SortKey = 'relevance' | 'date' | 'refs' | 'title';
-const SORT_KEYS: SortKey[] = ['relevance', 'date', 'refs', 'title'];
+type SortKey = 'relevance' | 'date' | 'title';
+const SORT_KEYS: SortKey[] = ['relevance', 'date', 'title'];
 
-function SortButton({ sort, setSort }: { sort: SortKey; setSort: (v: SortKey) => void }) {
+function LoadMoreButton({ loading, onClick }: { loading: boolean; onClick: () => void }) {
   const { t } = useTranslation();
   return (
+    <div className="flex justify-center border-t border-border px-8 py-4">
+      <Button variant="secondary" onClick={onClick} disabled={loading}>
+        {loading ? t('explorer.loadingMore') : t('explorer.loadMore')}
+      </Button>
+    </div>
+  );
+}
+
+function SortButton({ sort, setSort }: { sort: LawSort; setSort: (v: LawSort) => void }) {
+  const { t } = useTranslation();
+  const value: SortKey = sort === 'refs' ? 'relevance' : sort;
+  return (
     <select
-      value={sort}
+      value={value}
       onChange={(e) => setSort(e.target.value as SortKey)}
       className="h-9 rounded-md border border-border-strong bg-surface px-3 text-sm hover:bg-surface-2"
     >

@@ -63,7 +63,7 @@ export const RANK_MAP: Record<string, RangoNormativo> = {
   ley_organica: 'Ley Orgánica',
   ley_foral: 'Ley Foral',
   real_decreto: 'Real Decreto',
-  real_decreto_ley: 'Real Decreto',
+  real_decreto_ley: 'Real Decreto-ley',
   real_decreto_legislativo: 'RD Legislativo',
   decreto: 'Decreto',
   decreto_ley: 'Decreto-ley',
