@@ -8,6 +8,7 @@ import { useSearch, useTags, useUserTagVocab } from '@/lib/queries';
 import { useFocusTrap } from '@/lib/useFocusTrap';
 import { cn } from '@/lib/utils';
 import { HighlightedSnippet } from '@/components/domain/HighlightedSnippet';
+import { searchHitHref } from '@/lib/law-reading';
 import { STATIC_COMMANDS, filterCommands } from './command-palette/commands';
 
 type PaletteGroupId = 'tags' | 'userTags' | 'laws' | 'articles' | 'commands';
@@ -130,8 +131,8 @@ export function CommandPalette() {
           h.subtitle
         ),
         run: () => {
-          const p = h.payload as { lawId?: string };
-          if (p?.lawId) navigate(`/laws/${encodeURIComponent(p.lawId)}`);
+          const href = searchHitHref(h);
+          if (href) navigate(href);
           setPaletteOpen(false);
         },
       })),

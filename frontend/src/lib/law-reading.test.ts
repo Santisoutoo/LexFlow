@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   buildReadingItems,
   flattenToc,
+  lawDetailHref,
   parseArticleHash,
+  searchHitHref,
   sectionTargetId,
 } from './law-reading';
-import type { Article, Disposicion, HierarchyNode } from './types';
+import type { Article, Disposicion, HierarchyNode, SearchHit } from './types';
 
 const article = (num: string): Article => ({
   id: `LAW::${num}`,
@@ -55,6 +57,66 @@ describe('parseArticleHash', () => {
   it('returns null for non-article hashes', () => {
     expect(parseArticleHash('#section-foo')).toBeNull();
     expect(parseArticleHash('')).toBeNull();
+  });
+});
+
+describe('lawDetailHref', () => {
+  it('returns a law-only path when no article is given', () => {
+    expect(lawDetailHref('CE-1978')).toBe('/laws/CE-1978');
+    expect(lawDetailHref('CE-1978', null)).toBe('/laws/CE-1978');
+    expect(lawDetailHref('CE-1978', '')).toBe('/laws/CE-1978');
+  });
+
+  it('appends an encoded #art-N hash, including dotted numbers', () => {
+    expect(lawDetailHref('CE-1978', '14')).toBe('/laws/CE-1978#art-14');
+    expect(lawDetailHref('CE-1978', '28.3')).toBe(`/laws/CE-1978#art-${encodeURIComponent('28.3')}`);
+    expect(lawDetailHref('BOE-A-2018-16673', '15')).toBe('/laws/BOE-A-2018-16673#art-15');
+  });
+
+  it('encodes the law id', () => {
+    expect(lawDetailHref('BOE/A', '1')).toBe(`/laws/${encodeURIComponent('BOE/A')}#art-1`);
+  });
+});
+
+describe('searchHitHref', () => {
+  const articleHit = (over: Partial<SearchHit> = {}): SearchHit => ({
+    kind: 'article',
+    id: 'CE-1978::14',
+    title: 'Art. 14',
+    payload: { lawId: 'CE-1978', articleNum: '14' },
+    articleNumber: '14',
+    ...over,
+  });
+
+  it('builds an article deep link from articleNumber', () => {
+    expect(searchHitHref(articleHit())).toBe('/laws/CE-1978#art-14');
+  });
+
+  it('falls back to payload.articleNum and encodes dotted numbers', () => {
+    expect(
+      searchHitHref(
+        articleHit({
+          articleNumber: undefined,
+          payload: { lawId: 'CE-1978', articleNum: '28.3' },
+        }),
+      ),
+    ).toBe(`/laws/CE-1978#art-${encodeURIComponent('28.3')}`);
+  });
+
+  it('omits the hash for law-kind hits', () => {
+    expect(
+      searchHitHref({
+        kind: 'law',
+        id: 'CE-1978',
+        title: 'Constitución',
+        payload: { lawId: 'CE-1978', articleNum: '14' },
+        articleNumber: '14',
+      }),
+    ).toBe('/laws/CE-1978');
+  });
+
+  it('returns null when payload.lawId is missing', () => {
+    expect(searchHitHref(articleHit({ payload: {} }))).toBeNull();
   });
 });
 
