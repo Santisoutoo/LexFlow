@@ -65,6 +65,20 @@ describe('HelpDrawer content resolution', () => {
     await userEvent.click(screen.getByRole('button', { name: /abrir ayuda/i }));
     expect(screen.getByRole('heading', { name: 'LexFlow' })).toBeInTheDocument();
   });
+
+  it('lists graph zoom shortcuts on /graph', async () => {
+    renderAt('/graph');
+    await userEvent.click(screen.getByRole('button', { name: /abrir ayuda/i }));
+    expect(screen.getByText('Acercar')).toBeInTheDocument();
+    expect(screen.getByText('Alejar')).toBeInTheDocument();
+    expect(screen.getByText('Restablecer zoom')).toBeInTheDocument();
+  });
+
+  it('lists new-chat shortcut on /chat', async () => {
+    renderAt('/chat');
+    await userEvent.click(screen.getByRole('button', { name: /abrir ayuda/i }));
+    expect(screen.getByText('Conversación nueva')).toBeInTheDocument();
+  });
 });
 
 describe('HelpDrawer close paths', () => {

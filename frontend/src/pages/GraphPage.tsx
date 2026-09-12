@@ -55,6 +55,45 @@ function parseNodeBudget(raw: string | null): number {
   return Math.min(Math.floor(parsed), 50_000);
 }
 
+function isTypingTarget(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null;
+  return Boolean(el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable));
+}
+
+/**
+ * Route-scoped zoom shortcuts advertised in HelpDrawer (`+` / `-` / `0`).
+ *
+ * `useHotkey('+')` cannot parse `+` (it is the combo delimiter) and Shift+=
+ * would fail the shift-mismatch check, so this listener matches the keys
+ * the help text actually names.
+ */
+function useGraphZoomHotkeys(graphRef: { current: GraphCanvasHandle | null }) {
+  useEffect(() => {
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      if (isTypingTarget(event.target)) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const graph = graphRef.current;
+      if (!graph) return;
+      if (event.key === '+' || event.key === '=' || event.key === 'Add') {
+        event.preventDefault();
+        graph.zoomIn();
+        return;
+      }
+      if (event.key === '-' || event.key === 'Subtract') {
+        event.preventDefault();
+        graph.zoomOut();
+        return;
+      }
+      if (event.key === '0') {
+        event.preventDefault();
+        graph.fit();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [graphRef]);
+}
+
 export function GraphPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -64,6 +103,7 @@ export function GraphPage() {
   const [advancedFilters, setAdvancedFilters] = useState<GraphAdvancedFilters>(EMPTY_ADVANCED_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const graphRef = useRef<GraphCanvasHandle>(null);
+  useGraphZoomHotkeys(graphRef);
   const [legendOpen, setLegendOpen] = useState(false);
   const { pinnedLawIds, togglePin, isPinned } = useGraphPins();
   const { data: topLaws } = useGraphTop({ limit: 10 });

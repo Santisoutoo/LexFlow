@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { liveSecretsApi, type SecretStatusItem } from '@/lib/api/secrets';
 import { api } from '@/lib/api';
 import {
-  Settings as Cog,
   CheckCircle2,
   AlertTriangle,
   Wand2,
@@ -254,7 +253,6 @@ function ModelsSection() {
   const { data: models = [] } = useModels();
   const invalidateModels = useInvalidateModels();
   const defaultModel = useUi((s) => s.defaultModel);
-  const setDefaultModel = useUi((s) => s.setDefaultModel);
   const requestWizard = useUi((s) => s.requestWizard);
   const [secrets, setSecrets] = useState<SecretStatusItem[]>([]);
   const m = models.find((x) => x.id === defaultModel) ?? models[0];
@@ -316,7 +314,13 @@ function ModelsSection() {
 
       <div className="label-caps mb-2">{t('settings.models.providers')}</div>
       {models.map((p) => (
-        <div key={p.id} className="mb-2 flex items-center gap-3.5 rounded-lg border border-border bg-surface p-3.5">
+        <div
+          key={p.id}
+          className={cn(
+            'mb-2 flex items-center gap-3.5 rounded-lg border p-3.5',
+            p.id === defaultModel ? 'border-indigo-500/40 bg-primary-soft' : 'border-border bg-surface',
+          )}
+        >
           <div className={cn(
             'inline-flex size-9 items-center justify-center rounded-md font-semibold font-display',
             p.kind === 'local' ? 'bg-success-soft text-success' : 'bg-primary-soft text-indigo-700 dark:text-indigo-200',
@@ -351,7 +355,11 @@ function ModelsSection() {
                 ? t('settings.models.notRunning')
                 : cloudBadgeText(p)}
           </Badge>
-          <Button size="sm" variant="ghost" onClick={() => setDefaultModel(p.id)} icon={<Cog className="size-3.5" />} />
+          <SetDefaultProviderButton
+            providerId={p.id}
+            providerLabel={p.vendor}
+            isDefault={p.id === defaultModel}
+          />
         </div>
       ))}
 
@@ -359,6 +367,51 @@ function ModelsSection() {
       <ApiKeysCard onSecretsChange={refreshSecrets} onModelsChange={invalidateModels} />
       <SemanticSearchCard />
     </>
+  );
+}
+
+/**
+ * Explicit "use as default" control for a provider row.
+ *
+ * Replaces the icon-only Cog button: labelled, aria-labelled with the
+ * provider name, toast on change, and a current-default badge so the
+ * row tells the truth (#58 S2.8).
+ */
+export function SetDefaultProviderButton({
+  providerId,
+  providerLabel,
+  isDefault,
+}: {
+  providerId: string;
+  providerLabel: string;
+  isDefault: boolean;
+}) {
+  const { t } = useTranslation();
+  const setDefaultModel = useUi((s) => s.setDefaultModel);
+
+  const choose = () => {
+    if (isDefault) return;
+    setDefaultModel(providerId);
+    toast({
+      tone: 'success',
+      title: t('settings.models.defaultSetTitle'),
+      message: t('settings.models.defaultSetMessage', { provider: providerLabel }),
+    });
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      {isDefault && <Badge tone="info">{t('settings.models.isDefault')}</Badge>}
+      <Button
+        size="sm"
+        variant="secondary"
+        disabled={isDefault}
+        aria-label={t('settings.models.useAsDefaultAria', { provider: providerLabel })}
+        onClick={choose}
+      >
+        {t('settings.models.useAsDefault')}
+      </Button>
+    </div>
   );
 }
 

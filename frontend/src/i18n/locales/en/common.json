@@ -540,6 +540,11 @@
       "subtitle": "Configure the models available for chat. Local ones run on your machine; cloud ones make outbound requests.",
       "relaunchWizard": "Relaunch wizard",
       "defaultModel": "Default model",
+      "useAsDefault": "Use as default",
+      "useAsDefaultAria": "Use {{provider}} as default",
+      "isDefault": "Default",
+      "defaultSetTitle": "Default model updated",
+      "defaultSetMessage": "{{provider}} is now the default model",
       "configured": "configured",
       "missingCredential": "missing credential",
       "providers": "Providers",
@@ -848,7 +853,8 @@
     "cancel": "Cancel",
     "confirm": "Confirm",
     "delete": "Delete",
-    "loading": "Loading…"
+    "loading": "Loading…",
+    "comingSoon": "Coming soon"
   },
   "appUpdate": {
     "title": "New version available (v{{version}})",

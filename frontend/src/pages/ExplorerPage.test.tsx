@@ -171,4 +171,12 @@ describe('ExplorerPage pagination and states', () => {
     fireEvent.click(screen.getByRole('button', { name: /semántico|semantic/i }));
     expect(screen.getByTestId('search-page')).toBeInTheDocument();
   });
+
+  it('honest-disables Exportar with a coming-soon tooltip', () => {
+    mockBrowse([{ items: [makeLaw('LAW-1')], total: 1, cursor: null }]);
+    renderExplorer();
+    const exportBtn = screen.getByRole('button', { name: /exportar|export/i, hidden: true });
+    expect(exportBtn).toBeDisabled();
+    expect(exportBtn.parentElement).toHaveAttribute('title', expect.stringMatching(/próximamente|coming soon/i));
+  });
 });

@@ -28,3 +28,18 @@ describe('TopBar mobile account menu', () => {
     expect(screen.getByRole('link', { name: /comunidades|communities/i })).toHaveAttribute('href', '/communities');
   });
 });
+
+describe('TopBar right-rail toggle', () => {
+  it('hides the toggle on rail-less routes', () => {
+    renderTopBar('/home');
+    expect(screen.queryByRole('button', { name: /alternar panel derecho|toggle right panel/i })).toBeNull();
+  });
+
+  it('shows the toggle on law detail and graph', () => {
+    const { unmount } = renderTopBar('/laws/CE-1978');
+    expect(screen.getAllByRole('button', { name: /alternar panel derecho|toggle right panel/i }).length).toBeGreaterThan(0);
+    unmount();
+    renderTopBar('/graph');
+    expect(screen.getAllByRole('button', { name: /alternar panel derecho|toggle right panel/i }).length).toBeGreaterThan(0);
+  });
+});

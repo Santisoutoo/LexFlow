@@ -254,4 +254,17 @@ describe('LawDetailPage', () => {
     expect(screen.getByText('Modifica')).toBeInTheDocument();
     expect(screen.getByText('Cita')).toBeInTheDocument();
   });
+
+  it('renders four tabs and no stub Discusión tab', async () => {
+    renderPage('/laws/CE-1978');
+    await screen.findByText('Los españoles son iguales ante la ley.');
+    const tabs = screen.getAllByRole('tab');
+    expect(tabs).toHaveLength(4);
+    expect(tabs.map((tab) => tab.textContent ?? '').join(' ')).toMatch(/texto/i);
+    expect(tabs.map((tab) => tab.textContent ?? '').join(' ')).toMatch(/versiones/i);
+    expect(tabs.map((tab) => tab.textContent ?? '').join(' ')).toMatch(/grafo/i);
+    expect(tabs.map((tab) => tab.textContent ?? '').join(' ')).toMatch(/referencias/i);
+    expect(screen.queryByRole('tab', { name: /discusión|discussion/i })).toBeNull();
+    expect(screen.queryByText(/pestaña .+ — disponible|tab — available/i)).toBeNull();
+  });
 });

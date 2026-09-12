@@ -32,11 +32,11 @@ vi.mock('@/lib/store', () => ({
     }),
 }));
 
-function renderPalette() {
+function renderPalette(path = '/home') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>
         <CommandPalette />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -180,5 +180,31 @@ describe('CommandPalette go-to commands', () => {
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'ajustes' } });
     fireEvent.click(screen.getByText(/ir a ajustes|go to settings/i));
     expect(navigateMock).toHaveBeenCalledWith('/settings');
+  });
+});
+
+describe('CommandPalette PDF export', () => {
+  beforeEach(() => {
+    navigateMock.mockReset();
+    useSearchMock.mockReturnValue({
+      data: { hits: [], total: 0 } satisfies SearchResults,
+      isFetching: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+  });
+
+  it('omits Exportar página como PDF on /graph', () => {
+    renderPalette('/graph');
+    expect(screen.queryByText(/exportar página como pdf|export page as pdf/i)).toBeNull();
+  });
+
+  it('prints from Exportar página como PDF on /explorer', () => {
+    const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {});
+    renderPalette('/explorer');
+    fireEvent.click(screen.getByText(/exportar página como pdf|export page as pdf/i));
+    expect(printSpy).toHaveBeenCalledTimes(1);
+    printSpy.mockRestore();
   });
 });

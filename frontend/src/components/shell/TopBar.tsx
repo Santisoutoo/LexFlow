@@ -6,6 +6,7 @@ import { Avatar, Button, Kbd } from '@/components/ui';
 import { useUi } from '@/lib/store';
 import { useLaw } from '@/lib/queries';
 import { modKey } from '@/lib/utils';
+import { hasContextualRightRail } from '@/lib/shell-routes';
 import { MobileNavMenu } from './MobileNavMenu';
 
 export function TopBar() {
@@ -20,6 +21,7 @@ export function TopBar() {
   const navigate = useNavigate();
   const params = useParams<{ lawId?: string }>();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const showRightToggle = hasContextualRightRail(location.pathname);
 
   return (
     <header
@@ -44,15 +46,19 @@ export function TopBar() {
       <Button size="icon" variant="ghost" aria-label={t('shell.toggleTheme')} onClick={toggleTheme} className="ml-auto md:ml-0">
         {theme === 'light' ? <Sun className="size-4" /> : <Moon className="size-4" />}
       </Button>
-      {/* Desktop dock toggle — hidden on mobile, where the contextual panel is
-          a bottom sheet driven by the separate `mobileRightOpen` flag (#826 M3). */}
-      <Button size="icon" variant="ghost" aria-label={t('shell.toggleRightPanel')} onClick={toggleRight} className="hidden md:inline-flex">
-        {rightOpen ? <SidebarClose className="size-4" /> : <SidebarOpen className="size-4" />}
-      </Button>
-      {/* Mobile: open the contextual panel as a bottom sheet (closed by default). */}
-      <Button size="icon" variant="ghost" aria-label={t('shell.toggleRightPanel')} onClick={toggleMobileRight} className="md:hidden">
-        <Info className="size-4" />
-      </Button>
+      {showRightToggle && (
+        <>
+          {/* Desktop dock toggle — hidden on mobile, where the contextual panel is
+              a bottom sheet driven by the separate `mobileRightOpen` flag (#826 M3). */}
+          <Button size="icon" variant="ghost" aria-label={t('shell.toggleRightPanel')} onClick={toggleRight} className="hidden md:inline-flex">
+            {rightOpen ? <SidebarClose className="size-4" /> : <SidebarOpen className="size-4" />}
+          </Button>
+          {/* Mobile: open the contextual panel as a bottom sheet (closed by default). */}
+          <Button size="icon" variant="ghost" aria-label={t('shell.toggleRightPanel')} onClick={toggleMobileRight} className="md:hidden">
+            <Info className="size-4" />
+          </Button>
+        </>
+      )}
       <button
         type="button"
         className="rounded-full md:hidden"

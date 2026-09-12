@@ -34,7 +34,7 @@ const VERSION_KIND_BADGE: Record<'publish' | 'default', string> = {
 
 const ALL_GRAPH_KINDS: GraphNodeKind[] = ['law', 'article', 'reference', 'amendment', 'repealed'];
 
-type Tab = 'texto' | 'versiones' | 'grafo' | 'refs' | 'disc';
+type Tab = 'texto' | 'versiones' | 'grafo' | 'refs';
 
 /**
  * `versions` is newest-first (git log). `toIndex` is the row the user
@@ -149,7 +149,6 @@ export function LawDetailPage() {
               { id: 'versiones', label: t('lawDetail.tabs.versiones'), count: versions.length },
               { id: 'grafo', label: t('lawDetail.tabs.grafo') },
               { id: 'refs', label: t('lawDetail.tabs.refs'), count: law.referencias },
-              { id: 'disc', label: t('lawDetail.tabs.disc') },
             ]}
           />
         </div>
@@ -224,11 +223,6 @@ export function LawDetailPage() {
         )}
         {tab === 'refs' && (
           <LawDetailRefsTab refs={lawRefs} onRefClick={setSelectedRef} />
-        )}
-        {tab === 'disc' && (
-          <div className="flex-1 overflow-auto p-12 text-center text-muted">
-            <p>{t('lawDetail.tabPending', { tab: t('lawDetail.tabs.disc') })}</p>
-          </div>
         )}
       </div>
 
