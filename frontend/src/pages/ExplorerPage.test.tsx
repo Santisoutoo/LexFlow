@@ -154,6 +154,17 @@ describe('ExplorerPage pagination and states', () => {
     expect(within(row as HTMLElement).getByText('Derogada')).toBeInTheDocument();
   });
 
+  it('labels density tabs with Appearance copy, not glyphs', () => {
+    mockBrowse([{ items: [], total: 0, cursor: null }]);
+    renderExplorer();
+
+    expect(screen.getByRole('button', { name: /compacto/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /cómodo/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /amplio/i })).toBeInTheDocument();
+    expect(screen.queryByText('≡')).not.toBeInTheDocument();
+    expect(screen.getByText(/afecta toda la aplicación/i)).toBeInTheDocument();
+  });
+
   it('navigates to /search when switching to semantic mode', () => {
     mockBrowse([{ items: [], total: 0, cursor: null }]);
     mockSearch([{ hits: [], total: 0 }]);

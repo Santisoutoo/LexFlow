@@ -32,7 +32,7 @@ import { useTranslation } from 'react-i18next';
 import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
-import { useEditorStore, makeDefaultDocument } from '@/lib/editor-store';
+import { useEditorStore, makeDefaultDocument, isSentinelDocumentTitle } from '@/lib/editor-store';
 import { toast } from '@/lib/toast';
 import { exportMarkdown } from '@/pages/editor/export-utils';
 import { EditorToolbar } from '@/pages/editor/EditorToolbar';
@@ -278,11 +278,11 @@ function EditorWorkspace({ docId }: { docId: string }) {
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <input
             type="text"
-            value={title}
+            value={isSentinelDocumentTitle(title) ? '' : title}
             onChange={handleTitleChange}
             readOnly={isReadOnly}
-            aria-label="Document title"
-            placeholder="Untitled document"
+            aria-label={t('editor.documentTitleAria')}
+            placeholder={t('editor.placeholder')}
             className={cn(
               'w-full bg-transparent text-2xl font-semibold tracking-tight text-fg outline-none',
               'placeholder:text-muted',
@@ -293,7 +293,9 @@ function EditorWorkspace({ docId }: { docId: string }) {
           <span className="text-xs text-muted">
             {stored?.updatedAt && (
               <>
-                Saved {new Date(stored.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {t('editor.savedAt', {
+                  time: new Date(stored.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                })}
               </>
             )}
           </span>

@@ -10,7 +10,7 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { FilePlus, FileText } from 'lucide-react';
-import { listDocuments, useEditorStore } from '@/lib/editor-store';
+import { listDocuments, useEditorStore, isSentinelDocumentTitle } from '@/lib/editor-store';
 import { cn, timeAgo } from '@/lib/utils';
 
 export function DocumentPicker() {
@@ -66,7 +66,9 @@ export function DocumentList({ activeId }: { activeId?: string }) {
                 >
                   <FileText className="mt-0.5 size-3.5 shrink-0" />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{doc.title.trim() || t('editor.untitled')}</span>
+                    <span className="block truncate font-medium">
+                      {isSentinelDocumentTitle(doc.title) ? t('editor.untitled') : doc.title}
+                    </span>
                     <span className="block text-[11px] text-muted">{timeAgo(doc.updatedAt)}</span>
                   </span>
                 </button>

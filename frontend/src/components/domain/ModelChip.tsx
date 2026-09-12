@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown } from 'lucide-react';
-import { Badge, Kbd } from '@/components/ui';
+import { Badge } from '@/components/ui';
 import { useModels } from '@/lib/queries';
 import { useUi } from '@/lib/store';
 import { cn } from '@/lib/utils';
@@ -51,7 +51,8 @@ export function ModelChip() {
               </button>
             ))}
             <div className="mt-1 border-t border-border px-2.5 pt-2 pb-1 text-[11px] text-muted">
-              {t('model.changeModelsPre')} <Kbd>{t('model.changeModelsKbd')}</Kbd>
+              {t('model.changeModelsPre')}{' '}
+              <span className="font-medium">{t('model.changeModelsPath')}</span>
             </div>
           </div>
         </>

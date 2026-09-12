@@ -3,7 +3,7 @@ import { Settings, PanelLeft, PanelRightOpen, FileEdit, MapPin } from 'lucide-re
 import { useTranslation } from 'react-i18next';
 import { BrandMark } from '@/components/BrandMark';
 import { Kbd } from '@/components/ui';
-import { cn } from '@/lib/utils';
+import { cn, modKey } from '@/lib/utils';
 import { useUi, LEFT_RAIL_MIN, LEFT_RAIL_MAX } from '@/lib/store';
 import { RECENT_LAWS_RAIL_COUNT, useRecentLawsStore } from '@/lib/recent-laws';
 import { NAV } from './nav-items';
@@ -111,16 +111,16 @@ export function LeftRail() {
             in the mobile BottomTabBar (which is sized for exactly 5 tabs). */}
         <NavLink
           to="/communities"
-          title={!expanded ? t('nav.communities') : undefined}
+          title={t('nav.communitiesHint')}
           className={({ isActive }) =>
             cn(
-              'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13.5px] transition-colors',
+              'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[12.5px] transition-colors',
               isActive ? 'text-fg bg-surface-2' : 'text-muted hover:bg-surface-2',
               !expanded && 'justify-center px-0 py-2.5',
             )
           }
         >
-          <MapPin className="size-[17px]" />
+          <MapPin className="size-[15px] opacity-80" />
           {expanded && <span className="flex-1 text-left">{t('nav.communities')}</span>}
         </NavLink>
         {/* Editor — secondary destination; not in the main NAV array so it
@@ -165,7 +165,7 @@ export function LeftRail() {
         >
           {expanded ? <PanelLeft className="size-4" /> : <PanelRightOpen className="size-4" />}
           {expanded && <span className="flex-1 text-left">{t('nav.collapse')}</span>}
-          {expanded && <Kbd>⌘ \\</Kbd>}
+          {expanded && <Kbd>{`${modKey} \\`}</Kbd>}
         </button>
         </div>
       </div>

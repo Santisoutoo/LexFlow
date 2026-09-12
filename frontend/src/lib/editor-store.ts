@@ -81,6 +81,18 @@ export const DEFAULT_DOC_ID = 'draft';
 /** Default title for a newly minted document (UI may localise the empty display). */
 export const DEFAULT_NEW_DOC_TITLE = 'Untitled';
 
+const SENTINEL_TITLES = new Set(['', DEFAULT_NEW_DOC_TITLE, 'Draft']);
+
+/**
+ * True when `title` is an unlocalised store default.
+ *
+ * The persistence layer keeps English sentinels so existing localStorage
+ * drafts stay stable; the UI maps them through `t('editor.untitled')`.
+ */
+export function isSentinelDocumentTitle(title: string): boolean {
+  return SENTINEL_TITLES.has(title.trim());
+}
+
 /** Construct a fresh document stub for `id` with empty content. */
 export function makeDefaultDocument(id: string, title?: string): EditorDocument {
   return {

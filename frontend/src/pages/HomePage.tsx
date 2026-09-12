@@ -5,13 +5,14 @@ import { Sparkles, Search, ArrowRight, ChevronRight, Plus, GitCompareArrows, Boo
 import { Badge, Card, Chip, Kbd } from '@/components/ui';
 import { EmptyState } from '@/components/domain/EmptyState';
 import { Skeleton } from '@/components/domain/Skeleton';
-import { useLawsList, useSyncStatus, useTags } from '@/lib/queries';
+import { useLawsList, useSyncStatus, useTags, useVersions } from '@/lib/queries';
 import { useUi } from '@/lib/store';
 import { formatNumber, modKey, timeAgo, statusLabel, formatDate } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { pickGreeting } from '@/lib/greeting';
 import type { Law } from '@/lib/types';
 import { groupByRecency } from './home/recency-groups';
+import { useDiffExampleLaw } from './home/use-diff-example-law';
 
 type ChipKind = 'chat' | 'diff' | 'explorer';
 
@@ -21,6 +22,7 @@ interface ExampleChip {
   /** Route target. For 'chat' and 'explorer' this is already passed via
    *  the onClick handler below; kept here for documentation clarity. */
   target: string;
+  disabled?: boolean;
 }
 
 /**
@@ -32,12 +34,14 @@ interface ExampleChip {
  *   - 'diff'     → /laws/{id}/diff  (version-comparison prompts)
  *   - 'explorer' → /explorer?q=…   (plain keyword searches)
  */
-const EXAMPLE_CHIPS: ExampleChip[] = [
-  { label: 'Cambios al Código Penal en 2024',    kind: 'chat',     target: '/chat' },
-  { label: '¿Qué exige el art. 28 de la LOPDGDD?', kind: 'chat',  target: '/chat' },
-  { label: 'Diff entre v1.0 y v1.3 de la LOPDGDD', kind: 'diff',  target: '/laws/BOE-A-2018-16673/diff' },
-  { label: 'Leyes autonómicas sobre vivienda',   kind: 'explorer', target: '/explorer?q=leyes+auton%C3%B3micas+vivienda' },
-];
+function exampleChips(diffTarget: string, diffLabel: string, diffDisabled: boolean): ExampleChip[] {
+  return [
+    { label: 'Cambios al Código Penal en 2024', kind: 'chat', target: '/chat' },
+    { label: '¿Qué exige el art. 28 de la LOPDGDD?', kind: 'chat', target: '/chat' },
+    { label: diffLabel, kind: 'diff', target: diffTarget, disabled: diffDisabled },
+    { label: 'Leyes autonómicas sobre vivienda', kind: 'explorer', target: '/explorer?q=leyes+auton%C3%B3micas+vivienda' },
+  ];
+}
 
 export function HomePage() {
   const navigate = useNavigate();
@@ -55,6 +59,18 @@ export function HomePage() {
     () => (laws?.items ? groupByRecency(laws.items.slice(0, 10), new Date()) : []),
     [laws?.items],
   );
+  const diffCandidates = lawsLoading ? [] : (laws?.items ?? []);
+  const { lawId: diffLawId, isResolving: diffResolving, law: diffLaw } = useDiffExampleLaw(diffCandidates);
+  const diffBusy = lawsLoading || diffResolving;
+  const { data: diffVersions = [] } = useVersions(diffBusy ? undefined : diffLawId);
+  const diffHref = `/laws/${encodeURIComponent(diffLawId)}/diff`;
+  const diffFromTag = diffVersions[1]?.tag;
+  const diffToTag = diffVersions[0]?.tag;
+  const diffSub =
+    diffLaw?.short && diffFromTag && diffToTag
+      ? t('home.tiles.diffSub', { short: diffLaw.short, from: diffFromTag, to: diffToTag })
+      : t('home.tiles.diffSubFallback');
+  const chips = exampleChips(diffHref, t('home.chips.diff'), diffBusy);
 
   return (
     <div className="h-full overflow-auto scrollbar-thin">
@@ -82,14 +98,18 @@ export function HomePage() {
             <Kbd>{modKey} K</Kbd>
           </button>
           <div className="mt-3 flex flex-wrap gap-2">
-            {EXAMPLE_CHIPS.map(({ label, kind, target }) => (
+            {chips.map(({ label, kind, target, disabled }) => (
               <Chip
                 key={label}
                 icon={<Sparkles className="size-3" />}
-                className="bg-bg"
+                className={disabled ? 'bg-bg opacity-60' : 'bg-bg'}
+                disabled={disabled}
                 // Chat chips carry the question through router state so ChatPage
                 // can pre-fill the composer instead of landing on an empty chat.
-                onClick={() => navigate(target, kind === 'chat' ? { state: { draft: label } } : undefined)}
+                onClick={() => {
+                  if (disabled) return;
+                  navigate(target, kind === 'chat' ? { state: { draft: label } } : undefined);
+                }}
               >
                 {label}
               </Chip>
@@ -163,7 +183,7 @@ export function HomePage() {
             <div className="grid grid-cols-1 gap-2.5">
               <QuickTile icon={Network} tone="indigo" title={t('home.tiles.graphTitle')} sub={t('home.tiles.graphSub')} onClick={() => navigate('/graph')} />
               <QuickTile icon={MessagesSquare} tone="amber" title={t('home.tiles.chatTitle')} sub={t('home.tiles.chatSub')} onClick={() => navigate('/chat')} />
-              <QuickTile icon={GitCompareArrows} tone="violet" title={t('home.tiles.diffTitle')} sub={t('home.tiles.diffSub')} onClick={() => navigate('/laws/BOE-A-2018-16673/diff')} />
+              <QuickTile icon={GitCompareArrows} tone="violet" title={t('home.tiles.diffTitle')} sub={diffSub} disabled={diffBusy} onClick={() => navigate(diffHref)} />
               <QuickTile icon={BarChart3} tone="cyan" title={t('home.tiles.dashboardsTitle')} sub={t('home.tiles.dashboardsSub')} onClick={() => navigate('/dashboards')} />
             </div>
           </section>
@@ -249,13 +269,14 @@ function ChangedFeedSkeleton() {
 }
 
 function QuickTile({
-  icon: I, tone, title, sub, onClick,
+  icon: I, tone, title, sub, onClick, disabled,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   tone: 'indigo' | 'amber' | 'violet' | 'cyan';
   title: string;
   sub: string;
   onClick: () => void;
+  disabled?: boolean;
 }) {
   // Deslop #798: violet/cyan tints were copy-pasted arbitrary HSL values —
   // now sourced from the shared --reference-soft/--amendment-soft tokens
@@ -268,8 +289,10 @@ function QuickTile({
   };
   return (
     <button
+      type="button"
       onClick={onClick}
-      className="flex items-center gap-3 rounded-lg border border-border bg-surface p-3.5 text-left transition-colors hover:border-border-strong hover:bg-surface-2/50"
+      disabled={disabled}
+      className="flex items-center gap-3 rounded-lg border border-border bg-surface p-3.5 text-left transition-colors hover:border-border-strong hover:bg-surface-2/50 disabled:pointer-events-none disabled:opacity-60"
     >
       <span className={cn('inline-flex size-8 shrink-0 items-center justify-center rounded-md', palette[tone])}>
         <I className="size-4" />
