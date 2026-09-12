@@ -34,6 +34,7 @@ export function AppShell() {
     c: () => navigate('/chat'),
     d: () => navigate('/dashboards'),
     s: () => navigate('/settings'),
+    n: () => navigate('/editor'),
   });
 
   return (

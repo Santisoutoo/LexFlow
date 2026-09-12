@@ -3,7 +3,29 @@
  *
  * Inline tags merge with chip-driven tags from the Explorer URL. The last
  * `#fragment` token (if any) is exposed for autocomplete dropdowns.
+ *
+ * Also owns the `/search` href helper so palette, Explorer, and
+ * SearchResultsPage share one query-string contract.
  */
+
+export const SEARCH_MODES = ['fulltext', 'semantic', 'hybrid'] as const;
+export type SearchMode = (typeof SEARCH_MODES)[number];
+export const DEFAULT_SEARCH_MODE: SearchMode = 'fulltext';
+
+/** Coerce a `?mode=` value; unknown / missing → full-text. */
+export function parseSearchMode(raw: string | null | undefined): SearchMode {
+  if (raw === 'semantic' || raw === 'hybrid' || raw === 'fulltext') return raw;
+  return DEFAULT_SEARCH_MODE;
+}
+
+/** `/search?q=…&mode=…` — omits empty params. `q` keeps `#tag` tokens. */
+export function searchResultsHref(q: string, mode?: SearchMode): string {
+  const params = new URLSearchParams();
+  if (q) params.set('q', q);
+  if (mode) params.set('mode', mode);
+  const qs = params.toString();
+  return qs ? `/search?${qs}` : '/search';
+}
 
 export interface ParsedSearchInput {
   plainQ: string;

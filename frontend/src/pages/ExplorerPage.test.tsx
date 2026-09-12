@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { Law, SearchHit, SearchResults } from '@/lib/types';
@@ -152,5 +152,23 @@ describe('ExplorerPage pagination and states', () => {
     const row = screen.getByText('Ley derogada').closest('[role="button"]');
     expect(row).toBeTruthy();
     expect(within(row as HTMLElement).getByText('Derogada')).toBeInTheDocument();
+  });
+
+  it('navigates to /search when switching to semantic mode', () => {
+    mockBrowse([{ items: [], total: 0, cursor: null }]);
+    mockSearch([{ hits: [], total: 0 }]);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={['/explorer?q=despido']}>
+          <Routes>
+            <Route path="/explorer" element={<ExplorerPage />} />
+            <Route path="/search" element={<div data-testid="search-page" />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /semántico|semantic/i }));
+    expect(screen.getByTestId('search-page')).toBeInTheDocument();
   });
 });

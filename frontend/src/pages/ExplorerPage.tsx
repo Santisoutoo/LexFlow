@@ -29,7 +29,7 @@ import {
   useWarmup,
 } from '@/lib/queries';
 import { errorMessage } from '@/lib/errors';
-import { parseSearchInput } from '@/lib/search-query';
+import { parseSearchInput, parseSearchMode, searchResultsHref } from '@/lib/search-query';
 import { useUi } from '@/lib/store';
 import { cn, formatDate, statusLabel } from '@/lib/utils';
 import { RANK_MAP, STATUS_MAP, SCOPE_MAP } from '@/lib/api/transformers';
@@ -435,6 +435,18 @@ export function ExplorerPage() {
                 { id: 'comfortable', label: '≣' },
                 { id: 'cozy', label: '☰' },
               ]} />
+            )}
+            {isSearchMode && (
+              <Tabs
+                variant="segmented"
+                value="fulltext"
+                onChange={(id) => navigate(searchResultsHref(q, parseSearchMode(id)))}
+                tabs={[
+                  { id: 'fulltext', label: t('search.modeFullText') },
+                  { id: 'semantic', label: t('search.modeSemantic') },
+                  { id: 'hybrid', label: t('search.modeHybrid') },
+                ]}
+              />
             )}
             <Button variant="secondary" icon={<Download className="size-3.5" />} className="hidden sm:inline-flex">{t('explorer.export')}</Button>
           </div>

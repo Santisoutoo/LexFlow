@@ -117,6 +117,7 @@ describe('CommandPalette keyboard order', () => {
     renderPalette();
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'civil' } });
 
+    const viewAll = screen.getByText(/ver todos los resultados|view all results/i).closest('[role="option"]');
     const lawsHeader = screen.getByText(/leyes|laws/i);
     const articlesHeader = screen.getByText(/artículos|articles/i);
     const lawsSection = lawsHeader.parentElement as HTMLElement;
@@ -125,6 +126,8 @@ describe('CommandPalette keyboard order', () => {
     const lawOption = within(lawsSection).getByRole('option');
     const articleOption = within(articlesSection).getByRole('option');
 
+    expect(viewAll).toHaveAttribute('aria-selected', 'true');
+    fireEvent.keyDown(window, { key: 'ArrowDown' });
     expect(lawOption).toHaveAttribute('aria-selected', 'true');
     fireEvent.keyDown(window, { key: 'ArrowDown' });
     expect(articleOption).toHaveAttribute('aria-selected', 'true');
@@ -143,11 +146,39 @@ describe('CommandPalette view all results', () => {
     });
   });
 
-  it('navigates to explorer with the raw query', () => {
+  it('navigates to search with the raw query', () => {
     renderPalette();
     fireEvent.change(screen.getByRole('textbox'), { target: { value: '#laboral despido' } });
     fireEvent.click(screen.getByText(/ver todos los resultados|view all results/i));
 
-    expect(navigateMock).toHaveBeenCalledWith('/explorer?q=%23laboral+despido');
+    expect(navigateMock).toHaveBeenCalledWith('/search?q=%23laboral+despido');
+  });
+
+  it('navigates to search on Enter when a query is typed', () => {
+    renderPalette();
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'despido' } });
+    fireEvent.keyDown(window, { key: 'Enter' });
+
+    expect(navigateMock).toHaveBeenCalledWith('/search?q=despido');
+  });
+});
+
+describe('CommandPalette go-to commands', () => {
+  beforeEach(() => {
+    navigateMock.mockReset();
+    useSearchMock.mockReturnValue({
+      data: { hits: [], total: 0 } satisfies SearchResults,
+      isFetching: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+  });
+
+  it('surfaces the settings command for "ajustes" and navigates on run', () => {
+    renderPalette();
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'ajustes' } });
+    fireEvent.click(screen.getByText(/ir a ajustes|go to settings/i));
+    expect(navigateMock).toHaveBeenCalledWith('/settings');
   });
 });

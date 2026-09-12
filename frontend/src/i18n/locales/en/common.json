@@ -26,13 +26,23 @@
     "toggleRightPanel": "Toggle right panel",
     "breadcrumb": "Breadcrumb",
     "diff": "Diff",
-    "mockDataRibbon": "Demo data"
+    "mockDataRibbon": "Demo data",
+    "mobileMenu": {
+      "title": "More",
+      "openAria": "Open account menu",
+      "closeAria": "Close menu"
+    }
   },
   "editor": {
     "persistErrorTitle": "Could not save to the browser",
     "persistErrorBody": "Local storage is full. Export the document now so you do not lose your changes.",
     "persistErrorExport": "Export Markdown",
-    "persistErrorDismiss": "Dismiss"
+    "persistErrorDismiss": "Dismiss",
+    "documents": "Documents",
+    "newDocument": "New document",
+    "noDocuments": "No documents yet. Create one to get started.",
+    "untitled": "Untitled",
+    "pickDocument": "Pick a document or create a new one."
   },
   "model": {
     "local": "local",
@@ -414,6 +424,9 @@
       "article": "Articles"
     },
     "seeAll": "See all →",
+    "title": "Search",
+    "semanticUnavailable": "Semantic search is not active. Enable it in Settings → Models.",
+    "openSettings": "Open Settings",
     "modeFullText": "Text",
     "modeSemantic": "Semantic",
     "modeHybrid": "Hybrid",
@@ -818,9 +831,15 @@
     "tagSubtitle_other": "{{count}} statutes with this tag",
     "commands": {
       "theme": "Toggle theme",
+      "goHome": "Go to home",
+      "goExplorer": "Go to explorer",
+      "goSearch": "Go to search",
       "goGraph": "Go to graph",
       "goChat": "Go to chat",
       "goDash": "Dashboards",
+      "goCommunities": "Go to communities",
+      "goEditor": "Go to editor",
+      "goSettings": "Go to settings",
       "export": "Export page as PDF"
     }
   },
