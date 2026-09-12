@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ChevronRight, Search, Moon, Sun, SidebarOpen, SidebarClose, Info } from 'lucide-react';
@@ -5,6 +6,7 @@ import { Avatar, Button, Kbd } from '@/components/ui';
 import { useUi } from '@/lib/store';
 import { useLaw } from '@/lib/queries';
 import { modKey } from '@/lib/utils';
+import { MobileNavMenu } from './MobileNavMenu';
 
 export function TopBar() {
   const { t } = useTranslation();
@@ -17,6 +19,7 @@ export function TopBar() {
   const location = useLocation();
   const navigate = useNavigate();
   const params = useParams<{ lawId?: string }>();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <header
@@ -50,7 +53,18 @@ export function TopBar() {
       <Button size="icon" variant="ghost" aria-label={t('shell.toggleRightPanel')} onClick={toggleMobileRight} className="md:hidden">
         <Info className="size-4" />
       </Button>
-      <Avatar initials="LV" size={28} />
+      <button
+        type="button"
+        className="rounded-full md:hidden"
+        aria-haspopup="dialog"
+        aria-expanded={mobileMenuOpen}
+        aria-label={t('shell.mobileMenu.openAria')}
+        onClick={() => setMobileMenuOpen(true)}
+      >
+        <Avatar initials="LV" size={28} />
+      </button>
+      <Avatar initials="LV" size={28} className="hidden md:inline-flex" />
+      {mobileMenuOpen && <MobileNavMenu onClose={() => setMobileMenuOpen(false)} />}
     </header>
   );
 }
@@ -81,7 +95,9 @@ function Breadcrumb({ path, lawId, navigate }: { path: string; lawId?: string; n
   else if (path === '/chat') items.push({ label: t('nav.chat') });
   else if (path === '/dashboards') items.push({ label: t('nav.dashboards') });
   else if (path === '/communities') items.push({ label: t('nav.communities', 'Comunidades') });
-  else if (path === '/settings') items.push({ label: t('nav.settings') });
+  else if (path === '/settings' || path.startsWith('/settings/')) items.push({ label: t('nav.settings') });
+  else if (path === '/editor' || path.startsWith('/editor/')) items.push({ label: t('nav.editor') });
+  else if (path === '/search') items.push({ label: t('search.title') });
   else items.push({ label: path.slice(1) });
 
   return (

@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
-import { render, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { saveDocumentMock } = vi.hoisted(() => ({
+const { saveDocumentMock, createDocumentMock } = vi.hoisted(() => ({
   saveDocumentMock: vi.fn(),
+  createDocumentMock: vi.fn(() => 'new-doc-id'),
 }));
 
 vi.mock('@/lib/editor-store', () => {
@@ -13,6 +14,9 @@ vi.mock('@/lib/editor-store', () => {
     saveDocument: saveDocumentMock,
     persistError: null,
     clearPersistError: vi.fn(),
+    documents: {},
+    listDocuments: () => [],
+    createDocument: createDocumentMock,
   };
   const useEditorStore = (selector?: (s: typeof state) => unknown) =>
     typeof selector === 'function' ? selector(state) : state;
@@ -24,6 +28,7 @@ vi.mock('@/lib/editor-store', () => {
       content: { type: 'doc', content: [{ type: 'paragraph' }] },
       updatedAt: new Date().toISOString(),
     }),
+    listDocuments: () => [],
     useEditorStore,
   };
 });
@@ -89,6 +94,8 @@ function renderEditor(initialPath = '/editor/draft') {
 describe('EditorPage autosave flush', () => {
   beforeEach(() => {
     saveDocumentMock.mockReset();
+    createDocumentMock.mockReset();
+    createDocumentMock.mockReturnValue('new-doc-id');
     mockEditor.getJSON.mockReset();
     mockEditor.getJSON.mockReturnValue({
       type: 'doc',
@@ -128,6 +135,21 @@ describe('EditorPage autosave flush', () => {
     expect(saveDocumentMock).not.toHaveBeenCalledWith(
       expect.objectContaining({ id: 'doc-b', content: pendingContent }),
     );
+  });
+
+  it('creates a document from the picker and navigates to the new id', async () => {
+    createDocumentMock.mockReturnValue('new-doc-id');
+    render(
+      <MemoryRouter initialEntries={['/editor']}>
+        <Routes>
+          <Route path="/editor" element={<EditorPage />} />
+          <Route path="/editor/:docId" element={<div data-testid="opened-doc" />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /nuevo documento/i }));
+    expect(createDocumentMock).toHaveBeenCalled();
+    expect(await screen.findByTestId('opened-doc')).toBeInTheDocument();
   });
 
   it('flushes pending debounced save on unmount', async () => {

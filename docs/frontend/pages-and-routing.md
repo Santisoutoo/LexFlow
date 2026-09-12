@@ -19,7 +19,9 @@ to a single page file under
 | `/chat/:threadId`            | [`ChatPage.tsx`](../../frontend/src/pages/ChatPage.tsx)             | Chat with a specific thread loaded. |
 | `/dashboards`                | [`DashboardPage.tsx`](../../frontend/src/pages/DashboardPage.tsx)   | Default preset (compliance). |
 | `/dashboards/:preset`        | [`DashboardPage.tsx`](../../frontend/src/pages/DashboardPage.tsx)   | `:preset` is `compliance` or `analytics`. |
-| `/search`                    | [`SearchResultsPage.tsx`](../../frontend/src/pages/SearchResultsPage.tsx) | Read `?q=` from the query string. |
+| `/search`                    | [`SearchResultsPage.tsx`](../../frontend/src/pages/SearchResultsPage.tsx) | Read `?q=` and `?mode=` (`fulltext` \| `semantic` \| `hybrid`, default `fulltext`). |
+| `/editor`                    | [`EditorPage.tsx`](../../frontend/src/pages/EditorPage.tsx)         | Document picker (list + create). |
+| `/editor/:docId`             | [`EditorPage.tsx`](../../frontend/src/pages/EditorPage.tsx)         | TipTap editor for one document. |
 | `/settings`                  | [`SettingsPage.tsx`](../../frontend/src/pages/SettingsPage.tsx)     | General settings. |
 | `/settings/:section`         | [`SettingsPage.tsx`](../../frontend/src/pages/SettingsPage.tsx)     | Deep-link to a section tab. |
 | `*` (inside shell)           | [`NotFoundPage.tsx`](../../frontend/src/pages/NotFoundPage.tsx)     | In-shell 404. |

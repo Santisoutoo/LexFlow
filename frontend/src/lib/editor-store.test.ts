@@ -38,3 +38,40 @@ describe('useEditorStore persist errors', () => {
     expect(useEditorStore.getState().persistError).toBeNull();
   });
 });
+
+describe('useEditorStore document list', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useEditorStore.setState({ documents: {}, persistError: null });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('lists documents newest first', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+    useEditorStore.getState().saveDocument({
+      id: 'old',
+      title: 'Old',
+      content: { type: 'doc', content: [{ type: 'paragraph' }] },
+    });
+    vi.setSystemTime(new Date('2026-06-01T00:00:00Z'));
+    useEditorStore.getState().saveDocument({
+      id: 'new',
+      title: 'New',
+      content: { type: 'doc', content: [{ type: 'paragraph' }] },
+    });
+    const listed = useEditorStore.getState().listDocuments();
+    expect(listed.map((d) => d.id)).toEqual(['new', 'old']);
+  });
+
+  it('createDocument mints an id, persists, and returns it', () => {
+    const id = useEditorStore.getState().createDocument('Brief');
+    expect(id.length).toBeGreaterThan(8);
+    const stored = useEditorStore.getState().getDocument(id);
+    expect(stored?.title).toBe('Brief');
+    expect(useEditorStore.getState().listDocuments()).toHaveLength(1);
+  });
+});

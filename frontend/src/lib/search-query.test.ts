@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseSearchInput } from './search-query';
+import { parseSearchInput, parseSearchMode, searchResultsHref } from './search-query';
 
 describe('parseSearchInput', () => {
   it('extracts inline tags and plain query', () => {
@@ -22,5 +22,23 @@ describe('parseSearchInput', () => {
   it('exposes empty fragment when input ends with bare #', () => {
     const { tagFragment } = parseSearchInput('foo #');
     expect(tagFragment).toBe('');
+  });
+});
+
+describe('searchResultsHref', () => {
+  it('preserves #tag tokens in q', () => {
+    expect(searchResultsHref('#laboral despido')).toBe('/search?q=%23laboral+despido');
+  });
+
+  it('appends mode when provided', () => {
+    expect(searchResultsHref('ley', 'hybrid')).toBe('/search?q=ley&mode=hybrid');
+  });
+});
+
+describe('parseSearchMode', () => {
+  it('defaults unknown values to fulltext', () => {
+    expect(parseSearchMode(null)).toBe('fulltext');
+    expect(parseSearchMode('nope')).toBe('fulltext');
+    expect(parseSearchMode('semantic')).toBe('semantic');
   });
 });

@@ -51,6 +51,15 @@ interface EditorState {
   /** Return a document by id, or `undefined` if it has not been saved yet. */
   getDocument(id: string): EditorDocument | undefined;
 
+  /** Documents sorted by `updatedAt` descending (most recent first). */
+  listDocuments(): EditorDocument[];
+
+  /**
+   * Mint a new document, persist it immediately, and return its id.
+   * `title` defaults to `'Untitled'` — the UI localises the empty display.
+   */
+  createDocument(title?: string): string;
+
   /** Clear the persist-error flag after the user acknowledges it. */
   clearPersistError(): void;
 }
@@ -66,17 +75,25 @@ const EMPTY_CONTENT: JSONContent = {
   content: [{ type: 'paragraph' }],
 };
 
-/** The default document id used when the route carries no `:docId`. */
+/** Legacy default id — existing localStorage drafts keep this key. */
 export const DEFAULT_DOC_ID = 'draft';
 
+/** Default title for a newly minted document (UI may localise the empty display). */
+export const DEFAULT_NEW_DOC_TITLE = 'Untitled';
+
 /** Construct a fresh document stub for `id` with empty content. */
-export function makeDefaultDocument(id: string): EditorDocument {
+export function makeDefaultDocument(id: string, title?: string): EditorDocument {
   return {
     id,
-    title: id === DEFAULT_DOC_ID ? 'Draft' : `Document ${id}`,
+    title: title ?? (id === DEFAULT_DOC_ID ? 'Draft' : DEFAULT_NEW_DOC_TITLE),
     content: EMPTY_CONTENT,
     updatedAt: new Date().toISOString(),
   };
+}
+
+/** Sort store values by recency. Pure — safe to call from React with `useMemo`. */
+export function listDocuments(documents: Record<string, EditorDocument>): EditorDocument[] {
+  return Object.values(documents).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 /** localStorage wrapper that surfaces QuotaExceededError to the store (#44 R5). */
@@ -122,6 +139,15 @@ export const useEditorStore = create<EditorState>()(
         })),
 
       getDocument: (id) => get().documents[id],
+
+      listDocuments: () => listDocuments(get().documents),
+
+      createDocument: (title) => {
+        const id = crypto.randomUUID();
+        const stub = makeDefaultDocument(id, title ?? DEFAULT_NEW_DOC_TITLE);
+        get().saveDocument({ id: stub.id, title: stub.title, content: stub.content });
+        return id;
+      },
 
       clearPersistError: () => set({ persistError: null }),
     }),

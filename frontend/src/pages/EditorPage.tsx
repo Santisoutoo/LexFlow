@@ -16,8 +16,8 @@
  * - On unmount the debounce timer is cancelled via the cleanup returned
  *   from `useEffect` so a queued save never fires against an unmounted
  *   component.
- * - `docId` defaults to `DEFAULT_DOC_ID` (`'draft'`) when the route is
- *   visited without a `:docId` segment.
+ * - `docId` is required on `/editor/:docId`. Bare `/editor` renders the
+ *   document picker so the user can create or switch documents (#57 S1.4).
  *
  * --- WHERE TO CHANGE IF EDITOR FEATURES CHANGE ---
  * - Add a new TipTap extension → install it, add to `extensions` below,
@@ -32,7 +32,7 @@ import { useTranslation } from 'react-i18next';
 import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
-import { useEditorStore, DEFAULT_DOC_ID, makeDefaultDocument } from '@/lib/editor-store';
+import { useEditorStore, makeDefaultDocument } from '@/lib/editor-store';
 import { toast } from '@/lib/toast';
 import { exportMarkdown } from '@/pages/editor/export-utils';
 import { EditorToolbar } from '@/pages/editor/EditorToolbar';
@@ -45,6 +45,7 @@ import { LegalCitation } from '@/pages/editor/extensions/LegalCitation';
 import { CommentMark } from '@/pages/editor/extensions/CommentMark';
 import { useCommentStore } from '@/lib/comment-store';
 import { cn } from '@/lib/utils';
+import { DocumentList, DocumentPicker } from '@/pages/editor/DocumentList';
 
 /** Debounce window before a content change is written to localStorage (ms). */
 const AUTOSAVE_DELAY_MS = 600;
@@ -71,12 +72,17 @@ function flushPendingAutosave(
 }
 
 /**
- * EditorPage renders the document editor for the given `docId` route param.
- * When no `docId` is provided it falls back to `DEFAULT_DOC_ID` (`'draft'`).
+ * EditorPage renders the document picker at `/editor` and the workspace
+ * at `/editor/:docId`.
  */
 export function EditorPage() {
+  const { docId } = useParams<{ docId?: string }>();
+  if (!docId) return <DocumentPicker />;
+  return <EditorWorkspace docId={docId} />;
+}
+
+function EditorWorkspace({ docId }: { docId: string }) {
   const { t } = useTranslation();
-  const { docId = DEFAULT_DOC_ID } = useParams<{ docId?: string }>();
 
   const { getDocument, saveDocument, persistError, clearPersistError } = useEditorStore();
 
@@ -234,7 +240,14 @@ export function EditorPage() {
   }, [editor, title]);
 
   return (
-    <div className="flex h-full flex-col gap-4 overflow-auto p-6">
+    <div className="flex h-full min-h-0">
+      <aside className="hidden w-56 shrink-0 flex-col overflow-auto border-r border-border p-3 md:flex">
+        <DocumentList activeId={docId} />
+      </aside>
+      <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-auto p-6">
+        <div className="border-b border-border pb-3 md:hidden">
+          <DocumentList activeId={docId} />
+        </div>
       {persistError && (
         <div
           className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-[12.5px] text-amber-900 dark:text-amber-100"
@@ -278,10 +291,8 @@ export function EditorPage() {
             )}
           />
           <span className="text-xs text-muted">
-            {docId !== DEFAULT_DOC_ID ? `ID: ${docId}` : 'Draft'}
             {stored?.updatedAt && (
               <>
-                {' · '}
                 Saved {new Date(stored.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </>
             )}
@@ -387,6 +398,7 @@ export function EditorPage() {
         )}
       >
         <EditorContent editor={editor} />
+      </div>
       </div>
     </div>
   );

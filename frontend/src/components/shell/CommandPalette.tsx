@@ -1,20 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Search, BookOpenText, FileText, Moon, Network, MessagesSquare, BarChart3, Download, Hash, List } from 'lucide-react';
+import { Search, BookOpenText, FileText, Moon, Network, MessagesSquare, BarChart3, Download, Hash, List, Home, MapPin, FileEdit, Settings } from 'lucide-react';
 import { Button, Kbd } from '@/components/ui';
 import { errorMessage } from '@/lib/errors';
 import { useUi } from '@/lib/store';
 import { useSearch, useTags, useUserTagVocab, useWarmup } from '@/lib/queries';
-import { parseSearchInput } from '@/lib/search-query';
+import { parseSearchInput, searchResultsHref } from '@/lib/search-query';
 import { useFocusTrap } from '@/lib/useFocusTrap';
 import { cn } from '@/lib/utils';
 import { HighlightedSnippet } from '@/components/domain/HighlightedSnippet';
 import { searchHitHref } from '@/lib/law-reading';
-import { defaultExplorerState, serializeExplorerParams } from '@/pages/explorer/url-state';
-import { STATIC_COMMANDS, filterCommands } from './command-palette/commands';
+import { STATIC_COMMANDS, filterCommands, type CommandId } from './command-palette/commands';
 
-type PaletteGroupId = 'tags' | 'userTags' | 'laws' | 'articles' | 'commands';
+type PaletteGroupId = 'searchAll' | 'tags' | 'userTags' | 'laws' | 'articles' | 'commands';
 
 interface PaletteItem {
   id: string;
@@ -26,7 +25,7 @@ interface PaletteItem {
   run: () => void;
 }
 
-const GROUP_ORDER: PaletteGroupId[] = ['tags', 'userTags', 'laws', 'articles', 'commands'];
+const GROUP_ORDER: PaletteGroupId[] = ['searchAll', 'tags', 'userTags', 'laws', 'articles', 'commands'];
 
 export function CommandPalette() {
   const { t } = useTranslation();
@@ -68,6 +67,7 @@ export function CommandPalette() {
 
   const groupLabels: Record<PaletteGroupId, string> = useMemo(
     () => ({
+      searchAll: '',
       tags: t('commandPalette.groups.tags'),
       userTags: t('commandPalette.groups.userTags'),
       laws: t('commandPalette.groups.laws'),
@@ -88,11 +88,21 @@ export function CommandPalette() {
           .slice(0, 6)
       : (q.trim() === '' ? userTagVocab.slice(0, 5) : []);
 
-    const commandExtras: Record<string, { icon: React.ReactNode; run: () => void }> = {
+    const go = (to: string) => {
+      navigate(to);
+      setPaletteOpen(false);
+    };
+    const commandExtras: Record<CommandId, { icon: React.ReactNode; run: () => void }> = {
+      'go-home': { icon: <Home className="size-3.5" />, run: () => go('/home') },
+      'go-explorer': { icon: <BookOpenText className="size-3.5" />, run: () => go('/explorer') },
+      'go-search': { icon: <Search className="size-3.5" />, run: () => go('/search') },
+      'go-graph': { icon: <Network className="size-3.5" />, run: () => go('/graph') },
+      'go-chat': { icon: <MessagesSquare className="size-3.5" />, run: () => go('/chat') },
+      'go-dash': { icon: <BarChart3 className="size-3.5" />, run: () => go('/dashboards') },
+      'go-communities': { icon: <MapPin className="size-3.5" />, run: () => go('/communities') },
+      'go-editor': { icon: <FileEdit className="size-3.5" />, run: () => go('/editor') },
+      'go-settings': { icon: <Settings className="size-3.5" />, run: () => go('/settings') },
       theme: { icon: <Moon className="size-3.5" />, run: () => { toggleTheme(); setPaletteOpen(false); } },
-      'go-graph': { icon: <Network className="size-3.5" />, run: () => { navigate('/graph'); setPaletteOpen(false); } },
-      'go-chat': { icon: <MessagesSquare className="size-3.5" />, run: () => { navigate('/chat'); setPaletteOpen(false); } },
-      'go-dash': { icon: <BarChart3 className="size-3.5" />, run: () => { navigate('/dashboards'); setPaletteOpen(false); } },
       export: { icon: <Download className="size-3.5" />, run: () => { window.print(); setPaletteOpen(false); } },
     };
 
@@ -134,21 +144,21 @@ export function CommandPalette() {
     });
 
     const viewAllRow: PaletteItem[] =
-      plainQ.trim().length >= 2 && searchData !== undefined
+      plainQ.trim().length >= 2
         ? [{
             id: 'view-all-results',
-            group: 'commands',
+            group: 'searchAll',
             icon: <List className="size-3.5" />,
             title: t('commandPalette.viewAllResults'),
             run: () => {
-              const params = serializeExplorerParams({ ...defaultExplorerState(), q });
-              navigate(`/explorer?${params.toString()}`);
+              navigate(searchResultsHref(q));
               setPaletteOpen(false);
             },
           }]
         : [];
 
     return [
+      ...viewAllRow,
       ...tagSuggestions.map<PaletteItem>(({ tag, count }) => ({
         id: `tag-${tag}`,
         group: 'tags',
@@ -167,7 +177,6 @@ export function CommandPalette() {
       })),
       ...lawHits.map(mapHit),
       ...articleHits.map(mapHit),
-      ...viewAllRow,
       ...commands,
     ];
   }, [q, plainQ, tagFragment, vocab, userTagVocab, searchData, navigate, toggleTheme, setPaletteOpen, t]);
@@ -250,7 +259,9 @@ export function CommandPalette() {
             if (!rows.length) return null;
             return (
               <div key={g} className="mb-2">
-                <div className="label-caps px-2.5 pt-1 pb-1">{groupLabels[g]}</div>
+                {groupLabels[g] ? (
+                  <div className="label-caps px-2.5 pt-1 pb-1">{groupLabels[g]}</div>
+                ) : null}
                 {rows.map((it) => {
                   const idx = items.indexOf(it);
                   return (
@@ -271,6 +282,7 @@ export function CommandPalette() {
                         it.group === 'userTags' && 'bg-amber-soft text-amber-700 dark:text-amber-200',
                         it.group === 'laws' && 'bg-primary-soft text-indigo-700',
                         it.group === 'articles' && 'bg-amber-soft text-amber-700',
+                        it.group === 'searchAll' && 'bg-primary-soft text-indigo-700',
                         it.group === 'commands' && 'bg-reference-soft text-reference-soft-fg',
                       )}>{it.icon}</span>
                       <div className="min-w-0 flex-1">

@@ -26,13 +26,23 @@
     "toggleRightPanel": "Alternar panel derecho",
     "breadcrumb": "Migas",
     "diff": "Diff",
-    "mockDataRibbon": "Datos de demostración"
+    "mockDataRibbon": "Datos de demostración",
+    "mobileMenu": {
+      "title": "Más",
+      "openAria": "Abrir menú de cuenta",
+      "closeAria": "Cerrar menú"
+    }
   },
   "editor": {
     "persistErrorTitle": "No se pudo guardar en el navegador",
     "persistErrorBody": "El almacenamiento local está lleno. Exporta el documento ahora para no perder cambios.",
     "persistErrorExport": "Exportar Markdown",
-    "persistErrorDismiss": "Cerrar"
+    "persistErrorDismiss": "Cerrar",
+    "documents": "Documentos",
+    "newDocument": "Nuevo documento",
+    "noDocuments": "Aún no hay documentos. Crea uno para empezar.",
+    "untitled": "Sin título",
+    "pickDocument": "Elige un documento o crea uno nuevo."
   },
   "model": {
     "local": "local",
@@ -414,6 +424,9 @@
       "article": "Artículos"
     },
     "seeAll": "Ver todo →",
+    "title": "Búsqueda",
+    "semanticUnavailable": "La búsqueda semántica no está activa. Actívala en Ajustes → Modelos.",
+    "openSettings": "Abrir Ajustes",
     "modeFullText": "Texto",
     "modeSemantic": "Semántico",
     "modeHybrid": "Híbrido",
@@ -818,9 +831,15 @@
     "tagSubtitle_other": "{{count}} normas con este tag",
     "commands": {
       "theme": "Cambiar tema",
+      "goHome": "Ir al inicio",
+      "goExplorer": "Ir al explorador",
+      "goSearch": "Ir a búsqueda",
       "goGraph": "Ir al grafo",
       "goChat": "Ir al chat",
       "goDash": "Cuadros de mando",
+      "goCommunities": "Ir a comunidades",
+      "goEditor": "Ir al editor",
+      "goSettings": "Ir a ajustes",
       "export": "Exportar página como PDF"
     }
   },

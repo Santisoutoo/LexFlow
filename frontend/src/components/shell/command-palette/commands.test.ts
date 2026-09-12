@@ -48,13 +48,35 @@ describe('filterCommands', () => {
     filterCommands(registry, 'tema');
     expect(registry).toEqual(original);
   });
+
+  it('matches aliases case-insensitively', () => {
+    const withAliases = [
+      cmd({ id: 'go-settings', title: 'Ir a ajustes', aliases: ['settings', 'ajustes'] }),
+      cmd({ id: 'go-search', title: 'Ir a búsqueda', aliases: ['search', 'buscar'] }),
+    ];
+    expect(filterCommands(withAliases, 'settings').map((c) => c.id)).toEqual(['go-settings']);
+    expect(filterCommands(withAliases, 'BUSCAR').map((c) => c.id)).toEqual(['go-search']);
+  });
 });
 
 describe('STATIC_COMMANDS', () => {
-  it('contains exactly 5 commands with unique ids and title keys', () => {
-    expect(STATIC_COMMANDS).toHaveLength(5);
+  it('contains unique ids, title keys, and the Sprint 1 go-to destinations', () => {
+    expect(STATIC_COMMANDS).toHaveLength(11);
     const ids = STATIC_COMMANDS.map((c) => c.id);
     expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toEqual([
+      'go-home',
+      'go-explorer',
+      'go-search',
+      'go-graph',
+      'go-chat',
+      'go-dash',
+      'go-communities',
+      'go-editor',
+      'go-settings',
+      'theme',
+      'export',
+    ]);
     for (const c of STATIC_COMMANDS) {
       expect(c.titleKey.trim().length).toBeGreaterThan(0);
     }
