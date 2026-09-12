@@ -24,6 +24,12 @@
 /** localStorage key for the user-typed display name (set by #229 step 2 / #115). */
 export const USER_NAME_STORAGE_KEY = 'lexflow.user-name';
 
+/** Dispatched after the stored display name is written so the shell can re-read it. */
+export const USER_NAME_CHANGED_EVENT = 'lexflow:user-name-changed';
+
+/** Fallback avatar initials when no display name is stored. */
+export const DEFAULT_AVATAR_INITIALS = 'LF';
+
 /** localStorage key for the id of the last shown greeting (#248 no-repeat guard). */
 export const LAST_GREETING_STORAGE_KEY = 'lexflow.last-greeting-id';
 
@@ -41,7 +47,12 @@ function bucketFor(hour: number): TimeBucket {
   return 'evening';
 }
 
-function readStoredUserName(): string | null {
+/**
+ * Read the personalization display name from localStorage.
+ *
+ * Returns null when the key is missing, blank, or storage is unavailable.
+ */
+export function readStoredUserName(): string | null {
   try {
     const raw = localStorage.getItem(USER_NAME_STORAGE_KEY);
     if (!raw) return null;
@@ -50,6 +61,33 @@ function readStoredUserName(): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Notify shell chrome that the stored display name changed in this tab.
+ */
+export function notifyUserNameChanged(): void {
+  window.dispatchEvent(new CustomEvent(USER_NAME_CHANGED_EVENT));
+}
+
+/**
+ * Two-letter avatar initials from a display name.
+ *
+ * Uses the first letter of the first two words when present; a single
+ * word contributes up to two characters. Falls back to LexFlow's `LF`.
+ */
+export function displayInitials(name: string | null): string {
+  if (!name) return DEFAULT_AVATAR_INITIALS;
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return DEFAULT_AVATAR_INITIALS;
+  if (words.length === 1) {
+    const letters = Array.from(words[0]).slice(0, 2).join('');
+    return letters ? letters.toUpperCase() : DEFAULT_AVATAR_INITIALS;
+  }
+  const first = Array.from(words[0])[0] ?? '';
+  const second = Array.from(words[1])[0] ?? '';
+  const initials = `${first}${second}`.toUpperCase();
+  return initials || DEFAULT_AVATAR_INITIALS;
 }
 
 function readLastGreetingId(): string | null {

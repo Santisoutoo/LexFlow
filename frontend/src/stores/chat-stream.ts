@@ -11,7 +11,7 @@ interface ThreadStreamState {
   abortController: AbortController | null;
 }
 
-const EMPTY_THREAD_STATE: ThreadStreamState = {
+export const EMPTY_THREAD_STATE: ThreadStreamState = {
   stream: null,
   pendingUser: null,
   sending: false,

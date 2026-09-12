@@ -25,6 +25,7 @@ import {
 } from '@/lib/law-reading';
 import type { Article, ArticleRef, GraphData, GraphNodeKind, HierarchyNode, LawDetail, LawVersion } from '@/lib/types';
 import { REFERENCE_KIND_LABELS } from '@/lib/graph-colors';
+import { useRecentLawsStore } from '@/lib/recent-laws';
 import { RelatedLaws } from './RelatedLaws';
 
 const VERSION_KIND_BADGE: Record<'publish' | 'default', string> = {
@@ -70,6 +71,10 @@ export function LawDetailPage() {
   }, [location.hash]);
 
   const { data: law, isLoading, error, refetch } = useLaw(lawId);
+  const recordVisit = useRecentLawsStore((s) => s.recordVisit);
+  useEffect(() => {
+    if (law) recordVisit({ id: law.id, short: law.short });
+  }, [law, recordVisit]);
   const { data: versions = [], isLoading: versionsLoading } = useVersions(lawId);
   // #670 — custom user tags on this law. Keyed off the route param (like
   // `useVersions`/`useGraph` above), not `law.id`, so the hook can be

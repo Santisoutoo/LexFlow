@@ -79,6 +79,21 @@ describe('HelpDrawer content resolution', () => {
     await userEvent.click(screen.getByRole('button', { name: /abrir ayuda/i }));
     expect(screen.getByText('Conversación nueva')).toBeInTheDocument();
   });
+
+  it('renders communities copy on /communities, not the fallback', async () => {
+    renderAt('/communities');
+    await userEvent.click(screen.getByRole('button', { name: /abrir ayuda/i }));
+    expect(screen.getByRole('heading', { name: 'Comunidades' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'LexFlow' })).toBeNull();
+  });
+
+  it('renders editor copy and the g n shortcut on /editor', async () => {
+    renderAt('/editor');
+    await userEvent.click(screen.getByRole('button', { name: /abrir ayuda/i }));
+    expect(screen.getByRole('heading', { name: 'Editor' })).toBeInTheDocument();
+    expect(screen.getByText(/redacta documentos legales/i)).toBeInTheDocument();
+    expect(screen.getByText('n')).toBeInTheDocument();
+  });
 });
 
 describe('HelpDrawer close paths', () => {

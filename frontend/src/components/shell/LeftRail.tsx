@@ -5,7 +5,7 @@ import { BrandMark } from '@/components/BrandMark';
 import { Kbd } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { useUi, LEFT_RAIL_MIN, LEFT_RAIL_MAX } from '@/lib/store';
-import { useLawsList } from '@/lib/queries';
+import { RECENT_LAWS_RAIL_COUNT, useRecentLawsStore } from '@/lib/recent-laws';
 import { NAV } from './nav-items';
 import { RailResizer } from './RailResizer';
 import { useEdgeResize } from './use-edge-resize';
@@ -16,8 +16,7 @@ export function LeftRail() {
   const setLeftWidth = useUi((s) => s.setLeftWidth);
   const toggle = useUi((s) => s.toggleLeft);
   const { t } = useTranslation();
-  const { data: laws } = useLawsList({}, { staleTime: 60_000 });
-  const recent = laws?.items.slice(0, 3) ?? [];
+  const recent = useRecentLawsStore((s) => s.recent).slice(0, RECENT_LAWS_RAIL_COUNT);
   const { dragging, startDrag } = useEdgeResize('left', setLeftWidth);
 
   return (
@@ -82,27 +81,31 @@ export function LeftRail() {
         ))}
       </div>
 
-      {/* Recent */}
-      {expanded && recent.length > 0 && (
-        <div className="mt-auto border-t border-border px-3.5 py-3">
-          <div className="label-caps mb-1.5">{t('nav.recent')}</div>
-          <div className="flex flex-col gap-1">
-            {recent.map((l) => (
-              <NavLink
-                key={l.id}
-                to={`/laws/${l.id}`}
-                className="flex items-center gap-2 truncate rounded px-1.5 py-1 text-[12.5px] hover:bg-surface-2"
-              >
-                <span className="size-1.5 shrink-0 rounded-full bg-indigo-500" />
-                <span className="truncate">{l.short}</span>
-              </NavLink>
-            ))}
+      {/* Recent + secondary destinations stay pinned to the bottom of the rail. */}
+      <div className="mt-auto">
+        {expanded && recent.length > 0 && (
+          <div className="border-t border-border px-3.5 py-3">
+            <div className="label-caps mb-1.5">{t('nav.recent')}</div>
+            <div className="flex flex-col gap-1">
+              {recent.map((l) => (
+                <NavLink
+                  key={l.id}
+                  to={`/laws/${l.id}`}
+                  className="flex items-center gap-2 truncate rounded px-1.5 py-1 text-[12.5px] hover:bg-surface-2"
+                >
+                  <span className="size-1.5 shrink-0 rounded-full bg-indigo-500" />
+                  <span className="truncate">{l.short}</span>
+                </NavLink>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Bottom: comunidades + editor + settings + collapse */}
-      <div className={cn('border-t border-border p-2 flex flex-col gap-0.5', !expanded && 'items-center')}>
+        {/* Bottom: comunidades + editor + settings + collapse */}
+        <div
+          data-tour-id="left-rail-secondary"
+          className={cn('border-t border-border p-2 flex flex-col gap-0.5', !expanded && 'items-center')}
+        >
         {/* Comunidades — secondary browse destination (#671). Like the editor
             below, it lives outside the main NAV array so it doesn't take a slot
             in the mobile BottomTabBar (which is sized for exactly 5 tabs). */}
@@ -164,6 +167,7 @@ export function LeftRail() {
           {expanded && <span className="flex-1 text-left">{t('nav.collapse')}</span>}
           {expanded && <Kbd>⌘ \\</Kbd>}
         </button>
+        </div>
       </div>
 
       {/* Drag-to-resize separator on the right edge (#594). Only when the

@@ -219,7 +219,7 @@
     "whatIsThis": "Qué es esta página",
     "shortcutsHeading": "Atajos relevantes",
     "tutorialHeading": "Tutorial",
-    "tutorialBody": "El tour de 6 pasos repasa el layout, los atajos y las secciones principales. Lo puedes lanzar de nuevo en cualquier momento.",
+    "tutorialBody": "El tour de 7 pasos repasa el layout, los atajos y las secciones principales. Lo puedes lanzar de nuevo en cualquier momento.",
     "replay": "Repetir tutorial",
     "shortcuts": {
       "openPalette": "Abrir la paleta de comandos",
@@ -264,6 +264,14 @@
       "settings": {
         "title": "Ajustes",
         "description": "Configura personalización (nombre, idioma), apariencia, modelos de chat, servidores MCP y datos. Todo persiste en local; sin cuenta."
+      },
+      "communities": {
+        "title": "Comunidades",
+        "description": "Explora la legislación por ámbito territorial: normativa estatal y de cada comunidad autónoma. El mapa o la lista de tarjetas abre el Explorador ya filtrado por esa jurisdicción."
+      },
+      "editor": {
+        "title": "Editor",
+        "description": "Redacta documentos legales en local: elige un documento o crea uno nuevo, formatea con la barra y las citas se guardan en el navegador. Atajo g n desde cualquier página."
       },
       "fallback": {
         "title": "LexFlow",
@@ -634,7 +642,7 @@
       "subtitle": "Recursos de iniciación. El tutorial sombreado te lleva por las cinco secciones del producto en menos de un minuto.",
       "interactiveTutorial": "Tutorial interactivo",
       "welcomeTour": "Tour de bienvenida",
-      "welcomeTourSteps": "6 pasos: layout, atajos, paleta de comandos, búsqueda, grafo y chat.",
+      "welcomeTourSteps": "7 pasos: layout, atajos, paleta de comandos, búsqueda, grafo, destinos secundarios y chat.",
       "replayTutorial": "Repetir tutorial",
       "keyShortcuts": "Atajos clave",
       "shortcutPalette": "paleta universal de búsqueda y navegación",

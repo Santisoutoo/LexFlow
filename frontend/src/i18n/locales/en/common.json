@@ -219,7 +219,7 @@
     "whatIsThis": "What is this page",
     "shortcutsHeading": "Relevant shortcuts",
     "tutorialHeading": "Tutorial",
-    "tutorialBody": "The 6-step tour walks through the layout, shortcuts and main sections. You can launch it again any time.",
+    "tutorialBody": "The 7-step tour walks through the layout, shortcuts and main sections. You can launch it again any time.",
     "replay": "Replay tutorial",
     "shortcuts": {
       "openPalette": "Open the command palette",
@@ -264,6 +264,14 @@
       "settings": {
         "title": "Settings",
         "description": "Configure personalization (name, language), appearance, chat models, MCP servers and data. Everything persists locally; no account."
+      },
+      "communities": {
+        "title": "Communities",
+        "description": "Browse legislation by territorial scope: national law and each autonomous community. The map or card list opens the Explorer already filtered to that jurisdiction."
+      },
+      "editor": {
+        "title": "Editor",
+        "description": "Draft legal documents locally: pick or create a document, format with the toolbar, and citations persist in the browser. Shortcut g n from any page."
       },
       "fallback": {
         "title": "LexFlow",
@@ -634,7 +642,7 @@
       "subtitle": "Getting-started resources. The guided tutorial walks you through the five product sections in under a minute.",
       "interactiveTutorial": "Interactive tutorial",
       "welcomeTour": "Welcome tour",
-      "welcomeTourSteps": "6 steps: layout, shortcuts, command palette, search, graph and chat.",
+      "welcomeTourSteps": "7 steps: layout, shortcuts, command palette, search, graph, secondary destinations and chat.",
       "replayTutorial": "Replay tutorial",
       "keyShortcuts": "Key shortcuts",
       "shortcutPalette": "universal search and navigation palette",

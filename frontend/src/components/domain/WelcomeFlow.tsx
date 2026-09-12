@@ -25,7 +25,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { USER_NAME_STORAGE_KEY } from '../../lib/greeting';
+import { USER_NAME_STORAGE_KEY, notifyUserNameChanged } from '../../lib/greeting';
 
 // Lazy split so gsap + the Caveat font only download when a first-time
 // user actually reaches the welcome step. Returning users never fetch
@@ -49,6 +49,7 @@ function markWelcomed(name: string | null): void {
   try {
     if (name) localStorage.setItem(USER_NAME_STORAGE_KEY, name);
     localStorage.setItem(WELCOMED_STORAGE_KEY, 'true');
+    notifyUserNameChanged();
   } catch {
     /* private mode / sandbox — ignore. */
   }

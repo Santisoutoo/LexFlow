@@ -5,7 +5,7 @@
  * right-side drawer with three sections:
  *   1. **Qué es esta página** — 2-3 sentence description.
  *   2. **Atajos relevantes** — table of hotkeys for the current view.
- *   3. **Repetir tutorial** — re-launches the global 6-step tour
+ *   3. **Repetir tutorial** — re-launches the global 7-step tour
  *      (#116). Per-page mini-tours are tracked separately.
  *
  * Per-page content lives in `HELP_CONTENT` below — a route-prefix to
@@ -132,6 +132,25 @@ const HELP_CONTENT: Array<readonly [string, HelpPageContent]> = [
       title: 'help.pages.settings.title',
       description: 'help.pages.settings.description',
       shortcuts: NAV_SHORTCUTS,
+    },
+  ],
+  [
+    '/communities',
+    {
+      title: 'help.pages.communities.title',
+      description: 'help.pages.communities.description',
+      shortcuts: NAV_SHORTCUTS,
+    },
+  ],
+  [
+    '/editor',
+    {
+      title: 'help.pages.editor.title',
+      description: 'help.pages.editor.description',
+      shortcuts: [
+        { keys: ['g', 'n'], label: 'nav.editor' },
+        ...NAV_SHORTCUTS,
+      ],
     },
   ],
 ];
