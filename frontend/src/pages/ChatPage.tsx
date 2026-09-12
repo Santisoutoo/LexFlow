@@ -25,6 +25,7 @@ import { toast } from '@/lib/toast';
 import { chatErrorMessage, errorMessage } from '@/lib/errors';
 import type { ChatMessage as ChatMessageT, ChatSource } from '@/lib/types';
 import { lawDetailHref } from '@/lib/law-reading';
+import { useHotkey } from '@/lib/hotkeys';
 import { groupThreads } from './chat/group-threads';
 
 function sourceHref(source: ChatSource): string | null {
@@ -184,6 +185,11 @@ export function ChatPage() {
       toast({ tone: 'danger', title: t('chat.createFailed'), message });
     }
   };
+
+  useHotkey('mod+n', (e) => {
+    e.preventDefault();
+    void startNewThread();
+  }, [startNewThread]);
 
   const startRename = (threadId: string, currentTitle: string) => {
     setEditValue(currentTitle);

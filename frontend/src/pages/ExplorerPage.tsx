@@ -448,7 +448,7 @@ export function ExplorerPage() {
                 ]}
               />
             )}
-            <Button variant="secondary" icon={<Download className="size-3.5" />} className="hidden sm:inline-flex">{t('explorer.export')}</Button>
+            <Button variant="secondary" disabled title={t('common.comingSoon')} icon={<Download className="size-3.5" />} className="hidden sm:inline-flex">{t('explorer.export')}</Button>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[12.5px] text-muted">
             {isSearchMode ? (

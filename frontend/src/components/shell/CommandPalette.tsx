@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Search, BookOpenText, FileText, Moon, Network, MessagesSquare, BarChart3, Download, Hash, List, Home, MapPin, FileEdit, Settings } from 'lucide-react';
 import { Button, Kbd } from '@/components/ui';
@@ -11,6 +11,7 @@ import { useFocusTrap } from '@/lib/useFocusTrap';
 import { cn } from '@/lib/utils';
 import { HighlightedSnippet } from '@/components/domain/HighlightedSnippet';
 import { searchHitHref } from '@/lib/law-reading';
+import { isPrintableRoute } from '@/lib/shell-routes';
 import { STATIC_COMMANDS, filterCommands, type CommandId } from './command-palette/commands';
 
 type PaletteGroupId = 'searchAll' | 'tags' | 'userTags' | 'laws' | 'articles' | 'commands';
@@ -33,6 +34,7 @@ export function CommandPalette() {
   const setPaletteOpen = useUi((s) => s.setPaletteOpen);
   const toggleTheme = useUi((s) => s.toggleTheme);
   const navigate = useNavigate();
+  const location = useLocation();
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const listboxRef = useRef<HTMLDivElement>(null);
@@ -106,10 +108,13 @@ export function CommandPalette() {
       export: { icon: <Download className="size-3.5" />, run: () => { window.print(); setPaletteOpen(false); } },
     };
 
-    const translatedCommands = STATIC_COMMANDS.map((def) => ({
-      ...def,
-      title: t(def.titleKey),
-    }));
+    const printable = isPrintableRoute(location.pathname);
+    const translatedCommands = STATIC_COMMANDS
+      .filter((def) => def.id !== 'export' || printable)
+      .map((def) => ({
+        ...def,
+        title: t(def.titleKey),
+      }));
 
     const commands: PaletteItem[] = filterCommands(translatedCommands, q).map((def) => ({
       id: def.id,
@@ -179,7 +184,7 @@ export function CommandPalette() {
       ...articleHits.map(mapHit),
       ...commands,
     ];
-  }, [q, plainQ, tagFragment, vocab, userTagVocab, searchData, navigate, toggleTheme, setPaletteOpen, t]);
+  }, [q, plainQ, tagFragment, vocab, userTagVocab, searchData, navigate, location.pathname, toggleTheme, setPaletteOpen, t]);
 
   useEffect(() => {
     setActive((a) => (items.length === 0 ? 0 : Math.min(a, items.length - 1)));

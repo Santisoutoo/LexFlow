@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -9,6 +9,10 @@ import { ConfirmProvider } from '@/components/ui';
 import { useUi } from '@/lib/store';
 import { useChatStream } from '@/stores/chat-stream';
 import { api } from '@/lib/api';
+
+const { createThreadMutate } = vi.hoisted(() => ({
+  createThreadMutate: vi.fn(),
+}));
 
 const useModelsMock = vi.fn();
 const useChatThreadsMock = vi.fn();
@@ -21,7 +25,7 @@ vi.mock('@/lib/queries', () => ({
   },
   useChatThreads: () => useChatThreadsMock(),
   useChatThread: (id: string) => useChatThreadMock(id),
-  useCreateChatThread: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useCreateChatThread: () => ({ mutateAsync: createThreadMutate, isPending: false }),
   useDeleteChatThread: () => ({ mutateAsync: vi.fn() }),
   useRenameChatThread: () => ({ mutateAsync: vi.fn() }),
   useModels: () => useModelsMock(),
@@ -153,5 +157,28 @@ describe('ChatPage thread-scoped streaming', () => {
     expect(screen.queryByText('partial from A')).toBeNull();
 
     sendSpy.mockRestore();
+  });
+});
+
+describe('ChatPage new-thread hotkey', () => {
+  beforeEach(() => {
+    createThreadMutate.mockReset();
+    createThreadMutate.mockResolvedValue({ id: 'new-thread' });
+    useUi.setState({ defaultModel: 'ollama:qwen2.5:7b', wizardRequested: false });
+    useChatThreadsMock.mockReturnValue({ data: [{ id: 't1', title: 'Test', updatedAt: new Date().toISOString() }] });
+    useChatThreadMock.mockReturnValue({ data: [] });
+    useModelsMock.mockReturnValue({
+      data: [
+        { id: 'ollama:qwen2.5:7b', available: true, label: 'qwen2.5:7b', vendor: 'ollama', kind: 'local' },
+      ],
+    });
+  });
+
+  it('creates a thread on mod+n', async () => {
+    renderChat();
+    fireEvent.keyDown(window, { key: 'n', ctrlKey: true });
+    await waitFor(() => {
+      expect(createThreadMutate).toHaveBeenCalledWith({ model: 'ollama:qwen2.5:7b' });
+    });
   });
 });

@@ -540,6 +540,11 @@
       "subtitle": "Configura los modelos disponibles para el chat. Los locales se ejecutan en tu máquina; los de nube hacen peticiones salientes.",
       "relaunchWizard": "Volver a lanzar wizard",
       "defaultModel": "Modelo por defecto",
+      "useAsDefault": "Usar por defecto",
+      "useAsDefaultAria": "Usar {{provider}} por defecto",
+      "isDefault": "Predeterminado",
+      "defaultSetTitle": "Modelo por defecto actualizado",
+      "defaultSetMessage": "{{provider}} es ahora el modelo por defecto",
       "configured": "configurado",
       "missingCredential": "falta credencial",
       "providers": "Proveedores",
@@ -848,7 +853,8 @@
     "cancel": "Cancelar",
     "confirm": "Aceptar",
     "delete": "Eliminar",
-    "loading": "Cargando…"
+    "loading": "Cargando…",
+    "comingSoon": "Próximamente"
   },
   "appUpdate": {
     "title": "Nueva versión disponible (v{{version}})",

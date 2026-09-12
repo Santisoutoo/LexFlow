@@ -11,6 +11,7 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { USE_MOCK } from '@/lib/api/http';
 import { useUi } from '@/lib/store';
 import { useHotkey, useGoToHotkey } from '@/lib/hotkeys';
+import { hasContextualRightRail } from '@/lib/shell-routes';
 
 export function AppShell() {
   const { t } = useTranslation();
@@ -23,7 +24,11 @@ export function AppShell() {
   const navigate = useNavigate();
 
   useHotkey('mod+k', (e) => { e.preventDefault(); togglePalette(); });
-  useHotkey('mod+/', (e) => { e.preventDefault(); toggleRight(); });
+  useHotkey('mod+/', (e) => {
+    if (!hasContextualRightRail(location.pathname)) return;
+    e.preventDefault();
+    toggleRight();
+  }, [location.pathname, toggleRight]);
   useHotkey('mod+\\', (e) => { e.preventDefault(); toggleLeft(); });
   useHotkey('mod+.', (e) => { e.preventDefault(); toggleTheme(); });
 

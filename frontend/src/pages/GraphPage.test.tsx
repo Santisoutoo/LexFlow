@@ -6,6 +6,12 @@ import type { GraphData, GraphGlobalResult } from '@/lib/types';
 
 import { GraphPage } from './GraphPage';
 
+const { zoomInMock, zoomOutMock, fitMock } = vi.hoisted(() => ({
+  zoomInMock: vi.fn(),
+  zoomOutMock: vi.fn(),
+  fitMock: vi.fn(),
+}));
+
 const useGraphMock = vi.fn();
 const useGlobalGraphMock = vi.fn();
 const useGraphPathMock = vi.fn();
@@ -36,9 +42,24 @@ vi.mock('@/lib/queries', () => ({
   useLaw: () => ({ data: undefined }),
 }));
 
-vi.mock('@/components/domain/GraphCanvasLazy', () => ({
-  GraphCanvasLazy: () => <div data-testid="graph-canvas" />,
-}));
+vi.mock('@/components/domain/GraphCanvasLazy', async () => {
+  const React = await import('react');
+  return {
+    GraphCanvasLazy: React.forwardRef(function GraphCanvasLazy(
+      _props: unknown,
+      ref: React.ForwardedRef<{ zoomIn: () => void; zoomOut: () => void; fit: () => void }>,
+    ) {
+      React.useImperativeHandle(ref, () => ({
+        zoomIn: zoomInMock,
+        zoomOut: zoomOutMock,
+        fit: fitMock,
+        centerAt: () => {},
+        exportPng: () => {},
+      }));
+      return React.createElement('div', { 'data-testid': 'graph-canvas' });
+    }),
+  };
+});
 
 function renderGraph(initialEntry: string) {
   return render(
@@ -192,5 +213,26 @@ describe('GraphPage path panel', () => {
     await waitFor(() => {
       expect(screen.getByTestId('graph-degraded-banner')).toBeInTheDocument();
     });
+  });
+});
+
+describe('GraphPage zoom hotkeys', () => {
+  beforeEach(() => {
+    mockLocalReady();
+    useWarmupMock.mockReturnValue({ data: { graphReady: true } });
+    zoomInMock.mockClear();
+    zoomOutMock.mockClear();
+    fitMock.mockClear();
+  });
+
+  it('maps + / - / 0 to canvas zoom controls', async () => {
+    renderGraph('/graph?law=SEED-LAW');
+    await waitFor(() => expect(screen.getByTestId('graph-canvas')).toBeInTheDocument());
+    fireEvent.keyDown(window, { key: '+' });
+    fireEvent.keyDown(window, { key: '-' });
+    fireEvent.keyDown(window, { key: '0' });
+    expect(zoomInMock).toHaveBeenCalledTimes(1);
+    expect(zoomOutMock).toHaveBeenCalledTimes(1);
+    expect(fitMock).toHaveBeenCalledTimes(1);
   });
 });
