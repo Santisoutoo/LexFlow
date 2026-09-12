@@ -83,7 +83,7 @@ describe('HelpDrawer content resolution', () => {
   it('renders communities copy on /communities, not the fallback', async () => {
     renderAt('/communities');
     await userEvent.click(screen.getByRole('button', { name: /abrir ayuda/i }));
-    expect(screen.getByRole('heading', { name: 'Comunidades' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Comunidades autónomas' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'LexFlow' })).toBeNull();
   });
 

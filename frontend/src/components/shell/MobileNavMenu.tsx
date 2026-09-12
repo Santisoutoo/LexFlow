@@ -70,6 +70,7 @@ export function MobileNavMenu({ onClose }: { onClose: () => void }) {
               key={link.to}
               to={link.to}
               onClick={onClose}
+              title={link.to === '/communities' ? t('nav.communitiesHint') : undefined}
               className={({ isActive }) =>
                 cn(
                   'flex items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-[13.5px] font-medium transition-colors',

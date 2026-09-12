@@ -20,15 +20,16 @@
  *     where the tour left off.
  *
  * --- WHERE TO CHANGE IF X CHANGES ---
- * * Add / reorder a step    → `TUTORIAL_STEPS` below; only place that
- *                              matters.
+ * * Add / reorder a step    → `buildTutorialSteps` below; only place that
+ *                              matters. Copy lives in `tutorial.steps.*`.
  * * Auto-launch condition   → `<TutorialAutoLauncher>` below.
  * * Re-launch entry point   → `SettingsPage` consumes `useTour()`.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { TourProvider, useTour, type StepType } from '@reactour/tour';
 
 import { useUi } from '@/lib/store';
@@ -136,65 +137,48 @@ const STEP_CONTENT = (title: string, body: string) => (
  * matches a `data-tour-id` attribute in the shell, not a class. Selectors
  * that fail (e.g. on a viewport where the LeftRail is hidden) are
  * skipped by Reactour automatically.
+ *
+ * Copy lives in `tutorial.steps.*` so the tour follows the language setting.
  */
-const TUTORIAL_STEPS: StepType[] = [
-  {
-    selector: 'body',
-    content: STEP_CONTENT(
-      '¡Bienvenido a LexFlow!',
-      'Un recorrido de un minuto. Verás dónde están las piezas — explorador de leyes, búsqueda, grafo y chat. Pulsa Siguiente para empezar, o Esc en cualquier momento para salir.',
-    ),
-    position: 'center',
-  },
-  {
-    selector: '[data-tour-id="left-rail"]',
-    content: STEP_CONTENT(
-      'Navegación principal',
-      'Cada sección del producto vive aquí: Inicio, Explorador, Grafo, Chat, Cuadros. Cada una tiene un atajo de dos teclas (g + inicial). Por ejemplo: g c lleva al Chat.',
-    ),
-    position: 'right',
-  },
-  {
-    selector: '[data-tour-id="left-rail-secondary"]',
-    content: STEP_CONTENT(
-      'Editor, Comunidades y Ajustes',
-      'Debajo están Comunidades (legislación por territorio), el Editor de documentos (atajo g n) y Ajustes (g s). Comunidades no tiene atajo g+*.',
-    ),
-    position: 'right',
-  },
-  {
-    selector: '[data-tour-id="search-trigger"]',
-    content: STEP_CONTENT(
-      'Paleta de comandos',
-      'Ctrl K (⌘ K en Mac) abre la paleta universal: busca leyes, salta a una página, ejecuta acciones. Es el atajo más útil del producto.',
-    ),
-    position: 'bottom',
-  },
-  {
-    selector: '[data-tour-id="search-trigger"]',
-    content: STEP_CONTENT(
-      'Buscar leyes y artículos',
-      'Escribe en la paleta y la búsqueda corre sobre toda la legislación indexada — títulos, artículos, BOE. Los resultados se abren directamente en el explorador.',
-    ),
-    position: 'bottom',
-  },
-  {
-    selector: '[data-tour-id="left-rail"]',
-    content: STEP_CONTENT(
-      'Grafo de referencias',
-      'El Grafo conecta cada ley con las que la citan o modifica. Útil para entender el contexto de una norma: qué la cita, qué deroga, dónde se inserta. Atajo: g g.',
-    ),
-    position: 'right',
-  },
-  {
-    selector: '[data-tour-id="left-rail"]',
-    content: STEP_CONTENT(
-      'Chat legal con tu modelo',
-      'El Chat conversa con un modelo local o en nube una vez lo configuras en Ajustes. Te llevamos ahí al cerrar este tour. Atajo: g c.',
-    ),
-    position: 'right',
-  },
-];
+function buildTutorialSteps(t: (key: string) => string): StepType[] {
+  return [
+    {
+      selector: 'body',
+      content: STEP_CONTENT(t('tutorial.steps.welcome.title'), t('tutorial.steps.welcome.body')),
+      position: 'center',
+    },
+    {
+      selector: '[data-tour-id="left-rail"]',
+      content: STEP_CONTENT(t('tutorial.steps.nav.title'), t('tutorial.steps.nav.body')),
+      position: 'right',
+    },
+    {
+      selector: '[data-tour-id="left-rail-secondary"]',
+      content: STEP_CONTENT(t('tutorial.steps.secondary.title'), t('tutorial.steps.secondary.body')),
+      position: 'right',
+    },
+    {
+      selector: '[data-tour-id="search-trigger"]',
+      content: STEP_CONTENT(t('tutorial.steps.palette.title'), t('tutorial.steps.palette.body')),
+      position: 'bottom',
+    },
+    {
+      selector: '[data-tour-id="search-trigger"]',
+      content: STEP_CONTENT(t('tutorial.steps.search.title'), t('tutorial.steps.search.body')),
+      position: 'bottom',
+    },
+    {
+      selector: '[data-tour-id="left-rail"]',
+      content: STEP_CONTENT(t('tutorial.steps.graph.title'), t('tutorial.steps.graph.body')),
+      position: 'right',
+    },
+    {
+      selector: '[data-tour-id="left-rail"]',
+      content: STEP_CONTENT(t('tutorial.steps.chat.title'), t('tutorial.steps.chat.body')),
+      position: 'right',
+    },
+  ];
+}
 
 // ─── Provider ────────────────────────────────────────────────────────────
 
@@ -233,10 +217,12 @@ function _readTutorialCompleted(): boolean {
 export function TutorialProvider({ children }: { children: React.ReactNode }) {
   const reducedMotion = _prefersReducedMotion();
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const steps = useMemo(() => buildTutorialSteps(t), [t]);
 
   return (
     <TourProvider
-      steps={TUTORIAL_STEPS}
+      steps={steps}
       // Reactour exposes a `styles` factory for each surface; we only
       // override the colours so the tour matches the indigo accent the
       // rest of the SPA uses.
@@ -291,7 +277,7 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
             onClick={() => setCurrentStep((s) => Math.max(0, s - 1))}
             className="rounded-md px-2.5 py-1.5 text-[13px] font-medium text-muted transition-colors hover:bg-surface-2 hover:text-fg"
           >
-            Atrás
+            {t('tutorial.nav.back')}
           </button>
         )
       }
@@ -303,7 +289,7 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
             onClick={() => (isLast ? setIsOpen(false) : setCurrentStep((s) => Math.min(stepsLength - 1, s + 1)))}
             className="rounded-md bg-indigo-600 px-3.5 py-1.5 text-[13px] font-medium text-white shadow-sm transition-colors hover:bg-indigo-700"
           >
-            {isLast ? '¡Listo! A disfrutar' : 'Siguiente'}
+            {isLast ? t('tutorial.nav.done') : t('tutorial.nav.next')}
           </button>
         );
       }}

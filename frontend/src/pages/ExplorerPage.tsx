@@ -430,23 +430,46 @@ export function ExplorerPage() {
             </Button>
             {!isSearchMode && <SortButton sort={sort} setSort={setSort} />}
             {!isSearchMode && (
-              <Tabs variant="segmented" value={density} onChange={(v) => setDensity(v as 'compact' | 'comfortable' | 'cozy')} tabs={[
-                { id: 'compact', label: '≡' },
-                { id: 'comfortable', label: '≣' },
-                { id: 'cozy', label: '☰' },
-              ]} />
+              <div className="flex flex-col items-end gap-0.5" title={t('explorer.densityGlobalHint')}>
+                <span className="sr-only">{t('settings.appearance.densityLabel')}</span>
+                <Tabs
+                  variant="segmented"
+                  value={density}
+                  onChange={(v) => setDensity(v as 'compact' | 'comfortable' | 'cozy')}
+                  tabs={[
+                    {
+                      id: 'compact',
+                      label: t('settings.appearance.densityCompact'),
+                      title: t('explorer.densityCompactHint'),
+                    },
+                    {
+                      id: 'comfortable',
+                      label: t('settings.appearance.densityComfortable'),
+                      title: t('explorer.densityComfortableHint'),
+                    },
+                    {
+                      id: 'cozy',
+                      label: t('settings.appearance.densityCozy'),
+                      title: t('explorer.densityCozyHint'),
+                    },
+                  ]}
+                />
+                <span className="text-[11px] text-muted">{t('explorer.densityGlobalHint')}</span>
+              </div>
             )}
             {isSearchMode && (
-              <Tabs
-                variant="segmented"
-                value="fulltext"
-                onChange={(id) => navigate(searchResultsHref(q, parseSearchMode(id)))}
-                tabs={[
-                  { id: 'fulltext', label: t('search.modeFullText') },
-                  { id: 'semantic', label: t('search.modeSemantic') },
-                  { id: 'hybrid', label: t('search.modeHybrid') },
-                ]}
-              />
+              <div title={t('explorer.searchControlsDisabled')}>
+                <Tabs
+                  variant="segmented"
+                  value="fulltext"
+                  onChange={(id) => navigate(searchResultsHref(q, parseSearchMode(id)))}
+                  tabs={[
+                    { id: 'fulltext', label: t('search.modeFullText') },
+                    { id: 'semantic', label: t('search.modeSemantic') },
+                    { id: 'hybrid', label: t('search.modeHybrid') },
+                  ]}
+                />
+              </div>
             )}
             <Button variant="secondary" disabled title={t('common.comingSoon')} icon={<Download className="size-3.5" />} className="hidden sm:inline-flex">{t('explorer.export')}</Button>
           </div>

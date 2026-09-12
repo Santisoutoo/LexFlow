@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useEditorStore } from './editor-store';
+import { useEditorStore, isSentinelDocumentTitle } from './editor-store';
 
 describe('useEditorStore persist errors', () => {
   beforeEach(() => {
@@ -73,5 +73,14 @@ describe('useEditorStore document list', () => {
     const stored = useEditorStore.getState().getDocument(id);
     expect(stored?.title).toBe('Brief');
     expect(useEditorStore.getState().listDocuments()).toHaveLength(1);
+  });
+});
+
+describe('isSentinelDocumentTitle', () => {
+  it('treats empty, Untitled, and Draft as unlocalised defaults', () => {
+    expect(isSentinelDocumentTitle('')).toBe(true);
+    expect(isSentinelDocumentTitle('  Untitled  ')).toBe(true);
+    expect(isSentinelDocumentTitle('Draft')).toBe(true);
+    expect(isSentinelDocumentTitle('Brief')).toBe(false);
   });
 });

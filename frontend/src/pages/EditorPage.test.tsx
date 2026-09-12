@@ -3,14 +3,17 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { saveDocumentMock, createDocumentMock } = vi.hoisted(() => ({
+const { saveDocumentMock, createDocumentMock, getDocumentMock } = vi.hoisted(() => ({
   saveDocumentMock: vi.fn(),
   createDocumentMock: vi.fn(() => 'new-doc-id'),
+  getDocumentMock: vi.fn(() => undefined as
+    | { id: string; title: string; content: unknown; updatedAt: string }
+    | undefined),
 }));
 
 vi.mock('@/lib/editor-store', () => {
   const state = {
-    getDocument: () => undefined,
+    getDocument: getDocumentMock,
     saveDocument: saveDocumentMock,
     persistError: null,
     clearPersistError: vi.fn(),
@@ -29,6 +32,10 @@ vi.mock('@/lib/editor-store', () => {
       updatedAt: new Date().toISOString(),
     }),
     listDocuments: () => [],
+    isSentinelDocumentTitle: (title: string) => {
+      const trimmed = title.trim();
+      return trimmed === '' || trimmed === 'Untitled' || trimmed === 'Draft';
+    },
     useEditorStore,
   };
 });
@@ -95,6 +102,8 @@ describe('EditorPage autosave flush', () => {
   beforeEach(() => {
     saveDocumentMock.mockReset();
     createDocumentMock.mockReset();
+    getDocumentMock.mockReset();
+    getDocumentMock.mockReturnValue(undefined);
     createDocumentMock.mockReturnValue('new-doc-id');
     mockEditor.getJSON.mockReset();
     mockEditor.getJSON.mockReturnValue({
@@ -170,5 +179,18 @@ describe('EditorPage autosave flush', () => {
         content: pendingContent,
       });
     });
+  });
+
+  it('uses Spanish i18n for title aria, placeholder and saved line', () => {
+    getDocumentMock.mockReturnValue({
+      id: 'draft',
+      title: 'Untitled',
+      content: { type: 'doc', content: [{ type: 'paragraph' }] },
+      updatedAt: '2026-09-12T12:00:00.000Z',
+    });
+    renderEditor();
+    expect(screen.getByLabelText('Título del documento')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Documento sin título')).toBeInTheDocument();
+    expect(screen.getByText(/^Guardado /)).toBeInTheDocument();
   });
 });

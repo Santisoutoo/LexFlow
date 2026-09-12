@@ -7,7 +7,8 @@
     "dashboards": "Cuadros",
     "settings": "Ajustes",
     "editor": "Editor",
-    "communities": "Comunidades",
+    "communities": "Comunidades autónomas",
+    "communitiesHint": "Atajo al mapa territorial; también disponible como filtro en el Explorador",
     "main": "Navegación principal",
     "collapse": "Colapsar",
     "expand": "Expandir",
@@ -42,14 +43,17 @@
     "newDocument": "Nuevo documento",
     "noDocuments": "Aún no hay documentos. Crea uno para empezar.",
     "untitled": "Sin título",
-    "pickDocument": "Elige un documento o crea uno nuevo."
+    "pickDocument": "Elige un documento o crea uno nuevo.",
+    "documentTitleAria": "Título del documento",
+    "placeholder": "Documento sin título",
+    "savedAt": "Guardado {{time}}"
   },
   "model": {
     "local": "local",
     "cloud": "nube",
     "notConfigured": "sin configurar",
     "changeModelsPre": "Cambia modelos en",
-    "changeModelsKbd": "Ajustes › Modelos"
+    "changeModelsPath": "Ajustes › Modelos"
   },
   "lawHeader": {
     "save": "Guardar",
@@ -81,8 +85,45 @@
     "skip": "Saltar",
     "continue": "Continuar"
   },
+  "tutorial": {
+    "nav": {
+      "back": "Atrás",
+      "next": "Siguiente",
+      "done": "¡Listo! A disfrutar"
+    },
+    "steps": {
+      "welcome": {
+        "title": "¡Bienvenido a LexFlow!",
+        "body": "Un recorrido de un minuto. Verás dónde están las piezas — explorador de leyes, búsqueda, grafo y chat. Pulsa Siguiente para empezar, o Esc en cualquier momento para salir."
+      },
+      "nav": {
+        "title": "Navegación principal",
+        "body": "Cada sección del producto vive aquí: Inicio, Explorador, Grafo, Chat, Cuadros. Cada una tiene un atajo de dos teclas (g + inicial). Por ejemplo: g c lleva al Chat."
+      },
+      "secondary": {
+        "title": "Editor, Comunidades autónomas y Ajustes",
+        "body": "Debajo están Comunidades autónomas (legislación por territorio), el Editor de documentos (atajo g n) y Ajustes (g s). Comunidades autónomas no tiene atajo g+*."
+      },
+      "palette": {
+        "title": "Paleta de comandos",
+        "body": "Ctrl K (⌘ K en Mac) abre la paleta universal: busca leyes, salta a una página, ejecuta acciones. Es el atajo más útil del producto."
+      },
+      "search": {
+        "title": "Buscar leyes y artículos",
+        "body": "Escribe en la paleta y la búsqueda corre sobre toda la legislación indexada — títulos, artículos, BOE. Los resultados se abren directamente en el explorador."
+      },
+      "graph": {
+        "title": "Grafo de referencias",
+        "body": "El Grafo conecta cada ley con las que la citan o modifica. Útil para entender el contexto de una norma: qué la cita, qué deroga, dónde se inserta. Atajo: g g."
+      },
+      "chat": {
+        "title": "Chat legal con tu modelo",
+        "body": "El Chat conversa con un modelo local o en nube una vez lo configuras en Ajustes. Te llevamos ahí al cerrar este tour. Atajo: g c."
+      }
+    }
+  },
   "mcp": {
-    "title": "MCP Servers",
+    "title": "Conexiones avanzadas",
     "introPre": "Servidores Model Context Protocol que los clientes (Claude Desktop, Cursor, …) pueden lanzar para hablar con la legislación. La configuración se guarda en",
     "introMid": "con el mismo formato que",
     "introEnd": "así que es portable.",
@@ -266,7 +307,7 @@
         "description": "Configura personalización (nombre, idioma), apariencia, modelos de chat, servidores MCP y datos. Todo persiste en local; sin cuenta."
       },
       "communities": {
-        "title": "Comunidades",
+        "title": "Comunidades autónomas",
         "description": "Explora la legislación por ámbito territorial: normativa estatal y de cada comunidad autónoma. El mapa o la lista de tarjetas abre el Explorador ya filtrado por esa jurisdicción."
       },
       "editor": {
@@ -453,7 +494,7 @@
       "personalization": "Personalización",
       "appearance": "Apariencia",
       "models": "Modelos",
-      "mcpServers": "MCP Servers",
+      "mcpServers": "Conexiones avanzadas",
       "data": "Datos",
       "diagnostics": "Diagnóstico",
       "privacy": "Privacidad",
@@ -663,6 +704,10 @@
     "loadMore": "Cargar más",
     "loadingMore": "Cargando…",
     "searchControlsDisabled": "Orden y densidad solo aplican al modo exploración",
+    "densityGlobalHint": "Afecta toda la aplicación",
+    "densityCompactHint": "Compacto: más normas por pantalla",
+    "densityComfortableHint": "Cómodo: equilibrio entre densidad y detalle",
+    "densityCozyHint": "Amplio: más espacio y detalle por norma",
     "clearFilters": "Limpiar filtros",
     "removeUserTagFilter": "quitar filtro de tag",
     "howToSearch": "Cómo buscar",
@@ -729,7 +774,8 @@
       "chatTitle": "Chat con el corpus",
       "chatSub": "Pregunta en lenguaje natural",
       "diffTitle": "Comparar versiones",
-      "diffSub": "LOPDGDD · v1.0 → v1.3",
+      "diffSub": "{{short}} · {{from}} → {{to}}",
+      "diffSubFallback": "Compara dos versiones de una norma",
       "dashboardsTitle": "Cuadros de mando",
       "dashboardsSub": "Compliance · 6 indicadores"
     },
@@ -737,6 +783,9 @@
       "articles": "arts.",
       "versions": "versiones",
       "refs": "refs."
+    },
+    "chips": {
+      "diff": "Diff entre versiones de una norma"
     }
   },
   "errors": {

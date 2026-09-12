@@ -7,7 +7,8 @@
     "dashboards": "Dashboards",
     "settings": "Settings",
     "editor": "Editor",
-    "communities": "Communities",
+    "communities": "Autonomous communities",
+    "communitiesHint": "Shortcut to the territorial map; also available as a filter in the Explorer",
     "main": "Main navigation",
     "collapse": "Collapse",
     "expand": "Expand",
@@ -42,14 +43,17 @@
     "newDocument": "New document",
     "noDocuments": "No documents yet. Create one to get started.",
     "untitled": "Untitled",
-    "pickDocument": "Pick a document or create a new one."
+    "pickDocument": "Pick a document or create a new one.",
+    "documentTitleAria": "Document title",
+    "placeholder": "Untitled document",
+    "savedAt": "Saved {{time}}"
   },
   "model": {
     "local": "local",
     "cloud": "cloud",
     "notConfigured": "not configured",
     "changeModelsPre": "Change models in",
-    "changeModelsKbd": "Settings › Models"
+    "changeModelsPath": "Settings › Models"
   },
   "lawHeader": {
     "save": "Save",
@@ -81,8 +85,45 @@
     "skip": "Skip",
     "continue": "Continue"
   },
+  "tutorial": {
+    "nav": {
+      "back": "Back",
+      "next": "Next",
+      "done": "Done! Enjoy"
+    },
+    "steps": {
+      "welcome": {
+        "title": "Welcome to LexFlow!",
+        "body": "A one-minute tour. You will see where everything lives — law explorer, search, graph and chat. Press Next to start, or Esc at any time to leave."
+      },
+      "nav": {
+        "title": "Main navigation",
+        "body": "Each product section lives here: Home, Explorer, Graph, Chat, Dashboards. Each has a two-key shortcut (g + initial). For example: g c opens Chat."
+      },
+      "secondary": {
+        "title": "Editor, Autonomous communities and Settings",
+        "body": "Below are Autonomous communities (legislation by territory), the document Editor (shortcut g n) and Settings (g s). Autonomous communities has no g+* shortcut."
+      },
+      "palette": {
+        "title": "Command palette",
+        "body": "Ctrl K (⌘ K on Mac) opens the universal palette: search laws, jump to a page, run actions. It is the most useful shortcut in the product."
+      },
+      "search": {
+        "title": "Search laws and articles",
+        "body": "Type in the palette and search runs over the whole indexed corpus — titles, articles, BOE. Results open directly in the explorer."
+      },
+      "graph": {
+        "title": "Reference graph",
+        "body": "The Graph connects each law with those that cite or amend it. Useful to understand a norm's context: what cites it, what it repeals, where it sits. Shortcut: g g."
+      },
+      "chat": {
+        "title": "Legal chat with your model",
+        "body": "Chat talks to a local or cloud model once you configure one in Settings. We take you there when this tour closes. Shortcut: g c."
+      }
+    }
+  },
   "mcp": {
-    "title": "MCP Servers",
+    "title": "Advanced connections",
     "introPre": "Model Context Protocol servers that clients (Claude Desktop, Cursor, …) can launch to talk to the legislation. The configuration is saved in",
     "introMid": "in the same format as",
     "introEnd": "so it's portable.",
@@ -266,7 +307,7 @@
         "description": "Configure personalization (name, language), appearance, chat models, MCP servers and data. Everything persists locally; no account."
       },
       "communities": {
-        "title": "Communities",
+        "title": "Autonomous communities",
         "description": "Browse legislation by territorial scope: national law and each autonomous community. The map or card list opens the Explorer already filtered to that jurisdiction."
       },
       "editor": {
@@ -453,7 +494,7 @@
       "personalization": "Personalization",
       "appearance": "Appearance",
       "models": "Models",
-      "mcpServers": "MCP Servers",
+      "mcpServers": "Advanced connections",
       "data": "Data",
       "diagnostics": "Diagnostics",
       "privacy": "Privacy",
@@ -663,6 +704,10 @@
     "loadMore": "Load more",
     "loadingMore": "Loading…",
     "searchControlsDisabled": "Sort and density apply only in browse mode",
+    "densityGlobalHint": "Applies to the whole app",
+    "densityCompactHint": "Compact: more laws on screen",
+    "densityComfortableHint": "Comfortable: balance of density and detail",
+    "densityCozyHint": "Cozy: more space and detail per law",
     "clearFilters": "Clear filters",
     "removeUserTagFilter": "remove tag filter",
     "howToSearch": "How to search",
@@ -729,7 +774,8 @@
       "chatTitle": "Chat with the corpus",
       "chatSub": "Ask in natural language",
       "diffTitle": "Compare versions",
-      "diffSub": "LOPDGDD · v1.0 → v1.3",
+      "diffSub": "{{short}} · {{from}} → {{to}}",
+      "diffSubFallback": "Compare two versions of a law",
       "dashboardsTitle": "Dashboards",
       "dashboardsSub": "Compliance · 6 indicators"
     },
@@ -737,6 +783,9 @@
       "articles": "arts.",
       "versions": "versions",
       "refs": "refs."
+    },
+    "chips": {
+      "diff": "Diff between versions of a law"
     }
   },
   "errors": {

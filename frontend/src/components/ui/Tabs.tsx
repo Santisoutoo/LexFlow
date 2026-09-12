@@ -5,6 +5,8 @@ export interface TabItem {
   label: React.ReactNode;
   count?: number | string;
   icon?: React.ReactNode;
+  /** Native tooltip / accessible name for glyph-only or terse labels. */
+  title?: string;
 }
 
 export interface TabsProps {
@@ -22,6 +24,8 @@ export function Tabs({ tabs, value, onChange, variant = 'underline', className }
         {tabs.map((t) => (
           <button
             key={t.id}
+            title={t.title}
+            aria-label={typeof t.label === 'string' ? t.label : t.title}
             onClick={() => onChange?.(t.id)}
             className={cn(
               'rounded px-3 py-1 text-[13px] font-medium transition-colors',
