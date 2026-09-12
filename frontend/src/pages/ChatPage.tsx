@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
@@ -19,11 +19,11 @@ import {
 } from '@/lib/queries';
 import { api } from '@/lib/api';
 import { useUi } from '@/lib/store';
-import { useChatStream } from '@/stores/chat-stream';
+import { EMPTY_THREAD_STATE, useChatStream } from '@/stores/chat-stream';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import { chatErrorMessage, errorMessage } from '@/lib/errors';
-import type { ChatMessage as ChatMessageT, ChatSource } from '@/lib/types';
+import type { ChatMessage as ChatMessageT, ChatSource, ChatThread } from '@/lib/types';
 import { lawDetailHref } from '@/lib/law-reading';
 import { useHotkey } from '@/lib/hotkeys';
 import { groupThreads } from './chat/group-threads';
@@ -33,7 +33,11 @@ function sourceHref(source: ChatSource): string | null {
   return lawDetailHref(source.target.lawId, source.target.articleNum);
 }
 
-const FALLBACK_THREAD_ID = 'eipd';
+const EMPTY_THREADS: ChatThread[] = [];
+
+function newestThread(threads: ChatThread[]): ChatThread {
+  return threads.reduce((best, item) => (item.updatedAt > best.updatedAt ? item : best));
+}
 
 export function ChatPage() {
   const navigate = useNavigate();
@@ -49,14 +53,11 @@ export function ChatPage() {
   // ignore the param registered on the route. Internal navigation pushes
   // through `selectThread` so the URL stays in sync.
   const { threadId } = useParams<{ threadId?: string }>();
-  const [activeId, setActiveId] = useState<string>(threadId ?? FALLBACK_THREAD_ID);
-  useEffect(() => {
-    if (threadId && threadId !== activeId) setActiveId(threadId);
-  }, [threadId, activeId]);
-  const selectThread = (id: string) => {
+  const [activeId, setActiveId] = useState<string | null>(threadId ?? null);
+  const selectThread = useCallback((id: string, options?: { replace?: boolean }) => {
     setActiveId(id);
-    navigate(`/chat/${encodeURIComponent(id)}`);
-  };
+    navigate(`/chat/${encodeURIComponent(id)}`, { replace: options?.replace });
+  }, [navigate]);
   // Mobile: the thread rail is an off-canvas drawer (docked on desktop).
   const [threadsDrawerOpen, setThreadsDrawerOpen] = useState(false);
   const [draft, setDraft] = useState('');
@@ -71,7 +72,9 @@ export function ChatPage() {
       setDraft(incoming);
     }
   }, [location.state]);
-  const threadStream = useChatStream((s) => s.getThreadState(activeId));
+  const threadStream = useChatStream((s) =>
+    activeId ? s.getThreadState(activeId) : EMPTY_THREAD_STATE,
+  );
   const startSend = useChatStream((s) => s.startSend);
   const setPendingUser = useChatStream((s) => s.setPendingUser);
   const applyStreamChunk = useChatStream((s) => s.applyChunk);
@@ -107,8 +110,25 @@ export function ChatPage() {
     if (!isUsable) setDefaultModel(availableModel?.id ?? '');
   }, [models, defaultModel, availableModel, setDefaultModel]);
 
-  const { data: threads = [] } = useChatThreads();
-  const { data: msgs = [] } = useChatThread(activeId);
+  const { data: threadsData, isPending: threadsPending } = useChatThreads();
+  const threads = threadsData ?? EMPTY_THREADS;
+  const { data: msgs = [] } = useChatThread(activeId ?? undefined);
+
+  useEffect(() => {
+    if (threadId) {
+      if (threadId !== activeId) setActiveId(threadId);
+      return;
+    }
+    if (location.pathname !== '/chat') return;
+    if (threadsPending) return;
+    if (threads.length === 0) {
+      if (activeId !== null) setActiveId(null);
+      return;
+    }
+    const newest = newestThread(threads);
+    if (newest.id === activeId) return;
+    selectThread(newest.id, { replace: true });
+  }, [threadId, activeId, location.pathname, threadsPending, threads, selectThread]);
   // Audit #463 — live thread CRUD. The "Nueva conversación" button
   // calls ``create`` and navigates to the new id; rename/delete are
   // exposed via tiny inline buttons next to each row in the rail.
@@ -218,7 +238,10 @@ export function ChatPage() {
     if (!ok) return;
     try {
       await deleteThread.mutateAsync(threadId);
-      if (activeId === threadId) navigate('/chat');
+      if (activeId === threadId) {
+        setActiveId(null);
+        navigate('/chat');
+      }
     } catch (exc) {
       const message = errorMessage(exc, t);
       toast({ tone: 'danger', title: t('chat.deleteFailed'), message });
@@ -241,7 +264,7 @@ export function ChatPage() {
     // matching thread in the live backend, transparently create a new
     // one before sending so the first message doesn't 404.
     let target = activeId;
-    if (!threadsById.has(target)) {
+    if (!target || !threadsById.has(target)) {
       try {
         const created = await createThread.mutateAsync({ model: defaultModel });
         target = created.id;
@@ -275,7 +298,7 @@ export function ChatPage() {
   };
 
   const handleStop = () => {
-    stopSend(activeId);
+    if (activeId) stopSend(activeId);
   };
 
   return (
@@ -384,7 +407,7 @@ export function ChatPage() {
             icon={<Menu className="size-4" />}
           />
           <div className="min-w-0">
-            <div className="truncate font-display text-[15px] font-semibold">{threadsById.get(activeId)?.title ?? t('chat.threadFallback')}</div>
+            <div className="truncate font-display text-[15px] font-semibold">{activeId ? (threadsById.get(activeId)?.title ?? t('chat.threadFallback')) : t('chat.threadFallback')}</div>
             <div className="truncate text-[12px] text-muted">{t('chat.turns', { n: visible.length })} · {t('chat.sourcesCited', { n: sourcesCited })}</div>
           </div>
           <span className="ml-auto shrink-0"><ModelChip /></span>

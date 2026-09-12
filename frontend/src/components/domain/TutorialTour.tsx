@@ -1,5 +1,5 @@
 /**
- * Onboarding tutorial — 6-step shadowed tour (#116).
+ * Onboarding tutorial — 7-step shadowed tour (#116).
  *
  * Auto-runs once on first launch after the welcome flow + model wizard
  * have completed. Re-launchable from Settings → Ayuda. Single
@@ -15,7 +15,7 @@
  *     to instant — the user sees the highlighted box without the
  *     swooping animation.
  *   - Esc closes the tour, focus returns to the body.
- *   - Step 6 finishes with the chat being highlighted; closing it
+ *   - Step 7 finishes with the chat being highlighted; closing it
  *     navigates to the chat route so the wizard is reachable from
  *     where the tour left off.
  *
@@ -132,7 +132,7 @@ const STEP_CONTENT = (title: string, body: string) => (
 );
 
 /**
- * Six steps, in the order the user meets the concepts. Each `selector`
+ * Seven steps, in the order the user meets the concepts. Each `selector`
  * matches a `data-tour-id` attribute in the shell, not a class. Selectors
  * that fail (e.g. on a viewport where the LeftRail is hidden) are
  * skipped by Reactour automatically.
@@ -151,6 +151,14 @@ const TUTORIAL_STEPS: StepType[] = [
     content: STEP_CONTENT(
       'Navegación principal',
       'Cada sección del producto vive aquí: Inicio, Explorador, Grafo, Chat, Cuadros. Cada una tiene un atajo de dos teclas (g + inicial). Por ejemplo: g c lleva al Chat.',
+    ),
+    position: 'right',
+  },
+  {
+    selector: '[data-tour-id="left-rail-secondary"]',
+    content: STEP_CONTENT(
+      'Editor, Comunidades y Ajustes',
+      'Debajo están Comunidades (legislación por territorio), el Editor de documentos (atajo g n) y Ajustes (g s). Comunidades no tiene atajo g+*.',
     ),
     position: 'right',
   },

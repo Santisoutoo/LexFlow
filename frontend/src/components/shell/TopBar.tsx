@@ -1,13 +1,33 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ChevronRight, Search, Moon, Sun, SidebarOpen, SidebarClose, Info } from 'lucide-react';
 import { Avatar, Button, Kbd } from '@/components/ui';
 import { useUi } from '@/lib/store';
-import { useLaw } from '@/lib/queries';
+import { useChatThreads, useLaw } from '@/lib/queries';
 import { modKey } from '@/lib/utils';
 import { hasContextualRightRail } from '@/lib/shell-routes';
+import {
+  USER_NAME_CHANGED_EVENT,
+  displayInitials,
+  readStoredUserName,
+} from '@/lib/greeting';
 import { MobileNavMenu } from './MobileNavMenu';
+
+const DASHBOARD_PRESETS = new Set(['compliance', 'analytics']);
+
+const SETTINGS_SECTION_KEYS = new Set([
+  'personalization',
+  'appearance',
+  'models',
+  'mcpServers',
+  'data',
+  'diagnostics',
+  'privacy',
+  'help',
+  'updates',
+  'about',
+]);
 
 export function TopBar() {
   const { t } = useTranslation();
@@ -19,16 +39,35 @@ export function TopBar() {
   const setPaletteOpen = useUi((s) => s.setPaletteOpen);
   const location = useLocation();
   const navigate = useNavigate();
-  const params = useParams<{ lawId?: string }>();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const params = useParams<{ lawId?: string; threadId?: string; preset?: string; section?: string }>();
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [storedName, setStoredName] = useState(readStoredUserName);
   const showRightToggle = hasContextualRightRail(location.pathname);
+  const initials = displayInitials(storedName);
+
+  useEffect(() => {
+    const onChange = () => setStoredName(readStoredUserName());
+    window.addEventListener(USER_NAME_CHANGED_EVENT, onChange);
+    window.addEventListener('storage', onChange);
+    return () => {
+      window.removeEventListener(USER_NAME_CHANGED_EVENT, onChange);
+      window.removeEventListener('storage', onChange);
+    };
+  }, []);
 
   return (
     <header
       role="banner"
       className="flex h-12 shrink-0 items-center gap-3 border-b border-border bg-bg px-4"
     >
-      <Breadcrumb path={location.pathname} lawId={params.lawId} navigate={navigate} />
+      <Breadcrumb
+        path={location.pathname}
+        lawId={params.lawId}
+        threadId={params.threadId}
+        preset={params.preset}
+        section={params.section}
+        navigate={navigate}
+      />
 
       {/* Search trigger — desktop only; mobile uses the floating button in AppShell. */}
       <button
@@ -61,30 +100,45 @@ export function TopBar() {
       )}
       <button
         type="button"
-        className="rounded-full md:hidden"
+        className="rounded-full"
         aria-haspopup="dialog"
-        aria-expanded={mobileMenuOpen}
+        aria-expanded={accountMenuOpen}
         aria-label={t('shell.mobileMenu.openAria')}
-        onClick={() => setMobileMenuOpen(true)}
+        title={storedName ?? undefined}
+        onClick={() => setAccountMenuOpen(true)}
       >
-        <Avatar initials="LV" size={28} />
+        <Avatar initials={initials} size={28} />
       </button>
-      <Avatar initials="LV" size={28} className="hidden md:inline-flex" />
-      {mobileMenuOpen && <MobileNavMenu onClose={() => setMobileMenuOpen(false)} />}
+      {accountMenuOpen && <MobileNavMenu onClose={() => setAccountMenuOpen(false)} />}
     </header>
   );
 }
 
-function Breadcrumb({ path, lawId, navigate }: { path: string; lawId?: string; navigate: (to: string) => void }) {
+function Breadcrumb({
+  path,
+  lawId,
+  threadId,
+  preset,
+  section,
+  navigate,
+}: {
+  path: string;
+  lawId?: string;
+  threadId?: string;
+  preset?: string;
+  section?: string;
+  navigate: (to: string) => void;
+}) {
   const { t } = useTranslation();
   // Audit #409 perf: previously fetched the full paginated /laws list
   // (one row per law) just to extract one row's ``short`` name. Now we
   // hit ``/laws/{id}`` directly via ``useLaw`` — single-row payload,
   // dedupes with LawDetailPage's query.
   const { data: law } = useLaw(lawId);
+  const { data: threads = [] } = useChatThreads();
 
-  const items: { label: string; onClick?: () => void; sub?: string }[] = [];
-  if (path === '/') items.push({ label: t('nav.home') });
+  const items: { label: string; onClick?: () => void }[] = [];
+  if (path === '/' || path === '/home') items.push({ label: t('nav.home') });
   else if (path === '/explorer') items.push({ label: t('nav.explorer') });
   else if (path.startsWith('/laws/') && path.endsWith('/diff')) {
     items.push({ label: t('nav.explorer'), onClick: () => navigate('/explorer') });
@@ -94,17 +148,29 @@ function Breadcrumb({ path, lawId, navigate }: { path: string; lawId?: string; n
     items.push({ label: t('nav.explorer'), onClick: () => navigate('/explorer') });
     if (law) items.push({ label: law.short });
   } else if (path === '/graph') items.push({ label: t('nav.graph') });
-  // Audit #409 — the hardcoded 'Sesión: EIPD LOPDGDD' / 'Compliance'
-  // sub-labels are gone. Real per-thread / per-preset labels need a
-  // dedicated lookup that we don't have wired here yet; we drop the
-  // sub-label rather than lying.
-  else if (path === '/chat') items.push({ label: t('nav.chat') });
-  else if (path === '/dashboards') items.push({ label: t('nav.dashboards') });
-  else if (path === '/communities') items.push({ label: t('nav.communities', 'Comunidades') });
-  else if (path === '/settings' || path.startsWith('/settings/')) items.push({ label: t('nav.settings') });
-  else if (path === '/editor' || path.startsWith('/editor/')) items.push({ label: t('nav.editor') });
-  else if (path === '/search') items.push({ label: t('search.title') });
-  else items.push({ label: path.slice(1) });
+  else if (path === '/chat' || path.startsWith('/chat/')) {
+    items.push({ label: t('nav.chat'), onClick: threadId ? () => navigate('/chat') : undefined });
+    if (threadId) {
+      const title = threads.find((th) => th.id === threadId)?.title ?? t('chat.threadFallback');
+      items.push({ label: title });
+    }
+  } else if (path === '/dashboards' || path.startsWith('/dashboards/')) {
+    items.push({ label: t('nav.dashboards'), onClick: preset ? () => navigate('/dashboards') : undefined });
+    if (preset && DASHBOARD_PRESETS.has(preset)) {
+      items.push({ label: t(`dashboards.tabs.${preset}`) });
+    }
+  } else if (path === '/settings' || path.startsWith('/settings/')) {
+    items.push({ label: t('nav.settings'), onClick: section ? () => navigate('/settings') : undefined });
+    if (section && SETTINGS_SECTION_KEYS.has(section)) {
+      items.push({ label: t(`settings.sections.${section}`) });
+    }
+  } else if (path === '/communities' || path.startsWith('/communities/')) {
+    items.push({ label: t('nav.communities', 'Comunidades') });
+  } else if (path === '/editor' || path.startsWith('/editor/')) {
+    items.push({ label: t('nav.editor') });
+  } else if (path === '/search' || path.startsWith('/search/')) {
+    items.push({ label: t('search.title') });
+  } else items.push({ label: path.slice(1) });
 
   return (
     <nav aria-label={t('shell.breadcrumb')} className="flex min-w-0 items-center gap-1.5 text-[13px]">
@@ -116,7 +182,6 @@ function Breadcrumb({ path, lawId, navigate }: { path: string; lawId?: string; n
           ) : (
             <span className="font-semibold">{it.label}</span>
           )}
-          {it.sub && <span className="text-muted">· {it.sub}</span>}
         </span>
       ))}
     </nav>

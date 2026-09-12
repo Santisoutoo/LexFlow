@@ -11,7 +11,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { LAST_GREETING_STORAGE_KEY, USER_NAME_STORAGE_KEY, pickGreeting } from './greeting';
+import { LAST_GREETING_STORAGE_KEY, USER_NAME_STORAGE_KEY, displayInitials, pickGreeting } from './greeting';
 
 const MORNING = new Date('2026-01-01T08:00:00');
 const AFTERNOON = new Date('2026-01-01T14:00:00');
@@ -124,5 +124,20 @@ describe('pickGreeting — return shape', () => {
     const g = pickGreeting(AFTERNOON, pickFirst);
     expect(g.id).toBe('time-plain');
     expect(g.text).toBe('Buenas tardes, Victor');
+  });
+});
+
+describe('displayInitials', () => {
+  it('uses the first two letters of a single word', () => {
+    expect(displayInitials('Victor')).toBe('VI');
+  });
+
+  it('uses the first letter of the first two words', () => {
+    expect(displayInitials('Ana María')).toBe('AM');
+  });
+
+  it('falls back to LF when no name is stored', () => {
+    expect(displayInitials(null)).toBe('LF');
+    expect(displayInitials('   ')).toBe('LF');
   });
 });

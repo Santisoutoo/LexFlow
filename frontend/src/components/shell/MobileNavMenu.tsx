@@ -1,9 +1,9 @@
 /**
- * Mobile account menu — reaches Settings / Editor / Communities on <md.
+ * Account menu — reaches Settings / Editor / Communities.
  *
  * LeftRail is `hidden md:flex` and BottomTabBar is capped at the five
- * primary NAV tabs, so secondary destinations had no mobile entry. This
- * sheet is the overflow: avatar in TopBar opens it.
+ * primary NAV tabs, so secondary destinations need this overflow sheet.
+ * Avatar in TopBar opens it on every viewport.
  *
  * WHERE TO CHANGE IF X CHANGES: destinations live in `MENU_LINKS` below
  * (keep in sync with LeftRail's secondary block). Trigger lives in TopBar.
@@ -35,7 +35,7 @@ export function MobileNavMenu({ onClose }: { onClose: () => void }) {
   }, [onClose]);
 
   return (
-    <div className="md:hidden">
+    <div>
       <button
         type="button"
         aria-label={t('shell.mobileMenu.closeAria')}

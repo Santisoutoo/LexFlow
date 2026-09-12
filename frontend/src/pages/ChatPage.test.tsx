@@ -182,3 +182,46 @@ describe('ChatPage new-thread hotkey', () => {
     });
   });
 });
+
+describe('ChatPage default thread selection', () => {
+  beforeEach(() => {
+    useUi.setState({ defaultModel: 'ollama:qwen2.5:7b', wizardRequested: false });
+    useChatThreadMock.mockReturnValue({ data: [] });
+    useModelsMock.mockReturnValue({
+      data: [
+        { id: 'ollama:qwen2.5:7b', available: true, label: 'qwen2.5:7b', vendor: 'ollama', kind: 'local' },
+      ],
+    });
+  });
+
+  it('navigates /chat to the newest thread and highlights its row', async () => {
+    useChatThreadsMock.mockReturnValue({
+      data: [
+        { id: 'b', title: 'Older', updatedAt: '2026-01-01T00:00:00.000Z' },
+        { id: 'a', title: 'Newer', updatedAt: '2026-06-01T00:00:00.000Z' },
+      ],
+    });
+    renderChatAt('/chat');
+    const newer = await screen.findByRole('button', { name: 'Newer' });
+    expect(newer.className).toContain('font-semibold');
+    expect(screen.getByRole('button', { name: 'Older' }).className).not.toContain('font-semibold');
+  });
+
+  it('stays on a true empty state when there are no threads', () => {
+    useChatThreadsMock.mockReturnValue({ data: [] });
+    renderChatAt('/chat');
+    expect(useChatThreadMock).not.toHaveBeenCalledWith('eipd');
+    expect(screen.getByText(/consultará el corpus automáticamente/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Older$|^Newer$|^Test$/ })).toBeNull();
+  });
+
+  it('keeps an unknown deep-link id without crashing', () => {
+    useChatThreadsMock.mockReturnValue({
+      data: [{ id: 'a', title: 'Real thread', updatedAt: '2026-06-01T00:00:00.000Z' }],
+    });
+    renderChatAt('/chat/unknown-id');
+    expect(screen.getByText('Conversación')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Real thread' }).className).not.toContain('font-semibold');
+  });
+});
+

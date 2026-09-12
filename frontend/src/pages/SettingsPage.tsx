@@ -28,7 +28,7 @@ import { cloudProviderStatus } from '@/lib/model-status';
 import { Skeleton } from '@/components/domain/Skeleton';
 import { useUi } from '@/lib/store';
 import { cn, timeAgo } from '@/lib/utils';
-import { USER_NAME_STORAGE_KEY } from '@/lib/greeting';
+import { USER_NAME_STORAGE_KEY, notifyUserNameChanged, readStoredUserName } from '@/lib/greeting';
 import { toast } from '@/lib/toast';
 import { SUPPORTED_LANGS } from '@/i18n';
 import type { Lang } from '@/i18n';
@@ -164,6 +164,7 @@ function PersonalizacionSection() {
       } else {
         localStorage.setItem(USER_NAME_STORAGE_KEY, trimmed);
       }
+      notifyUserNameChanged();
       toast({
         tone: 'info',
         title: trimmed.length === 0
@@ -235,17 +236,6 @@ function PersonalizacionSection() {
       </div>
     </>
   );
-}
-
-function readStoredUserName(): string | null {
-  try {
-    const raw = localStorage.getItem(USER_NAME_STORAGE_KEY);
-    if (!raw) return null;
-    const trimmed = raw.trim();
-    return trimmed.length === 0 ? null : trimmed;
-  } catch {
-    return null;
-  }
 }
 
 function ModelsSection() {
