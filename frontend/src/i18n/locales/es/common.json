@@ -57,6 +57,13 @@
     "changeModelsPre": "Cambia modelos en",
     "changeModelsPath": "Ajustes › Modelos"
   },
+  "law": {
+    "statusTooltip": "Estado según legalize-es · sync {{date}} · verificar en BOE"
+  },
+  "trust": {
+    "disclaimerTitle": "Aviso legal y procedencia de datos",
+    "disclaimerBody": "LexFlow es una herramienta de consulta; no constituye asesoramiento jurídico. Fuente: legalize-es (última sync {{syncAgo}}). Verifica siempre en <0>boe.es</0>"
+  },
   "lawHeader": {
     "save": "Guardar",
     "addUserTag": "tag",
@@ -514,7 +521,7 @@
       "subtitle": "Resumen de lo que cambió en legalize-es desde la última sincronización. Para ejecutar una sincronización, ve a Ajustes → Datos.",
       "upToDate": "El corpus está al día con la última revisión sincronizada.",
       "atCommit": "Revisión actual: {{sha}}",
-      "removedShort": "Derogadas"
+      "removedShort": "Retiradas del corpus"
     },
     "about": {
       "title": "Acerca de LexFlow",
@@ -757,6 +764,11 @@
     "searchPlaceholder": "Pregunta o busca cualquier norma…",
     "popularTags": "Tags populares",
     "syncPrefix": "El corpus está al día. Última sincronización con",
+    "sync": {
+      "upToDate": "El corpus está al día. Última sincronización con",
+      "behind": "{{behind}} commits pendientes con {{upstream}} · última sync {{ago}}",
+      "unknown": "Estado de sincronización desconocido"
+    },
     "whatChanged": "Qué ha cambiado",
     "seeAll": "Ver todo",
     "shortcuts": "Atajos",

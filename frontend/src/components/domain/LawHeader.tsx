@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Hash, Plus, X, ExternalLink } from 'lucide-react';
-import { Badge } from '@/components/ui';
-import { formatDate, statusLabel } from '@/lib/utils';
+import { LawStatusBadge } from '@/components/domain/LawStatusBadge';
+import { formatDate } from '@/lib/utils';
+import { boeActUrl } from '@/lib/boe-url';
 import type { Law, UserTag } from '@/lib/types';
 
 export interface LawHeaderProps {
@@ -36,24 +37,20 @@ export function LawHeader({
   onRemoveUserTag,
 }: LawHeaderProps) {
   const { t } = useTranslation();
-  const tone =
-    law.status === 'vigente' ? 'success' :
-    law.status === 'derogada' ? 'danger' : 'amber';
-  const boeUrl = law.sourceUrl ?? (law.boe ? `https://www.boe.es/buscar/act.php?id=${law.boe}` : undefined);
+  const boeUrl = law.boe ? boeActUrl(law.boe, law.sourceUrl) : undefined;
   return (
     <header className="bg-bg pt-5 pb-0 px-8">
       <div className="mb-2 flex items-center gap-2">
-        <Badge tone={tone}>{statusLabel(law.status)}</Badge>
-        <span className="font-mono text-[12px] text-muted">{law.boe}</span>
+        <LawStatusBadge status={law.status} />
         {boeUrl && (
           <a
             href={boeUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-[12px] text-indigo-700 hover:underline dark:text-indigo-300"
+            className="inline-flex items-center gap-1 font-mono text-[12px] text-indigo-700 hover:underline dark:text-indigo-300"
           >
+            {law.boe}
             <ExternalLink className="size-3" aria-hidden />
-            {t('lawHeader.viewOnBoe')}
           </a>
         )}
         <span className="text-[12px] text-muted">·</span>
@@ -80,7 +77,7 @@ export function LawHeader({
               too — a chevron on an inert element still reads as a picker
               affordance that doesn't exist. A plain badge just states
               the real status. */}
-          <Badge tone={tone}>{statusLabel(law.status)}</Badge>
+          <LawStatusBadge status={law.status} />
         </span>
       </div>
 

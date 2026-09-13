@@ -18,7 +18,7 @@ import {
   Power,
 } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
-import { Avatar, Badge, Button, Card, Tabs, useConfirm } from '@/components/ui';
+import { Avatar, Badge, Button, Callout, Card, Tabs, useConfirm } from '@/components/ui';
 import { ApiKeyRow } from '@/components/domain/ApiKeyRow';
 import { McpServersSection } from '@/components/domain/McpServersSection';
 import { useTutorialRelaunch } from '@/components/domain/use-tutorial-relaunch';
@@ -27,7 +27,7 @@ import type { InstalledModel } from '@/lib/types';
 import { cloudProviderStatus } from '@/lib/model-status';
 import { Skeleton } from '@/components/domain/Skeleton';
 import { useUi } from '@/lib/store';
-import { cn, timeAgo } from '@/lib/utils';
+import { cn, formatDate, timeAgo } from '@/lib/utils';
 import { USER_NAME_STORAGE_KEY, notifyUserNameChanged, readStoredUserName } from '@/lib/greeting';
 import { toast } from '@/lib/toast';
 import { SUPPORTED_LANGS } from '@/i18n';
@@ -932,10 +932,13 @@ function SummaryStat({ label, value, tone }: { label: string; value: number; ton
  */
 function AboutSection() {
   const { t } = useTranslation();
+  const { data: sync } = useSyncStatus();
   // The Vite build inlines `__APP_VERSION__` from `package.json`'s
   // version field (see `vite-env.d.ts`). Fall back to "—" so a
   // missing define never crashes the page.
   const version = (import.meta.env.VITE_APP_VERSION as string | undefined) ?? '—';
+  const syncAgo = timeAgo(sync?.lastSyncAt);
+  const syncDate = formatDate(sync?.lastSyncAt);
   return (
     <>
       <h1 className="font-display text-[22px] font-semibold">{t('settings.about.title')}</h1>
@@ -959,6 +962,20 @@ function AboutSection() {
           </dd>
         </dl>
       </Card>
+      <Callout tone="info" title={t('trust.disclaimerTitle')} className="mt-4 max-w-xl">
+        <Trans
+          i18nKey="trust.disclaimerBody"
+          values={{ syncAgo, syncDate }}
+          components={[
+            <a
+              href="https://www.boe.es/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-600 underline underline-offset-2 dark:text-indigo-300"
+            />,
+          ]}
+        />
+      </Callout>
     </>
   );
 }

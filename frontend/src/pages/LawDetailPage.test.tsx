@@ -57,6 +57,9 @@ vi.mock('@/lib/queries', async (importOriginal) => {
     useAddUserTag: () => ({ mutate: vi.fn() }),
     useRemoveUserTag: () => ({ mutate: vi.fn() }),
     useGraph: () => ({ data: { nodes: [], edges: [] } }),
+    useSyncStatus: () => ({
+      data: { lastSyncAt: '2024-03-05T12:00:00Z', upstream: 'legalize-es@main', behind: 0, busy: false },
+    }),
   };
 });
 
@@ -202,6 +205,19 @@ describe('LawDetailPage', () => {
 
     renderPage('/laws/EMPTY');
     expect(await screen.findByText(/No readable content yet|Sin contenido legible/i)).toBeInTheDocument();
+  });
+
+  it('shows law status (not hardcoded vigente) on the newest version row', async () => {
+    mockLawData = { ...mockLawData, status: 'derogada' };
+    mockVersions = [
+      { tag: 'bbbbbbb', date: '2024-06-01', label: 'Newest', kind: 'amend' },
+      { tag: 'aaaaaaa', date: '2024-01-01', label: 'Previous', kind: 'publish' },
+    ];
+
+    renderPage('/laws/CE-1978');
+    await userEvent.click(screen.getByRole('tab', { name: /versiones/i }));
+    expect(screen.queryByText(/^vigente$/i)).toBeNull();
+    expect(screen.getAllByText('Derogada').length).toBeGreaterThanOrEqual(1);
   });
 
   it('deep-links Ver cambios to the matching from/to commit pair', async () => {

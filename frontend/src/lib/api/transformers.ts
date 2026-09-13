@@ -25,6 +25,7 @@ import type {
   BackendReference,
   BackendSection,
 } from '../../api';
+import { boeActUrl } from '../boe-url';
 import type {
   Ambito,
   Article,
@@ -43,13 +44,6 @@ import type {
   RangoNormativo,
   ReferenceRelationKind,
 } from '../types';
-
-/** Official BOE consolidada HTML — used when `metadata.source` is missing. */
-const BOE_ACT_URL_PREFIX = 'https://www.boe.es/buscar/act.php?id=';
-
-function boeSourceUrl(identifier: string, source?: string | null): string {
-  return source || `${BOE_ACT_URL_PREFIX}${identifier}`;
-}
 
 // ─── Enum maps ───────────────────────────────────────────────────────────
 
@@ -164,7 +158,7 @@ export function transformLaw(raw: BackendLawSummary): Law {
     // when the user opens a law. Counts are advisory in the Explorer header.
     referencias: 0,
     versiones: 0,
-    sourceUrl: boeSourceUrl(raw.identifier),
+    sourceUrl: boeActUrl(raw.identifier),
   };
 }
 
@@ -189,7 +183,7 @@ export function transformLawDetail(raw: BackendLawDetail): LawDetail {
     // law-header tag chips in live mode.
     tags: m.tags ?? [],
     ultimaModificacion: m.last_updated ?? undefined,
-    sourceUrl: boeSourceUrl(m.identifier, m.source),
+    sourceUrl: boeActUrl(m.identifier, m.source),
     hierarchy,
     articles,
     disposiciones,

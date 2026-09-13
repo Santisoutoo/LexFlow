@@ -52,11 +52,11 @@ import {
   type ModelTier,
   type TierKey,
 } from '@/lib/model-tiering';
-import { qk, useInvalidateModels, useModels, useSystemProfile } from '@/lib/queries';
+import { qk, useInvalidateModels, useModels, useSyncStatus, useSystemProfile } from '@/lib/queries';
 import { useUi } from '@/lib/store';
 import { toast } from '@/lib/toast';
 import type { SystemProfile } from '@/lib/types';
-import { cn } from '@/lib/utils';
+import { cn, formatDate, timeAgo } from '@/lib/utils';
 import {
   clearWizardPull,
   markWizardCompleted,
@@ -571,6 +571,9 @@ function StepTelemetry({
   onChange: (value: boolean) => void;
 }) {
   const { t } = useTranslation();
+  const { data: sync } = useSyncStatus();
+  const syncAgo = timeAgo(sync?.lastSyncAt);
+  const syncDate = formatDate(sync?.lastSyncAt);
   return (
     <div className="flex flex-col gap-3 text-[13.5px]">
       <p className="text-muted">{t('wizard.telemetryBody')}</p>
@@ -580,6 +583,20 @@ function StepTelemetry({
       </div>
       <Callout tone="info" title={t('wizard.telemetryNotSentTitle')}>
         {t('wizard.telemetryNotSentBody')}
+      </Callout>
+      <Callout tone="info" title={t('trust.disclaimerTitle')}>
+        <Trans
+          i18nKey="trust.disclaimerBody"
+          values={{ syncAgo, syncDate }}
+          components={[
+            <a
+              href="https://www.boe.es/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-600 underline underline-offset-2 dark:text-indigo-300"
+            />,
+          ]}
+        />
       </Callout>
     </div>
   );

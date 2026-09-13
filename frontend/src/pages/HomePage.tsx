@@ -2,12 +2,13 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Sparkles, Search, ArrowRight, ChevronRight, Plus, GitCompareArrows, BookOpenText, Network, MessagesSquare, BarChart3, Hash } from 'lucide-react';
-import { Badge, Card, Chip, Kbd } from '@/components/ui';
+import { Card, Chip, Kbd } from '@/components/ui';
+import { LawStatusBadge } from '@/components/domain/LawStatusBadge';
 import { EmptyState } from '@/components/domain/EmptyState';
 import { Skeleton } from '@/components/domain/Skeleton';
 import { useLawsList, useSyncStatus, useTags, useVersions } from '@/lib/queries';
 import { useUi } from '@/lib/store';
-import { formatNumber, modKey, timeAgo, statusLabel, formatDate } from '@/lib/utils';
+import { formatNumber, modKey, timeAgo, formatDate } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { pickGreeting } from '@/lib/greeting';
 import type { Law } from '@/lib/types';
@@ -51,7 +52,7 @@ export function HomePage() {
   // cambiado" feed and the "Reciente" cards below. Limit handled at the
   // group level so the feed shows enough variety across buckets.
   const { data: laws, isLoading: lawsLoading } = useLawsList({ sort: 'date', limit: 12 });
-  const { data: sync } = useSyncStatus();
+  const { data: sync, isError: syncError, isLoading: syncLoading } = useSyncStatus();
   const { data: vocab = [] } = useTags();
   const greeting = useMemo(() => pickGreeting(), []);
   const recent = laws?.items.slice(0, 3) ?? [];
@@ -80,11 +81,25 @@ export function HomePage() {
             randomised welcome pool (#248) is `lib/greeting.ts`. */}
         <header className="mb-7">
           <h1 className="font-display text-2xl md:text-4xl font-semibold -tracking-[0.015em]">{greeting.text}</h1>
-          <p className="mt-1 text-[14.5px] text-muted">
-            {t('home.syncPrefix')}{' '}
-            <code className="font-mono text-[12.5px] text-indigo-600 dark:text-indigo-300">{sync?.upstream ?? 'legalize-es@main'}</code>{' '}
-            {timeAgo(sync?.lastSyncAt)}.
-          </p>
+          {!syncLoading && (
+            <p className="mt-1 text-[14.5px] text-muted">
+              {syncError || !sync ? (
+                t('home.sync.unknown')
+              ) : sync.behind > 0 ? (
+                t('home.sync.behind', {
+                  behind: sync.behind,
+                  upstream: sync.upstream,
+                  ago: timeAgo(sync.lastSyncAt),
+                })
+              ) : (
+                <>
+                  {t('home.sync.upToDate')}{' '}
+                  <code className="font-mono text-[12.5px] text-indigo-600 dark:text-indigo-300">{sync.upstream}</code>{' '}
+                  {timeAgo(sync.lastSyncAt)}.
+                </>
+              )}
+            </p>
+          )}
         </header>
 
         {/* Search hero */}
@@ -199,7 +214,7 @@ export function HomePage() {
             {recent.map((l) => (
               <Card key={l.id} hoverable onClick={() => navigate(`/laws/${encodeURIComponent(l.id)}`)}>
                 <div className="mb-2 flex items-center gap-2">
-                  <Badge tone={l.status === 'vigente' ? 'success' : l.status === 'derogada' ? 'danger' : 'amber'}>{statusLabel(l.status)}</Badge>
+                  <LawStatusBadge status={l.status} />
                   <span className="font-mono text-[11px] text-muted">{l.boe}</span>
                 </div>
                 <div className="font-display text-[15.5px] font-semibold leading-tight">{l.short}</div>

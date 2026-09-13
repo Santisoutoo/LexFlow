@@ -29,6 +29,7 @@ const profileFixture: SystemProfile = {
 
 const useSystemProfileMock = vi.fn();
 const useModelsMock = vi.fn();
+const useSyncStatusMock = vi.fn();
 const invalidateModelsMock = vi.fn();
 
 vi.mock('@/lib/queries', () => ({
@@ -37,6 +38,7 @@ vi.mock('@/lib/queries', () => ({
   },
   useSystemProfile: () => useSystemProfileMock(),
   useModels: () => useModelsMock(),
+  useSyncStatus: () => useSyncStatusMock(),
   useInvalidateModels: () => invalidateModelsMock,
 }));
 
@@ -77,6 +79,21 @@ async function goToStep4Confirm() {
   await userEvent.click(screen.getByRole('button', { name: /continuar/i }));
 }
 
+async function goToStep5Telemetry() {
+  vi.spyOn(api.models, 'pull').mockImplementation(async function* () {
+    yield { type: 'done', model: 'llama3.2:3b' };
+  });
+  vi.spyOn(api.models, 'list').mockResolvedValue([
+    { id: 'ollama:llama3.2:3b', available: true, label: 'llama3.2:3b', vendor: 'ollama', kind: 'local' },
+  ]);
+  await goToStep4Confirm();
+  await userEvent.click(screen.getByRole('button', { name: /instalar/i }));
+  await userEvent.click(screen.getByRole('button', { name: /usar free local/i }));
+  await waitFor(() => {
+    expect(screen.getByText(/paso 5 de 5/i)).toBeInTheDocument();
+  });
+}
+
 describe('ModelWizard legal disclaimer', () => {
   beforeEach(() => {
     sessionStorage.clear();
@@ -89,12 +106,23 @@ describe('ModelWizard legal disclaimer', () => {
     useModelsMock.mockReturnValue({
       data: [{ id: 'ollama:llama3.2:3b', available: true, label: 'llama3.2:3b', vendor: 'ollama', kind: 'local' }],
     });
+    useSyncStatusMock.mockReturnValue({
+      data: { lastSyncAt: '2024-03-05T12:00:00Z', upstream: 'legalize-es@main', behind: 0, busy: false },
+    });
   });
 
   it('shows the no-legal-advice disclaimer on the model-pick step', async () => {
     renderWizard();
     await goToStepPick();
     expect(screen.getByText(/no sustituye el criterio de un abogado/i)).toBeInTheDocument();
+  });
+
+  it('shows corpus provenance disclaimer on the telemetry step', async () => {
+    renderWizard();
+    await goToStep5Telemetry();
+    expect(screen.getByText(/herramienta de consulta/i)).toBeInTheDocument();
+    expect(screen.getByText(/legalize-es/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /boe\.es/i })).toHaveAttribute('href', 'https://www.boe.es/');
   });
 });
 
