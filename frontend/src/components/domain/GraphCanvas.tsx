@@ -30,10 +30,12 @@
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import ForceGraph2D, { type ForceGraphMethods } from 'react-force-graph-2d';
+import { useTranslation } from 'react-i18next';
 
 import {
   EDGE_KIND_LABELS,
   GRAPH_EDGE_STROKE,
+  INFERRED_EDGE_DASH,
   NODE_KIND_LABELS,
   paintNode,
   resolveCommunityFill,
@@ -85,6 +87,7 @@ interface FGLink {
   source: string | FGNode;
   target: string | FGNode;
   kind?: NonNullable<GraphEdge['kind']>;
+  resolution?: GraphEdge['resolution'];
 }
 
 /** Base node radius (graph units) per kind; laws anchor, the rest ring them. */
@@ -161,6 +164,7 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
   // matchMedia change-listener effect below).
   const [reduced, setReduced] = useState(prefersReducedMotion);
   const theme = useUi((s) => s.theme);
+  const { t } = useTranslation();
 
   // Stable across selection + filter changes (depends on `data` only) so the
   // simulation never restarts on a click or a chip toggle.
@@ -177,7 +181,9 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
       }),
     );
     const byId = new Map(nodes.map((n) => [n.id, n]));
-    const links = data.edges.map((e): FGLink => ({ source: e.source, target: e.target, kind: e.kind }));
+    const links = data.edges.map(
+      (e): FGLink => ({ source: e.source, target: e.target, kind: e.kind, resolution: e.resolution }),
+    );
     return { nodes, links, byId };
   }, [data]);
 
@@ -359,10 +365,12 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
       const source = typeof link.source === 'object' ? link.source : graphData.byId.get(link.source);
       const target = typeof link.target === 'object' ? link.target : graphData.byId.get(link.target);
       const kind = EDGE_KIND_LABELS[link.kind ?? 'cites'];
-      if (!source || !target) return kind;
-      return `${kind}\n${source.label} → ${target.label}`;
+      const inferredHint =
+        link.resolution === 'inferred' ? `\n${t('graph.edge.inferredTooltip')}` : '';
+      if (!source || !target) return `${kind}${inferredHint}`;
+      return `${kind}\n${source.label} → ${target.label}${inferredHint}`;
     },
-    [graphData.byId, graphData.links.length, lodProfile],
+    [graphData.byId, graphData.links.length, lodProfile, t],
   );
 
   return (
@@ -395,6 +403,7 @@ export const GraphCanvas = forwardRef<GraphCanvasHandle, GraphCanvasProps>(funct
           }}
           nodeLabel={(n) => nodeLabel(n as FGNode)}
           linkLabel={(l) => linkLabel(l as FGLink)}
+          linkLineDash={(l) => ((l as FGLink).resolution === 'inferred' ? INFERRED_EDGE_DASH : null)}
           linkDirectionalArrowLength={() => 5 / (fgRef.current?.zoom() ?? 1)}
           linkDirectionalArrowColor={(l) => {
             const link = l as FGLink;

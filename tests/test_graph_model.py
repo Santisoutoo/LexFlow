@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lexflow.core.enums import LawRank, LawStatus, ReferenceKind
+from lexflow.core.enums import EdgeResolution, LawRank, LawStatus, ReferenceKind
 from lexflow.core.models import LawMetadata
 from lexflow.core.registry import LawRegistry
 from lexflow.graph.algorithms import pagerank, top_laws
@@ -150,3 +150,29 @@ def test_add_reference_three_way_kind_merge() -> None:
     graph.add_reference("A", "B", kind=ReferenceKind.MODIFIES)
     graph.add_reference("A", "B", kind=ReferenceKind.CITES)
     assert graph.graph["A"]["B"]["kind"] == ReferenceKind.MODIFIES.value
+
+
+def test_add_reference_stores_resolution() -> None:
+    graph = LegalGraph()
+    _law(graph, "A", "Ley A")
+    _law(graph, "B", "Ley B")
+    graph.add_reference("A", "B", resolution=EdgeResolution.INFERRED)
+    assert graph.graph["A"]["B"]["resolution"] == EdgeResolution.INFERRED.value
+
+
+def test_add_reference_merge_prefers_boe_id_over_inferred() -> None:
+    graph = LegalGraph()
+    _law(graph, "A", "Ley A")
+    _law(graph, "B", "Ley B")
+    graph.add_reference("A", "B", resolution=EdgeResolution.INFERRED)
+    graph.add_reference("A", "B", resolution=EdgeResolution.BOE_ID)
+    assert graph.graph["A"]["B"]["resolution"] == EdgeResolution.BOE_ID.value
+
+
+def test_add_reference_merge_keeps_boe_id_when_inferred_arrives_second() -> None:
+    graph = LegalGraph()
+    _law(graph, "A", "Ley A")
+    _law(graph, "B", "Ley B")
+    graph.add_reference("A", "B", resolution=EdgeResolution.BOE_ID)
+    graph.add_reference("A", "B", resolution=EdgeResolution.INFERRED)
+    assert graph.graph["A"]["B"]["resolution"] == EdgeResolution.BOE_ID.value

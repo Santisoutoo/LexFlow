@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Generic, TypeVar
+from typing import Generic, Literal, TypeVar
 
 from pydantic import BaseModel, Field, computed_field
 
@@ -321,12 +321,17 @@ class GraphEdgeData(BaseModel):
     ``kind`` carries the relationship type (cites / modifies / repeals /
     develops, #144). Older cached graphs that pre-date the typing
     surface ``None`` here — the frontend treats it as ``cites``.
+
+    ``resolution`` is how the target was identified (``boe-id`` vs
+    ``inferred``, #64). Older caches may omit it — the frontend treats
+    missing as ``boe-id``.
     """
 
     source: str
     target: str
     source_article: str | None = None
     kind: str | None = None
+    resolution: Literal["boe-id", "inferred"] | None = None
 
 
 class GraphSubgraphResponse(BaseModel):

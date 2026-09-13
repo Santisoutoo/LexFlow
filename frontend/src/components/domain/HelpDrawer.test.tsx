@@ -72,6 +72,7 @@ describe('HelpDrawer content resolution', () => {
     expect(screen.getByText('Acercar')).toBeInTheDocument();
     expect(screen.getByText('Alejar')).toBeInTheDocument();
     expect(screen.getByText('Restablecer zoom')).toBeInTheDocument();
+    expect(screen.getByText(/referencias detectadas automáticamente/i)).toBeInTheDocument();
   });
 
   it('lists new-chat shortcut on /chat', async () => {

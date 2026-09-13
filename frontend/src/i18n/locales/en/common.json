@@ -302,7 +302,7 @@
       },
       "graph": {
         "title": "Reference graph",
-        "description": "Each node is a law; edges are citations, amendments or repeals between laws. Drag to pan, scroll to zoom; the right panel sets the exploration depth."
+        "description": "Each node is a law; edges are automatically detected references. Drag to pan, scroll to zoom; the right panel sets the exploration depth."
       },
       "chat": {
         "title": "Legal chat",
@@ -863,7 +863,8 @@
     "legend": {
       "clusters": "Clusters",
       "cluster": "Cluster {{id}}",
-      "nodeKinds": "Node kinds"
+      "nodeKinds": "Node kinds",
+      "inferredEdge": "Inferred reference"
     },
     "filters": {
       "subgraphHint": "Filters apply to the current subgraph only. Scope and jurisdiction need the global view.",
@@ -876,6 +877,15 @@
       "status": "Status",
       "pagerank": "PageRank",
       "genericNode": "Local subgraph node."
+    },
+    "edge": {
+      "inferredTooltip": "automatically inferred reference — may contain errors"
+    },
+    "relatedLaws": {
+      "title": "Related laws",
+      "empty": "No related laws yet.",
+      "inferred": "inferred",
+      "subtitle": "from automatically detected references"
     }
   },
   "dashboards": {

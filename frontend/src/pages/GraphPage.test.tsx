@@ -137,6 +137,22 @@ describe('GraphPage controls', () => {
     });
   });
 
+  it('shows inferred-edge legend row when any edge is inferred', async () => {
+    useGraphMock.mockReturnValue({
+      data: {
+        ...graphFixture,
+        edges: [{ id: 'e0', source: 'SEED-LAW', target: 'OTHER-LAW', kind: 'cites', resolution: 'inferred' }],
+      },
+      error: null,
+      refetch: vi.fn(),
+      isLoading: false,
+    });
+    renderGraph('/graph?law=SEED-LAW');
+    await waitFor(() => {
+      expect(screen.getByText(/referencia inferida/i)).toBeInTheDocument();
+    });
+  });
+
   it('opens advanced filters panel', async () => {
     renderGraph('/graph?law=SEED-LAW');
     await waitFor(() => screen.getByRole('button', { name: /filtros avanzados/i }));

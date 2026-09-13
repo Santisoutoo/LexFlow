@@ -50,6 +50,30 @@ def test_textual_citation_resolves_to_edge() -> None:
     assert ("BOE-A-2018-16673", "BOE-A-2015-10565") in edges
 
 
+def test_textual_citation_edge_is_inferred() -> None:
+    graph = build_graph(
+        _Registry(
+            {
+                "BOE-A-2018-16673": ("Ley Orgánica 3/2018, de 5 de diciembre, de Protección de Datos", ["Ley 39/2015"]),
+                "BOE-A-2015-10565": ("Ley 39/2015, de 1 de octubre, del Procedimiento Administrativo Común", []),
+            }
+        )
+    )  # type: ignore[arg-type]
+    edge = graph.graph["BOE-A-2018-16673"]["BOE-A-2015-10565"]
+    assert edge["resolution"] == "inferred"
+
+
+def test_explicit_boe_id_edge_is_boe_id() -> None:
+    class _IdRegistry(_Registry):
+        def get_law(self, law_id: str) -> Law:
+            _title, citations = self._laws[law_id]
+            refs = [Reference(target_id=c, target_text=c, source_article=None) for c in citations]
+            return Law(metadata=self.get_metadata(law_id), file_path=f"{law_id}.md", references=refs)
+
+    graph = build_graph(_IdRegistry({"A": ("Ley A", ["B"]), "B": ("Ley B", [])}))  # type: ignore[arg-type]
+    assert graph.graph["A"]["B"]["resolution"] == "boe-id"
+
+
 def test_citation_match_is_accent_and_case_insensitive() -> None:
     edges = _edges(
         _Registry(

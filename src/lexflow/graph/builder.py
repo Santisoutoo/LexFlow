@@ -12,7 +12,7 @@ import logging
 import unicodedata
 
 from lexflow.core.delta_sync import CorpusDiff
-from lexflow.core.enums import ReferenceKind
+from lexflow.core.enums import EdgeResolution, ReferenceKind, parse_edge_resolution
 from lexflow.core.exceptions import LexFlowError
 from lexflow.core.models import Law
 
@@ -117,23 +117,29 @@ def _add_law_edges(graph: LegalGraph, law_id: str, law: Law, citation_index: dic
     citation text ("Ley 39/2015"), which is how most cross-references in the
     corpus become edges at all (#569); self-citations are skipped. Propagates
     ``ref.kind`` (cites/modifies/repeals/develops, #144) into the edge
-    attribute so frontend renders can colour by relation.
+    attribute so frontend renders can colour by relation. ``resolution``
+    is ``boe-id`` when the parser already knew ``ref.target_id``, and
+    ``inferred`` when the target came from ``citation_index`` (#64).
     """
     added = 0
     for ref in law.references:
-        target_id = ref.target_id
-        if not target_id:
+        if ref.target_id:
+            target_id = ref.target_id
+            resolution = EdgeResolution.BOE_ID
+        else:
             signature = _ref_signature(ref.target_text)
             resolved = citation_index.get(signature) if signature else None
             if not resolved or resolved == law_id:  # unknown citation or self-cite
                 continue
             target_id = resolved
+            resolution = EdgeResolution.INFERRED
         inserted = graph.add_reference(
             law_id,
             target_id,
             source_article=ref.source_article,
             reference_text=ref.target_text,
             kind=ref.kind,
+            resolution=resolution,
         )
         if inserted:
             added += 1
@@ -144,6 +150,7 @@ def _add_law_edges(graph: LegalGraph, law_id: str, law: Law, citation_index: dic
                 source_article=ref.source_article,
                 reference_text=ref.target_text,
                 kind=ref.kind,
+                resolution=resolution,
             )
     return added
 
@@ -162,6 +169,7 @@ def _remove_law_from_graph(graph: LegalGraph, law_id: str) -> None:
             source_article=attrs.get("source_article"),
             reference_text=attrs.get("reference_text", "") or "",
             kind=kind,
+            resolution=parse_edge_resolution(attrs.get("resolution")),
         )
     graph.drop_source_from_dangling(law_id)
     graph.remove_law(law_id)
@@ -198,4 +206,5 @@ def _resolve_incoming(graph: LegalGraph, law_id: str) -> None:
             source_article=ref["source_article"],
             reference_text=ref["reference_text"] or "",
             kind=kind,
+            resolution=parse_edge_resolution(ref.get("resolution")),
         )

@@ -8,15 +8,39 @@ the audit found and removed.
 
 from __future__ import annotations
 
+from collections.abc import MutableMapping
+
 import networkx as nx
 
-from lexflow.core.enums import ReferenceKind, stronger_reference_kind
+from lexflow.core.enums import (
+    EdgeResolution,
+    ReferenceKind,
+    parse_edge_resolution,
+    stronger_edge_resolution,
+    stronger_reference_kind,
+)
 from lexflow.core.models import LawMetadata
 
 # A handful of laws (the Constitution, Ley 39/2015, …) are cited by thousands
 # of others, so an uncapped depth-2 ego-graph around them is an unrenderable
 # hairball (and slow to PageRank-enrich). Bound it; see ``get_subgraph``.
 MAX_SUBGRAPH_NODES = 250
+
+
+def _merge_parallel_edge(
+    edge: MutableMapping[str, object],
+    kind: ReferenceKind,
+    resolution: EdgeResolution,
+) -> None:
+    """Keep stronger ``kind`` and prefer BOE-id ``resolution`` on a duplicate pair."""
+    existing_raw = edge.get("kind", ReferenceKind.CITES.value)
+    try:
+        existing_kind = ReferenceKind(str(existing_raw))
+    except ValueError:
+        existing_kind = ReferenceKind.CITES
+    edge["kind"] = stronger_reference_kind(existing_kind, kind).value
+    existing_resolution = parse_edge_resolution(edge.get("resolution"))
+    edge["resolution"] = stronger_edge_resolution(existing_resolution, resolution).value
 
 
 class LegalGraph:
@@ -62,6 +86,7 @@ class LegalGraph:
         source_article: str | None = None,
         reference_text: str = "",
         kind: ReferenceKind = ReferenceKind.CITES,
+        resolution: EdgeResolution = EdgeResolution.BOE_ID,
     ) -> bool:
         """Add a directed edge from source to target law.
 
@@ -69,17 +94,14 @@ class LegalGraph:
         a known node. ``kind`` carries the relationship type (cites /
         modifies / repeals / develops, #144) — defaults to ``cites`` so
         callers built before the typing landed still get a sensible edge.
+        ``resolution`` is how the target was identified (BOE id vs citation
+        heuristic, #64); parallel edges keep the stronger kind and prefer
+        ``boe-id`` over ``inferred``.
         """
         if source_id not in self._g or target_id not in self._g:
             return False
         if self._g.has_edge(source_id, target_id):
-            edge = self._g[source_id][target_id]
-            existing_raw = edge.get("kind", ReferenceKind.CITES.value)
-            try:
-                existing_kind = ReferenceKind(existing_raw)
-            except ValueError:
-                existing_kind = ReferenceKind.CITES
-            edge["kind"] = stronger_reference_kind(existing_kind, kind).value
+            _merge_parallel_edge(self._g[source_id][target_id], kind, resolution)
             return True
         self._g.add_edge(
             source_id,
@@ -87,6 +109,7 @@ class LegalGraph:
             source_article=source_article,
             reference_text=reference_text,
             kind=kind.value,
+            resolution=resolution.value,
         )
         return True
 
@@ -136,11 +159,14 @@ class LegalGraph:
         source_article: str | None,
         reference_text: str,
         kind: ReferenceKind = ReferenceKind.CITES,
+        resolution: EdgeResolution = EdgeResolution.BOE_ID,
     ) -> None:
         """Park an unresolved reference from *source_id* to absent *target_id*.
 
         Carries ``kind`` so when the target later appears the resolved
-        edge keeps its original relationship type (#144).
+        edge keeps its original relationship type (#144). ``resolution``
+        round-trips so inferred vs BOE-id provenance survives dangling
+        parking (#64).
         """
         self.dangling.setdefault(target_id, []).append(
             {
@@ -148,6 +174,7 @@ class LegalGraph:
                 "source_article": source_article,
                 "reference_text": reference_text,
                 "kind": kind.value,
+                "resolution": resolution.value,
             }
         )
 

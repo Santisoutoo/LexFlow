@@ -221,6 +221,10 @@ export function GraphPage() {
   const legendCommunities = useMemo(() => (graph ? deriveLegendCommunities(graph) : []), [graph]);
   const legendEdgeKinds = useMemo(() => (graph ? deriveLegendEdgeKinds(graph) : []), [graph]);
   const legendNodeKinds = useMemo(() => (graph ? deriveLegendNodeKinds(graph) : []), [graph]);
+  const hasInferredEdges = useMemo(
+    () => Boolean(graph?.edges.some((edge) => edge.resolution === 'inferred')),
+    [graph],
+  );
 
   const handleSearchKeyDown = useCallback(
     (event: KeyboardEvent<HTMLInputElement>) => {
@@ -495,6 +499,16 @@ export function GraphPage() {
                     {EDGE_KIND_LABELS[kind]}
                   </div>
                 ))}
+                {hasInferredEdges && (
+                  <div className="flex items-center gap-2 text-muted">
+                    <span
+                      className="block w-5 border-t border-dashed"
+                      style={{ borderColor: 'hsl(220 9% 50%)' }}
+                      aria-hidden
+                    />
+                    {t('graph.legend.inferredEdge')}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -561,6 +575,14 @@ export function GraphPage() {
                   <span className="ml-auto shrink-0 text-[11px] text-muted">
                     {EDGE_KIND_LABELS[e.kind ?? 'cites']}
                   </span>
+                  {e.resolution === 'inferred' && (
+                    <span
+                      className="text-[10.5px] font-normal text-muted"
+                      title={t('graph.edge.inferredTooltip')}
+                    >
+                      {t('graph.relatedLaws.inferred')}
+                    </span>
+                  )}
                 </Chip>
               ))}
             </div>

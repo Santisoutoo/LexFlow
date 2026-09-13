@@ -170,6 +170,30 @@ describe('resolveRelatedLawNeighbours', () => {
     expect(result).toHaveLength(1);
     expect(result[0].edgeKind).toBe('repeals');
   });
+
+  it('marks a neighbour inferred when the edge resolution is inferred', () => {
+    const inferredGraph = {
+      nodes: [centre, lawA],
+      edges: [edge('e1', 'centre', 'law-a', { resolution: 'inferred' })],
+    };
+    const result = resolveRelatedLawNeighbours(inferredGraph, 'centre');
+    expect(result).toHaveLength(1);
+    expect(result[0].inferred).toBe(true);
+  });
+
+  it('merges inferred with a boe-id edge: inferred stays true, strongest kind wins', () => {
+    const mergeGraph = {
+      nodes: [centre, lawA],
+      edges: [
+        edge('e1', 'centre', 'law-a', { kind: 'cites', resolution: 'inferred' }),
+        edge('e2', 'centre', 'law-a', { kind: 'repeals', resolution: 'boe-id' }),
+      ],
+    };
+    const result = resolveRelatedLawNeighbours(mergeGraph, 'centre');
+    expect(result).toHaveLength(1);
+    expect(result[0].inferred).toBe(true);
+    expect(result[0].edgeKind).toBe('repeals');
+  });
 });
 
 // ─── buildAdjacencyIndex / resolveNeighbourhood ───────────────────────────────

@@ -186,3 +186,15 @@ class TestGlobalGraphEdges:
             assert "kind" in edge
             if edge["kind"] is not None:
                 assert edge["kind"] in allowed
+
+    def test_edges_include_resolution(
+        self,
+        client: TestClient,
+        graph_from_fixture: LegalGraph,
+    ) -> None:
+        body = client.get("/api/v1/graph").json()
+        allowed = {"boe-id", "inferred"}
+        for edge in body["edges"]:
+            assert "resolution" in edge
+            if edge["resolution"] is not None:
+                assert edge["resolution"] in allowed

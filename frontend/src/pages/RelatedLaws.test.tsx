@@ -54,4 +54,30 @@ describe('RelatedLaws', () => {
     await userEvent.click(screen.getByText('Neighbour 2'));
     expect(onNavigate).toHaveBeenCalledWith('n2');
   });
+
+  it('shows the inferida badge for citation-inferred neighbours', () => {
+    const inferredGraph: GraphData = {
+      ...graph,
+      edges: [{ id: 'e1', source: 'centre', target: 'n1', kind: 'cites', resolution: 'inferred' }],
+    };
+    render(
+      <RelatedLaws graph={inferredGraph} currentLawId="centre" onNavigate={() => undefined} />,
+    );
+
+    expect(screen.getByText('inferida')).toBeInTheDocument();
+    expect(screen.getByText(/según referencias detectadas automáticamente/i)).toBeInTheDocument();
+  });
+
+  it('does not show the inferida badge for BOE-resolved neighbours', () => {
+    const boeGraph: GraphData = {
+      ...graph,
+      edges: [{ id: 'e1', source: 'centre', target: 'n1', kind: 'cites', resolution: 'boe-id' }],
+    };
+    render(
+      <RelatedLaws graph={boeGraph} currentLawId="centre" onNavigate={() => undefined} />,
+    );
+
+    expect(screen.queryByText('inferida')).not.toBeInTheDocument();
+    expect(screen.queryByText(/según referencias detectadas automáticamente/i)).not.toBeInTheDocument();
+  });
 });

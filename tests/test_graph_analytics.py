@@ -93,7 +93,7 @@ def test_analytics_survive_cache_roundtrip(tmp_path: Path, sample_law_dir: Path)
     assert loaded is not None
     restored, cached_hash = loaded
     assert cached_hash == "rev-test"
-    assert CACHE_VERSION == "5"
+    assert CACHE_VERSION == "6"
     for nid in graph.graph.nodes:
         assert restored.graph.nodes[nid]["pagerank"] == graph.graph.nodes[nid]["pagerank"]
         assert restored.graph.nodes[nid]["community"] == graph.graph.nodes[nid]["community"]

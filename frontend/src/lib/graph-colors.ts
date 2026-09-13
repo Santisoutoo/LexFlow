@@ -153,6 +153,9 @@ export const GRAPH_PRIMARY_FILL_SOFT = 'hsl(232 72% 52% / 0.10)';
  * Falls back to ``border-strong`` (existing default) when the backend
  * omits ``kind`` (legacy edges from before #144).
  */
+/** Canvas / legend dash pattern for inferred (citation-heuristic) edges (#64). */
+export const INFERRED_EDGE_DASH: number[] = [4, 3];
+
 export const GRAPH_EDGE_STROKE: Record<GraphEdgeKind, string> = {
   cites: 'hsl(232 55% 58%)', // indigo — desaturated for CVD separation from cyan
   develops: 'hsl(195 80% 42%)', // cyan — darker/saturated vs cites

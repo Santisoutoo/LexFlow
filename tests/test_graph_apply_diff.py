@@ -7,7 +7,7 @@ resolution) is exercised deterministically, independent of the parser.
 from __future__ import annotations
 
 from lexflow.core.delta_sync import CorpusDiff
-from lexflow.core.enums import LawRank, LawStatus, ReferenceKind
+from lexflow.core.enums import EdgeResolution, LawRank, LawStatus, ReferenceKind
 from lexflow.core.models import Law, LawMetadata, Reference
 from lexflow.graph.builder import apply_diff_to_graph, build_graph
 from lexflow.graph.model import LegalGraph
@@ -158,3 +158,28 @@ def test_upsert_merges_duplicate_target_kinds() -> None:
 
     _add_law_edges(graph, "A", law, {})
     assert graph.graph["A"]["B"]["kind"] == ReferenceKind.REPEALS.value
+
+
+def test_dangling_resolve_preserves_boe_id_resolution() -> None:
+    reg = FakeRegistry({"A": ("Ley A", ["B"])})
+    graph = build_graph(reg)  # type: ignore[arg-type]
+    assert graph.dangling["B"][0]["resolution"] == EdgeResolution.BOE_ID.value
+
+    reg.set_law("B", "Ley B", [])
+    apply_diff_to_graph(graph, reg, CorpusDiff(added=["B"], modified=[], removed=[]))  # type: ignore[arg-type]
+
+    assert graph.graph["A"]["B"]["resolution"] == EdgeResolution.BOE_ID.value
+
+
+def test_remove_and_readd_preserves_inferred_resolution() -> None:
+    reg = FakeRegistry({"A": ("Ley A", ["B"]), "B": ("Ley B", [])})
+    graph = build_graph(reg)  # type: ignore[arg-type]
+    graph.graph["A"]["B"]["resolution"] = EdgeResolution.INFERRED.value
+
+    reg.drop_law("B")
+    apply_diff_to_graph(graph, reg, CorpusDiff(added=[], modified=[], removed=["B"]))  # type: ignore[arg-type]
+    assert graph.dangling["B"][0]["resolution"] == EdgeResolution.INFERRED.value
+
+    reg.set_law("B", "Ley B", [])
+    apply_diff_to_graph(graph, reg, CorpusDiff(added=["B"], modified=[], removed=[]))  # type: ignore[arg-type]
+    assert graph.graph["A"]["B"]["resolution"] == EdgeResolution.INFERRED.value

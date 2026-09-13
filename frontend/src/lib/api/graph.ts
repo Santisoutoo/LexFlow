@@ -59,6 +59,15 @@ export function normalizeEdgeKind(raw: string | null | undefined): GraphData['ed
 }
 
 /**
+ * Normalize a backend edge resolution; missing/unknown → `boe-id`.
+ */
+export function normalizeEdgeResolution(
+  raw: string | null | undefined,
+): NonNullable<GraphData['edges'][number]['resolution']> {
+  return raw === 'inferred' ? 'inferred' : 'boe-id';
+}
+
+/**
  * Project a `BackendGraphEdge` with the SPA's `e-<i>` id convention.
  */
 export function projectEdge(e: BackendGraphEdge, index: number): GraphData['edges'][number] {
@@ -67,6 +76,7 @@ export function projectEdge(e: BackendGraphEdge, index: number): GraphData['edge
     source: e.source,
     target: e.target,
     kind: normalizeEdgeKind(e.kind),
+    resolution: normalizeEdgeResolution(e.resolution),
   };
 }
 

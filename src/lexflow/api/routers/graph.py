@@ -8,7 +8,7 @@ it without reaching into this module's globals.
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 import networkx as nx
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -215,6 +215,15 @@ def _assemble_nodes(
     ]
 
 
+def _wire_resolution(raw: object) -> Literal["boe-id", "inferred"] | None:
+    """Coerce a stored edge attr to the wire union; unknown/missing → None."""
+    if raw == "boe-id":
+        return "boe-id"
+    if raw == "inferred":
+        return "inferred"
+    return None
+
+
 def _assemble_edges(g: nx.DiGraph) -> list[GraphEdgeData]:
     return [
         GraphEdgeData(
@@ -222,6 +231,7 @@ def _assemble_edges(g: nx.DiGraph) -> list[GraphEdgeData]:
             target=v,
             source_article=g.edges[u, v].get("source_article"),
             kind=g.edges[u, v].get("kind"),
+            resolution=_wire_resolution(g.edges[u, v].get("resolution")),
         )
         for u, v in g.edges
     ]

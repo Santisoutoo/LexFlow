@@ -24,7 +24,9 @@ logger = logging.getLogger(__name__)
 # key the cache on a builder-logic hash so this can't silently regress again.
 # v5 persists PageRank + community on nodes at build time (#25 Sprint C)
 # so request handlers stop recomputing nx.pagerank / greedy_modularity.
-CACHE_VERSION = "5"
+# v6 persists edge ``resolution`` (boe-id vs inferred, #64) so the SPA can
+# render inferred edges honestly; pre-v6 caches omit the attr.
+CACHE_VERSION = "6"
 
 
 def save_graph(graph: LegalGraph, cache_path: Path, data_hash: str) -> None:
