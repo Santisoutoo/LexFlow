@@ -43,6 +43,7 @@ import { CommentsPanel } from '@/pages/editor/CommentsPanel';
 import { ExportMenu } from '@/pages/editor/ExportMenu';
 import { LegalCitation } from '@/pages/editor/extensions/LegalCitation';
 import { CommentMark } from '@/pages/editor/extensions/CommentMark';
+import { AiGeneratedMark } from '@/pages/editor/extensions/AiGeneratedMark';
 import { useCommentStore } from '@/lib/comment-store';
 import { cn } from '@/lib/utils';
 import { DocumentList, DocumentPicker } from '@/pages/editor/DocumentList';
@@ -138,6 +139,7 @@ function EditorWorkspace({ docId }: { docId: string }) {
       LegalCitation,
       // Inline comment anchors (#602). The note text lives in comment-store.
       CommentMark,
+      AiGeneratedMark,
     ],
     content: initialDoc.content,
     editable: !isReadOnly,
@@ -396,6 +398,8 @@ function EditorWorkspace({ docId }: { docId: string }) {
           '[&_.ProseMirror_.lex-comment--resolved]:bg-transparent [&_.ProseMirror_.lex-comment--resolved]:px-0',
           '[&_.ProseMirror_.lex-comment--resolved]:underline [&_.ProseMirror_.lex-comment--resolved]:decoration-dotted',
           '[&_.ProseMirror_.lex-comment--resolved]:decoration-amber-400/70',
+          '[&_.ProseMirror_.lex-ai-generated]:rounded-sm [&_.ProseMirror_.lex-ai-generated]:bg-[hsl(var(--indigo-500)/0.18)]',
+          '[&_.ProseMirror_.lex-ai-generated]:box-decoration-clone [&_.ProseMirror_.lex-ai-generated]:px-0.5',
           isReadOnly && 'cursor-default',
         )}
       >

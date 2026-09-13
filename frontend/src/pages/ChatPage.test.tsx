@@ -89,6 +89,45 @@ describe('ChatPage no-model banner', () => {
   });
 });
 
+describe('ChatPage first-turn notice', () => {
+  const thread = { id: 't1', title: 'Test', updatedAt: new Date().toISOString() };
+
+  beforeEach(() => {
+    useUi.setState({ defaultModel: 'ollama:qwen2.5:7b', wizardRequested: false });
+    useChatThreadsMock.mockReturnValue({ data: [thread], isPending: false });
+    useModelsMock.mockReturnValue({
+      data: [
+        { id: 'ollama:qwen2.5:7b', available: true, label: 'qwen2.5:7b', vendor: 'ollama', kind: 'local' },
+      ],
+    });
+  });
+
+  it('shows per-thread notice when there is no committed assistant turn', () => {
+    useChatThreadMock.mockReturnValue({
+      data: [{ id: 'm1', role: 'user', createdAt: new Date().toISOString(), content: 'hola' }],
+    });
+    renderChatAt('/chat/t1');
+    expect(screen.getByText(/esta conversación usa IA/i)).toBeInTheDocument();
+  });
+
+  it('hides per-thread notice after the first assistant message', () => {
+    useChatThreadMock.mockReturnValue({
+      data: [
+        { id: 'm1', role: 'user', createdAt: new Date().toISOString(), content: 'hola' },
+        {
+          id: 'm2',
+          role: 'assistant',
+          createdAt: new Date().toISOString(),
+          content: ['respuesta'],
+          sources: [],
+        },
+      ],
+    });
+    renderChatAt('/chat/t1');
+    expect(screen.queryByText(/esta conversación usa IA/i)).toBeNull();
+  });
+});
+
 describe('ChatPage empty state and accessibility', () => {
   beforeEach(() => {
     useUi.setState({ defaultModel: 'ollama:qwen2.5:7b', wizardRequested: false });

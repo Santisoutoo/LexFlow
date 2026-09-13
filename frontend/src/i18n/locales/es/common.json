@@ -46,7 +46,9 @@
     "pickDocument": "Elige un documento o crea uno nuevo.",
     "documentTitleAria": "Título del documento",
     "placeholder": "Documento sin título",
-    "savedAt": "Guardado {{time}}"
+    "savedAt": "Guardado {{time}}",
+    "aiDraftDisclaimer": "Texto generado por IA — revísalo antes de usarlo.",
+    "aiDraftAttribution": "— Generado por IA. Revisa antes de usar."
   },
   "model": {
     "local": "local",
@@ -196,6 +198,7 @@
     "lmstudioRunning": "corriendo",
     "redetectHint": "En el paso 3 te guiamos para instalarlo.",
     "redetect": "Re-detectar",
+    "aiLegalDisclaimer": "LexFlow no sustituye el criterio de un abogado. Las respuestas de IA pueden contener errores y no constituyen asesoramiento jurídico.",
     "recommended": "Recomendado",
     "recommendedForYou": "Recomendado para tu equipo",
     "cloudChosen": "Has elegido",
@@ -296,7 +299,7 @@
       },
       "chat": {
         "title": "Chat legal",
-        "description": "Conversa con un modelo (local o en nube) que tiene acceso al corpus de leyes. Las respuestas vienen con citas; cada cita es clickable y abre la ley en el panel lateral."
+        "description": "Conversa con un modelo (local o en nube) con acceso al corpus de leyes. Las respuestas pueden incluir citas al corpus; cuando aparecen, son clickables y abren la ley en el panel lateral."
       },
       "dashboards": {
         "title": "Cuadros",
@@ -341,6 +344,8 @@
     "comingSoon": "Próximamente",
     "enterHint": "Enter envía · ⇧↵ línea",
     "aiDisclaimer": "Contenido generado por IA. Puede contener errores y no constituye asesoramiento jurídico.",
+    "firstTurnNotice": "Esta conversación usa IA. Las respuestas pueden contener errores y no constituyen asesoramiento jurídico.",
+    "ungroundedWarning": "Respuesta sin fuentes del corpus — verifícala antes de usarla",
     "noModelTitle": "No hay modelo configurado",
     "noModelBody": "Configura un modelo en Ajustes → Modelos (o arranca Ollama/LM Studio) antes de chatear.",
     "setupAssistantTitle": "Configura tu asistente (2 min)",

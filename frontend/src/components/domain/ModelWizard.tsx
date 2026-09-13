@@ -596,9 +596,13 @@ function StepPick({
   selectedKey: TierKey;
   onSelect: (key: TierKey) => void;
 }) {
+  const { t } = useTranslation();
   const recommendedKey = useMemo(() => recommendTier(profile), [profile]);
   return (
     <div className="flex flex-col gap-3 pt-1">
+      <Callout tone="info">
+        <p className="text-[13px]">{t('wizard.aiLegalDisclaimer')}</p>
+      </Callout>
       {TIER_CATALOG.map((tier) => {
         const fit = fitForModel(profile, tier);
         const isSelected = tier.key === selectedKey;

@@ -46,7 +46,9 @@
     "pickDocument": "Pick a document or create a new one.",
     "documentTitleAria": "Document title",
     "placeholder": "Untitled document",
-    "savedAt": "Saved {{time}}"
+    "savedAt": "Saved {{time}}",
+    "aiDraftDisclaimer": "AI-generated text — review before using.",
+    "aiDraftAttribution": "— AI-generated. Review before using."
   },
   "model": {
     "local": "local",
@@ -196,6 +198,7 @@
     "lmstudioRunning": "running",
     "redetectHint": "In step 3 we walk you through installing it.",
     "redetect": "Re-detect",
+    "aiLegalDisclaimer": "LexFlow does not replace a lawyer's judgment. AI answers may contain errors and do not constitute legal advice.",
     "recommended": "Recommended",
     "recommendedForYou": "Recommended for your machine",
     "cloudChosen": "You chose",
@@ -296,7 +299,7 @@
       },
       "chat": {
         "title": "Legal chat",
-        "description": "Chat with a model (local or cloud) that has access to the law corpus. Answers come with citations; each citation is clickable and opens the law in the side panel."
+        "description": "Chat with a model (local or cloud) with access to the law corpus. Answers may include citations to the corpus; when they appear, they are clickable and open the law in the side panel."
       },
       "dashboards": {
         "title": "Dashboards",
@@ -341,6 +344,8 @@
     "comingSoon": "Coming soon",
     "enterHint": "Enter sends · ⇧↵ newline",
     "aiDisclaimer": "AI-generated content. May contain errors and does not constitute legal advice.",
+    "firstTurnNotice": "This conversation uses AI. Answers may contain errors and do not constitute legal advice.",
+    "ungroundedWarning": "Answer without corpus sources — verify before using",
     "noModelTitle": "No model configured",
     "noModelBody": "Configure a model in Settings → Models (or start Ollama/LM Studio) before chatting.",
     "setupAssistantTitle": "Set up your assistant (2 min)",

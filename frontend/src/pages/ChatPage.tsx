@@ -24,14 +24,9 @@ import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import { chatErrorMessage, errorMessage } from '@/lib/errors';
 import type { ChatMessage as ChatMessageT, ChatSource, ChatThread } from '@/lib/types';
-import { lawDetailHref } from '@/lib/law-reading';
+import { chatSourceHref } from '@/lib/chat-sources';
 import { useHotkey } from '@/lib/hotkeys';
 import { groupThreads } from './chat/group-threads';
-
-function sourceHref(source: ChatSource): string | null {
-  if (!source.target?.lawId) return null;
-  return lawDetailHref(source.target.lawId, source.target.articleNum);
-}
 
 const EMPTY_THREADS: ChatThread[] = [];
 
@@ -153,6 +148,8 @@ export function ChatPage() {
     () => msgs.reduce((acc, m) => acc + (m.role === 'assistant' && 'sources' in m ? m.sources.length : 0), 0),
     [msgs],
   );
+  const showFirstTurnNotice =
+    activeId != null && !msgs.some((m) => m.role === 'assistant');
 
   // Scroll to bottom whenever visible messages change or a stream token
   // arrives. `stream` fires on every SSE token, so we coalesce rapid calls
@@ -430,6 +427,11 @@ export function ChatPage() {
                 </div>
               </Callout>
             )}
+            {showFirstTurnNotice && (
+              <Callout tone="info" className="mt-2">
+                <p className="text-[13px]">{t('chat.firstTurnNotice')}</p>
+              </Callout>
+            )}
             {visible.length === 0 ? (
               // No active thread (first time, or the cached id no
               // longer exists). Surface a hint pointing at the input
@@ -444,7 +446,7 @@ export function ChatPage() {
                   key={m.id}
                   message={m}
                   onSourceClick={(s: ChatSource) => {
-                    const href = sourceHref(s);
+                    const href = chatSourceHref(s);
                     if (href) navigate(href);
                   }}
                 />
@@ -522,7 +524,7 @@ export function ChatPage() {
                 key={`${s.target?.lawId ?? s.law}::${s.target?.articleNum ?? ''}`}
                 source={s}
                 onClick={() => {
-                  const href = sourceHref(s);
+                  const href = chatSourceHref(s);
                   if (href) navigate(href);
                 }}
               />
