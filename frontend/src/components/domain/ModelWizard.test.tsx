@@ -65,12 +65,38 @@ function renderWizard(onComplete = vi.fn()) {
   };
 }
 
+async function goToStepPick() {
+  await userEvent.click(screen.getByRole('button', { name: /continuar/i }));
+  await userEvent.click(screen.getByRole('button', { name: /continuar/i }));
+}
+
 async function goToStep4Confirm() {
   await userEvent.click(screen.getByRole('button', { name: /continuar/i }));
   await userEvent.click(screen.getByRole('button', { name: /continuar/i }));
   await userEvent.click(screen.getByRole('button', { name: /free local — small/i }));
   await userEvent.click(screen.getByRole('button', { name: /continuar/i }));
 }
+
+describe('ModelWizard legal disclaimer', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    localStorage.clear();
+    useSystemProfileMock.mockReturnValue({
+      data: profileFixture,
+      isLoading: false,
+      refetch: vi.fn().mockResolvedValue({ data: profileFixture }),
+    });
+    useModelsMock.mockReturnValue({
+      data: [{ id: 'ollama:llama3.2:3b', available: true, label: 'llama3.2:3b', vendor: 'ollama', kind: 'local' }],
+    });
+  });
+
+  it('shows the no-legal-advice disclaimer on the model-pick step', async () => {
+    renderWizard();
+    await goToStepPick();
+    expect(screen.getByText(/no sustituye el criterio de un abogado/i)).toBeInTheDocument();
+  });
+});
 
 describe('ModelWizard finish gate', () => {
   beforeEach(() => {

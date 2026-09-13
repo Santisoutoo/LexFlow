@@ -71,6 +71,7 @@ vi.mock('@/pages/editor/CommentsPanel', () => ({ CommentsPanel: () => null }));
 vi.mock('@/pages/editor/ExportMenu', () => ({ ExportMenu: () => null }));
 vi.mock('@/pages/editor/extensions/LegalCitation', () => ({ LegalCitation: {} }));
 vi.mock('@/pages/editor/extensions/CommentMark', () => ({ CommentMark: {} }));
+vi.mock('@/pages/editor/extensions/AiGeneratedMark', () => ({ AiGeneratedMark: {} }));
 
 /** Navigates when `docId` prop changes so doc-switch effects run inside one router. */
 function DocIdNavigator({ docId }: { docId: string }) {

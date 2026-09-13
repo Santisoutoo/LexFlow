@@ -94,6 +94,13 @@ function ChatMessageImpl({ message, onSourceClick }: ChatMessageProps) {
           {chatErrorMessage(message.error, t)}
         </Callout>
       )}
+      {!message.streaming &&
+        !message.error &&
+        message.sources.length === 0 && (
+          <Callout tone="warning" className="mt-3">
+            {t('chat.ungroundedWarning')}
+          </Callout>
+        )}
       {message.sources.length > 0 && (
         <div className="mt-3.5">
           <div className="label-caps mb-1.5">{t('chat.sources')}</div>

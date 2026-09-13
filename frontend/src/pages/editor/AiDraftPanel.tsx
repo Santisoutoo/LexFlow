@@ -18,10 +18,14 @@
 import { useMemo, useRef, useState } from 'react';
 import type { Editor, JSONContent } from '@tiptap/react';
 import { useEditorState } from '@tiptap/react';
-import { Sparkles, X, Send, Loader2, BookOpenText } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { Sparkles, X, Send, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui';
+import { CitationCard } from '@/components/domain/CitationCard';
 import { api } from '@/lib/api';
 import { applyChunk } from '@/lib/api.mock';
+import { chatSourceHref } from '@/lib/chat-sources';
 import { useModels } from '@/lib/queries';
 import { useUi } from '@/lib/store';
 import type { ChatMessage as ChatMessageT, ChatSource } from '@/lib/types';
@@ -38,7 +42,10 @@ function draftToBlocks(text: string): JSONContent[] {
     .split(/\n{2,}/)
     .map((para) => para.trim())
     .filter(Boolean)
-    .map((para) => ({ type: 'paragraph', content: [{ type: 'text', text: para }] }));
+    .map((para) => ({
+      type: 'paragraph',
+      content: [{ type: 'text', text: para, marks: [{ type: 'aiGenerated' }] }],
+    }));
 }
 
 interface Preset {
@@ -55,6 +62,8 @@ const PRESETS: Preset[] = [
 ];
 
 export function AiDraftPanel({ editor, onClose }: AiDraftPanelProps) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
   const { data: models = [] } = useModels();
   const defaultModel = useUi((s) => s.defaultModel);
   // Same resolution as ChatPage: prefer the configured default if it's
@@ -161,6 +170,8 @@ export function AiDraftPanel({ editor, onClose }: AiDraftPanelProps) {
           </div>
         )}
 
+        <p className="text-[11.5px] text-muted">{t('editor.aiDraftDisclaimer')}</p>
+
         {/* Selection-based quick actions. */}
         <section className="space-y-2">
           <div className="label-caps">Acciones sobre la selección</div>
@@ -223,16 +234,19 @@ export function AiDraftPanel({ editor, onClose }: AiDraftPanelProps) {
 
             {sources.length > 0 && (
               <div className="space-y-1">
-                <div className="label-caps">Fuentes</div>
-                {sources.map((s, i) => (
-                  <div key={i} className="flex items-center gap-2 rounded bg-surface-2 px-2 py-1 text-[12px]">
-                    <BookOpenText className="size-3.5 shrink-0 text-indigo-600" />
-                    <span className="truncate">
-                      {s.article ? `${s.article} · ` : ''}
-                      {s.law}
-                    </span>
-                  </div>
-                ))}
+                <div className="label-caps">{t('chat.sources')}</div>
+                <div className="grid grid-cols-1 gap-2">
+                  {sources.map((s) => (
+                    <CitationCard
+                      key={`${s.target?.lawId ?? s.law}::${s.target?.articleNum ?? ''}`}
+                      source={s}
+                      onClick={() => {
+                        const href = chatSourceHref(s);
+                        if (href) navigate(href);
+                      }}
+                    />
+                  ))}
+                </div>
               </div>
             )}
 

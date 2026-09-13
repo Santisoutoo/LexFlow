@@ -80,6 +80,13 @@ describe('HelpDrawer content resolution', () => {
     expect(screen.getByText('Conversación nueva')).toBeInTheDocument();
   });
 
+  it('softens the chat grounding claim on /chat', async () => {
+    renderAt('/chat');
+    await userEvent.click(screen.getByRole('button', { name: /abrir ayuda/i }));
+    expect(screen.getByText(/pueden incluir citas al corpus/i)).toBeInTheDocument();
+    expect(screen.queryByText(/vienen con citas/i)).toBeNull();
+  });
+
   it('renders communities copy on /communities, not the fallback', async () => {
     renderAt('/communities');
     await userEvent.click(screen.getByRole('button', { name: /abrir ayuda/i }));
