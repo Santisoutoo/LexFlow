@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Search, Download, ChevronRight, BookOpenText, Hash, SlidersHorizontal, X, FileText } from 'lucide-react';
-import { Badge, Button, Callout, Chip, Input, Tabs } from '@/components/ui';
+import { Button, Callout, Chip, Input, Tabs } from '@/components/ui';
 import { EmptyState } from '@/components/domain/EmptyState';
+import { LawStatusBadge } from '@/components/domain/LawStatusBadge';
 import { ErrorState } from '@/components/domain/ErrorState';
 import { HighlightedSnippet } from '@/components/domain/HighlightedSnippet';
 import { SearchInterpretationBanner } from '@/components/domain/SearchInterpretationBanner';
@@ -612,11 +613,7 @@ export function ExplorerPage() {
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                             <span className="truncate font-semibold leading-snug">{primaryHeading}</span>
-                            {hit.status && (
-                              <Badge tone={hit.status === 'vigente' ? 'success' : hit.status === 'derogada' ? 'danger' : 'amber'}>
-                                {statusLabel(hit.status)}
-                              </Badge>
-                            )}
+                            {hit.status && <LawStatusBadge status={hit.status} />}
                             {articleNum && (
                               <span className="shrink-0 font-mono text-[11px] text-muted">
                                 Art.&nbsp;{articleNum}
@@ -687,7 +684,7 @@ export function ExplorerPage() {
                       <div className="flex items-center gap-2">
                         <span className="min-w-0 truncate font-semibold">{l.short}</span>
                         <span className="ml-auto shrink-0">
-                          <Badge tone={l.status === 'vigente' ? 'success' : l.status === 'derogada' ? 'danger' : 'amber'}>{statusLabel(l.status)}</Badge>
+                          <LawStatusBadge status={l.status} />
                         </span>
                       </div>
                       <div className="truncate text-[12px] text-muted">{l.title}</div>
@@ -775,7 +772,7 @@ export function ExplorerPage() {
                           </div>
                         </div>
                       </td>
-                      <td><Badge tone={l.status === 'vigente' ? 'success' : l.status === 'derogada' ? 'danger' : 'amber'}>{statusLabel(l.status)}</Badge></td>
+                      <td><LawStatusBadge status={l.status} /></td>
                       <td className="text-muted">{l.rango}</td>
                       <td className="hidden font-mono text-[12px] text-muted lg:table-cell">{formatDate(l.publicada)}</td>
                       <td className="pr-4 text-right font-mono">{l.articulos}</td>

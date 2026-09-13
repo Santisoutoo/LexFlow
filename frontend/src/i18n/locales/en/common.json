@@ -57,6 +57,13 @@
     "changeModelsPre": "Change models in",
     "changeModelsPath": "Settings › Models"
   },
+  "law": {
+    "statusTooltip": "Status per legalize-es · sync {{date}} · verify on BOE"
+  },
+  "trust": {
+    "disclaimerTitle": "Legal notice & data provenance",
+    "disclaimerBody": "LexFlow is a reference tool; it does not constitute legal advice. Source: legalize-es (last sync {{syncAgo}}). Always verify on <0>boe.es</0>"
+  },
   "lawHeader": {
     "save": "Save",
     "addUserTag": "tag",
@@ -514,7 +521,7 @@
       "subtitle": "Summary of what changed in legalize-es since the last sync. To run a sync, go to Settings → Data.",
       "upToDate": "The corpus is up to date with the latest synced revision.",
       "atCommit": "Current revision: {{sha}}",
-      "removedShort": "Repealed"
+      "removedShort": "Removed from corpus"
     },
     "about": {
       "title": "About LexFlow",
@@ -757,6 +764,11 @@
     "searchPlaceholder": "Ask or search any law…",
     "popularTags": "Popular tags",
     "syncPrefix": "The corpus is up to date. Last sync with",
+    "sync": {
+      "upToDate": "The corpus is up to date. Last sync with",
+      "behind": "{{behind}} pending commits with {{upstream}} · last sync {{ago}}",
+      "unknown": "Sync status unknown"
+    },
     "whatChanged": "What changed",
     "seeAll": "See all",
     "shortcuts": "Shortcuts",

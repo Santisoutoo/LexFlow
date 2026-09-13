@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Plus, X, GitCompareArrows, ExternalLink, Minus, Type } from 'lucide-react';
 import { LawHeader } from '@/components/domain/LawHeader';
+import { LawStatusBadge } from '@/components/domain/LawStatusBadge';
 import { EmptyState } from '@/components/domain/EmptyState';
 import { LawToc } from '@/components/domain/LawToc';
 import { ReadingItemRenderer } from '@/components/domain/ReadingItemRenderer';
@@ -196,7 +197,7 @@ export function LawDetailPage() {
                       <div className="flex items-baseline gap-2">
                         <span className="font-mono font-semibold">{v.tag}</span>
                         <span className="text-sm">{v.label}</span>
-                        {i === 0 && <Badge tone="success">vigente</Badge>}
+                        {i === 0 && <LawStatusBadge status={law.status} />}
                       </div>
                       <div className="mt-0.5 text-[12px] text-muted">{formatDate(v.date)}</div>
                     </div>

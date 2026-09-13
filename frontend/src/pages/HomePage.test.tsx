@@ -8,6 +8,7 @@ import { HomePage } from './HomePage';
 import { FALLBACK_DIFF_LAW_ID } from './home/use-diff-example-law';
 
 const useLawsListMock = vi.fn();
+const useSyncStatusMock = vi.fn();
 const versionsMock = vi.fn();
 
 vi.mock('@/lib/queries', async (importOriginal) => {
@@ -15,7 +16,7 @@ vi.mock('@/lib/queries', async (importOriginal) => {
   return {
     ...actual,
     useLawsList: (...args: unknown[]) => useLawsListMock(...args),
-    useSyncStatus: () => ({ data: undefined }),
+    useSyncStatus: () => useSyncStatusMock(),
     useTags: () => ({ data: [] }),
   };
 });
@@ -74,10 +75,46 @@ function renderHome() {
   );
 }
 
+describe('HomePage sync banner', () => {
+  beforeEach(() => {
+    useLawsListMock.mockReturnValue({ data: { items: [] }, isLoading: false });
+    versionsMock.mockReset();
+    versionsMock.mockResolvedValue([]);
+  });
+
+  it('shows up-to-date copy when behind is zero', () => {
+    useSyncStatusMock.mockReturnValue({
+      data: { behind: 0, upstream: 'legalize-es@main', lastSyncAt: '2024-03-05T12:00:00Z', busy: false },
+      isError: false,
+      isLoading: false,
+    });
+    renderHome();
+    expect(screen.getByText(/El corpus está al día\. Última sincronización/i)).toBeInTheDocument();
+  });
+
+  it('shows pending commits when behind is greater than zero', () => {
+    useSyncStatusMock.mockReturnValue({
+      data: { behind: 3, upstream: 'legalize-es@main', lastSyncAt: '2024-03-05T12:00:00Z', busy: false },
+      isError: false,
+      isLoading: false,
+    });
+    renderHome();
+    expect(screen.getByText(/3 commits pendientes/i)).toBeInTheDocument();
+    expect(screen.queryByText(/El corpus está al día\. Última sincronización/i)).toBeNull();
+  });
+
+  it('shows unknown copy on sync query failure', () => {
+    useSyncStatusMock.mockReturnValue({ data: undefined, isError: true, isLoading: false });
+    renderHome();
+    expect(screen.getByText(/estado de sincronización desconocido/i)).toBeInTheDocument();
+  });
+});
+
 describe('HomePage diff targets', () => {
   beforeEach(() => {
     versionsMock.mockReset();
     useLawsListMock.mockReset();
+    useSyncStatusMock.mockReturnValue({ data: undefined, isError: false, isLoading: false });
   });
 
   it('uses a list item with versiones ≥ 2 without probing other ids', async () => {
