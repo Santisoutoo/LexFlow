@@ -148,7 +148,7 @@ function UserTagsRow({
           <button
             type="button"
             onClick={() => onRemoveUserTag(ut.tag)}
-            aria-label={t('lawHeader.removeUserTag', 'Quitar "{{label}}"', { label: ut.label })}
+            aria-label={t('lawHeader.removeUserTag', { label: ut.label })}
             className="rounded-full p-0.5 hover:bg-amber-500/30"
           >
             <X className="size-2.5" />
@@ -165,7 +165,7 @@ function UserTagsRow({
             if (e.key === 'Enter') commit();
             if (e.key === 'Escape') setAdding(false);
           }}
-          placeholder={t('lawHeader.addUserTagPlaceholder', 'nueva etiqueta')}
+          placeholder={t('lawHeader.addUserTagPlaceholder')}
           className="w-32 rounded-full border border-amber-500/60 bg-surface px-2 py-px font-mono text-[11px] outline-none focus:ring-2 focus:ring-amber-500/50"
         />
       ) : (
@@ -175,7 +175,7 @@ function UserTagsRow({
           className="inline-flex items-center gap-0.5 rounded-full border border-dashed border-border-strong px-2 py-px font-mono text-[11px] text-muted transition-colors hover:border-amber-500/60 hover:text-amber-700 dark:hover:text-amber-200"
         >
           <Plus className="size-2.5" />
-          {t('lawHeader.addUserTag', 'tag')}
+          {t('lawHeader.addUserTag')}
         </button>
       )}
     </div>

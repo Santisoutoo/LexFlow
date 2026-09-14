@@ -46,7 +46,7 @@ function exampleChips(diffTarget: string, diffLabel: string, diffDisabled: boole
 
 export function HomePage() {
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const setPaletteOpen = useUi((s) => s.setPaletteOpen);
   // Most recent laws by publication date — drives both the "Qué ha
   // cambiado" feed and the "Reciente" cards below. Limit handled at the
@@ -54,7 +54,7 @@ export function HomePage() {
   const { data: laws, isLoading: lawsLoading } = useLawsList({ sort: 'date', limit: 12 });
   const { data: sync, isError: syncError, isLoading: syncLoading } = useSyncStatus();
   const { data: vocab = [] } = useTags();
-  const greeting = useMemo(() => pickGreeting(), []);
+  const greeting = useMemo(() => pickGreeting(t), [t, i18n.language]);
   const recent = laws?.items.slice(0, 3) ?? [];
   const changedByDate = useMemo(
     () => (laws?.items ? groupByRecency(laws.items.slice(0, 10), new Date()) : []),

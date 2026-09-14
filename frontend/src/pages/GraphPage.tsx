@@ -531,7 +531,7 @@ export function GraphPage() {
             <Button
               size="icon"
               variant="ghost"
-              aria-label={t('graph.fit', 'Ajustar a la vista')}
+              aria-label={t('graph.fit')}
               icon={<Maximize2 className="size-3.5" />}
               onClick={() => graphRef.current?.fit()}
             />

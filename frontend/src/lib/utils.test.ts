@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import i18n from '@/i18n';
 import { cn, formatDate, formatNumber, groupBy, statusLabel } from './utils';
 
 describe('cn (Tailwind class merger)', () => {
@@ -22,12 +23,19 @@ describe('cn (Tailwind class merger)', () => {
 });
 
 describe('formatDate', () => {
-  it('formats an ISO date with the es-ES locale', () => {
-    // Intl output varies by node version; assert a stable contract:
-    // contains the year + a 1-3 char month abbreviation.
+  it('formats an ISO date with the es-ES locale', async () => {
+    await i18n.changeLanguage('es');
     const out = formatDate('2024-03-15');
     expect(out).toMatch(/2024/);
     expect(out).toMatch(/mar/i);
+  });
+
+  it('formats an ISO date with the en-GB locale when language is en', async () => {
+    await i18n.changeLanguage('en');
+    const out = formatDate('2024-03-15');
+    expect(out).toMatch(/2024/);
+    expect(out).toMatch(/Mar/);
+    await i18n.changeLanguage('es');
   });
 
   it('returns em-dash for null / undefined', () => {

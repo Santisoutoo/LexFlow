@@ -309,7 +309,7 @@ export function ChatPage() {
       {threadsDrawerOpen && (
         <button
           type="button"
-          aria-label={t('chat.closeThreads', 'Cerrar conversaciones')}
+          aria-label={t('chat.closeThreads')}
           onClick={() => setThreadsDrawerOpen(false)}
           className="fixed inset-0 z-40 bg-black/40 md:hidden"
         />
@@ -404,7 +404,7 @@ export function ChatPage() {
             size="icon"
             variant="ghost"
             className="md:hidden"
-            aria-label={t('chat.openThreads', 'Conversaciones')}
+            aria-label={t('chat.openThreads')}
             onClick={() => setThreadsDrawerOpen(true)}
             icon={<Menu className="size-4" />}
           />

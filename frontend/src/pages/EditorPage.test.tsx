@@ -40,6 +40,8 @@ vi.mock('@/lib/editor-store', () => {
   };
 });
 
+import i18n from '@/i18n';
+import en from '@/i18n/locales/en/common.json';
 import { EditorPage } from './EditorPage';
 
 let onUpdateHandler: ((args: { editor: { getJSON: () => unknown } }) => void) | undefined;
@@ -51,6 +53,9 @@ const mockEditor = {
   })),
   commands: { setContent: vi.fn() },
   setEditable: vi.fn(),
+  extensionManager: { extensions: [{ name: 'placeholder', options: { placeholder: '' } }] },
+  view: { dispatch: vi.fn() },
+  state: { tr: {} },
 };
 
 vi.mock('@tiptap/react', () => ({
@@ -193,5 +198,21 @@ describe('EditorPage autosave flush', () => {
     expect(screen.getByLabelText('Título del documento')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Documento sin título')).toBeInTheDocument();
     expect(screen.getByText(/^Guardado /)).toBeInTheDocument();
+  });
+
+  it('uses English i18n for title aria and placeholder when locale is en', async () => {
+    i18n.addResourceBundle('en', 'common', en, true, true);
+    await i18n.changeLanguage('en');
+    getDocumentMock.mockReturnValue({
+      id: 'draft',
+      title: 'Untitled',
+      content: { type: 'doc', content: [{ type: 'paragraph' }] },
+      updatedAt: '2026-09-12T12:00:00.000Z',
+    });
+    renderEditor();
+    expect(screen.getByLabelText('Document title')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Untitled document')).toBeInTheDocument();
+    expect(screen.getByText(/^Saved /)).toBeInTheDocument();
+    await i18n.changeLanguage('es');
   });
 });

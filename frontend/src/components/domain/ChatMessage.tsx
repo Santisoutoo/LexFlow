@@ -46,12 +46,12 @@ function ChatMessageImpl({ message, onSourceClick }: ChatMessageProps) {
         <div className="inline-flex items-center gap-2.5 rounded-md border border-border bg-surface-2 px-3 py-2 font-mono text-[12.5px]">
           <ToolIcon className="size-3.5 text-muted" />
           <span className="font-semibold text-indigo-600 dark:text-indigo-300">{message.name}</span>
-          <span className="text-muted">(</span>
+          <span className="text-muted">{t('chat.toolCall.openParen')}</span>
           <span className="text-muted">
             {Object.entries(message.args).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(', ')}
           </span>
-          <span className="text-muted">)</span>
-          <span className="text-muted">→</span>
+          <span className="text-muted">{t('chat.toolCall.closeParen')}</span>
+          <span className="text-muted">{t('chat.toolCall.arrow')}</span>
           <span>{message.result}</span>
           <ChevronRight className="ml-1 size-3 text-muted" />
         </div>

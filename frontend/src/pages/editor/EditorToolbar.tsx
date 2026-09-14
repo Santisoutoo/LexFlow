@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 import type { Editor } from '@tiptap/react';
 import { useEditorState } from '@tiptap/react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { cn } from '@/lib/utils';
 
@@ -111,6 +112,8 @@ export function EditorToolbar({
   onAddComment,
   onOpenComments,
 }: EditorToolbarProps) {
+  const { t } = useTranslation();
+
   // `useEditorState` subscribes to ProseMirror transactions and re-renders
   // only when the selected values change — cheaper than shouldRerenderOnTransaction.
   const editorState = useEditorState({
@@ -144,10 +147,12 @@ export function EditorToolbar({
     isEmptySelection,
   } = editorState;
 
+  const readToggleLabel = isReadOnly ? t('editor.toolbar.switchToEdit') : t('editor.toolbar.switchToRead');
+
   return (
     <div
       role="toolbar"
-      aria-label="Editor toolbar"
+      aria-label={t('editor.toolbar.aria')}
       className="flex flex-wrap items-center gap-0.5 rounded-lg border border-border bg-surface px-2 py-1.5 shadow-sm"
     >
       {/* Action controls wrapped in a disabled <fieldset> so read-only blocks
@@ -160,19 +165,19 @@ export function EditorToolbar({
       {/* Heading levels */}
       <ToolButton
         icon={<Heading1 className="size-3.5" />}
-        label="Heading 1"
+        label={t('editor.toolbar.heading1')}
         active={isH1}
         onPress={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
       />
       <ToolButton
         icon={<Heading2 className="size-3.5" />}
-        label="Heading 2"
+        label={t('editor.toolbar.heading2')}
         active={isH2}
         onPress={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
       />
       <ToolButton
         icon={<Heading3 className="size-3.5" />}
-        label="Heading 3"
+        label={t('editor.toolbar.heading3')}
         active={isH3}
         onPress={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
       />
@@ -182,13 +187,13 @@ export function EditorToolbar({
       {/* Inline marks */}
       <ToolButton
         icon={<Bold className="size-3.5" />}
-        label="Bold"
+        label={t('editor.toolbar.bold')}
         active={isBold}
         onPress={() => editor.chain().focus().toggleBold().run()}
       />
       <ToolButton
         icon={<Italic className="size-3.5" />}
-        label="Italic"
+        label={t('editor.toolbar.italic')}
         active={isItalic}
         onPress={() => editor.chain().focus().toggleItalic().run()}
       />
@@ -198,13 +203,13 @@ export function EditorToolbar({
       {/* Lists */}
       <ToolButton
         icon={<List className="size-3.5" />}
-        label="Bullet list"
+        label={t('editor.toolbar.bulletList')}
         active={isBulletList}
         onPress={() => editor.chain().focus().toggleBulletList().run()}
       />
       <ToolButton
         icon={<ListOrdered className="size-3.5" />}
-        label="Ordered list"
+        label={t('editor.toolbar.orderedList')}
         active={isOrderedList}
         onPress={() => editor.chain().focus().toggleOrderedList().run()}
       />
@@ -214,12 +219,12 @@ export function EditorToolbar({
       {/* Citations: typed legal citation (#599) + plain blockquote */}
       <ToolButton
         icon={<Scale className="size-3.5" />}
-        label="Insertar cita legal"
+        label={t('editor.toolbar.insertCitation')}
         onPress={onInsertCitation}
       />
       <ToolButton
         icon={<Quote className="size-3.5" />}
-        label="Blockquote (legal citation)"
+        label={t('editor.toolbar.blockquote')}
         active={isBlockquote}
         onPress={() => editor.chain().focus().toggleBlockquote().run()}
       />
@@ -229,27 +234,27 @@ export function EditorToolbar({
       {/* Templates (#600) */}
       <ToolButton
         icon={<LayoutTemplate className="size-3.5" />}
-        label="Plantillas"
+        label={t('editor.toolbar.templates')}
         onPress={onOpenTemplates}
       />
 
       {/* AI drafting assistant (#601) */}
       <ToolButton
         icon={<Sparkles className="size-3.5" />}
-        label="Asistente de redacción IA"
+        label={t('editor.toolbar.aiDraft')}
         onPress={onOpenAiPanel}
       />
 
       {/* Comments / annotations (#602) */}
       <ToolButton
         icon={<MessageSquarePlus className="size-3.5" />}
-        label="Comentar la selección"
+        label={t('editor.toolbar.commentSelection')}
         disabled={isEmptySelection}
         onPress={onAddComment}
       />
       <ToolButton
         icon={<MessageSquare className="size-3.5" />}
-        label="Ver comentarios"
+        label={t('editor.toolbar.viewComments')}
         onPress={onOpenComments}
       />
 
@@ -258,13 +263,13 @@ export function EditorToolbar({
       {/* Undo / Redo */}
       <ToolButton
         icon={<Undo2 className="size-3.5" />}
-        label="Undo"
+        label={t('editor.toolbar.undo')}
         disabled={!canUndo}
         onPress={() => editor.chain().focus().undo().run()}
       />
       <ToolButton
         icon={<Redo2 className="size-3.5" />}
-        label="Redo"
+        label={t('editor.toolbar.redo')}
         disabled={!canRedo}
         onPress={() => editor.chain().focus().redo().run()}
       />
@@ -277,12 +282,12 @@ export function EditorToolbar({
           type="button"
           variant={isReadOnly ? 'secondary' : 'ghost'}
           size="sm"
-          aria-label={isReadOnly ? 'Switch to edit mode' : 'Switch to read mode'}
-          title={isReadOnly ? 'Switch to edit mode' : 'Switch to read mode'}
+          aria-label={readToggleLabel}
+          title={readToggleLabel}
           icon={isReadOnly ? <Pencil className="size-3.5" /> : <Eye className="size-3.5" />}
           onClick={onToggleReadOnly}
         >
-          {isReadOnly ? 'Edit' : 'Read'}
+          {isReadOnly ? t('editor.toolbar.edit') : t('editor.toolbar.read')}
         </Button>
       </div>
     </div>

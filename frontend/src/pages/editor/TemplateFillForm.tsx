@@ -11,6 +11,7 @@
  * inserts the draft. Unknown/empty vars are intentionally left as placeholders.
  */
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, BookOpenText, Search, X } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { useLaw, useSearch } from '@/lib/queries';
@@ -25,6 +26,7 @@ interface TemplateFillFormProps {
 }
 
 export function TemplateFillForm({ template, onApply, onBack }: TemplateFillFormProps) {
+  const { t } = useTranslation();
   const variables = useMemo(() => extractVariables(template.content), [template]);
   const lawVars = variables.filter((v) => v.startsWith('law.'));
   const customVars = variables.filter((v) => !v.startsWith('law.'));
@@ -44,12 +46,12 @@ export function TemplateFillForm({ template, onApply, onBack }: TemplateFillForm
   return (
     <div className="flex flex-col">
       <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-        <Button variant="ghost" size="icon-sm" aria-label="Volver a la lista" title="Volver" onClick={onBack}>
+        <Button variant="ghost" size="icon-sm" aria-label={t('editor.templateFill.backAria')} title={t('editor.templateFill.back')} onClick={onBack}>
           <ArrowLeft className="size-4" />
         </Button>
         <div className="min-w-0">
           <div className="truncate text-[14px] font-semibold">{template.name}</div>
-          <div className="text-[11px] text-muted">Rellena las variables para generar el borrador</div>
+          <div className="text-[11px] text-muted">{t('editor.templateFill.subtitle')}</div>
         </div>
       </div>
 
@@ -57,7 +59,7 @@ export function TemplateFillForm({ template, onApply, onBack }: TemplateFillForm
         {/* Built-in corpus variables: pick one law to fill them all. */}
         {lawVars.length > 0 && (
           <section className="space-y-2">
-            <div className="label-caps">Datos de la ley</div>
+            <div className="label-caps">{t('editor.templateFill.lawSection')}</div>
             {lawId && law ? (
               <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface-2 px-3 py-2">
                 <span className="inline-flex items-center gap-2 truncate text-[13px]">
@@ -65,7 +67,7 @@ export function TemplateFillForm({ template, onApply, onBack }: TemplateFillForm
                   <span className="truncate font-medium">{law.short || law.title}</span>
                   <span className="truncate text-muted">{law.id}</span>
                 </span>
-                <Button variant="ghost" size="icon-sm" aria-label="Quitar ley" title="Quitar" onClick={() => setLawId(null)}>
+                <Button variant="ghost" size="icon-sm" aria-label={t('editor.templateFill.removeLawAria')} title={t('editor.templateFill.removeLaw')} onClick={() => setLawId(null)}>
                   <X className="size-3.5" />
                 </Button>
               </div>
@@ -76,15 +78,15 @@ export function TemplateFillForm({ template, onApply, onBack }: TemplateFillForm
                   <input
                     value={lawQuery}
                     onChange={(e) => setLawQuery(e.target.value)}
-                    aria-label="Buscar la ley con la que rellenar"
-                    placeholder="Buscar la ley con la que rellenar…"
+                    aria-label={t('editor.templateFill.lawSearchAria')}
+                    placeholder={t('editor.templateFill.lawSearchPlaceholder')}
                     className="flex-1 bg-transparent text-[13.5px] outline-none placeholder:text-muted"
                   />
                 </div>
                 <div className="max-h-44 overflow-auto p-1 scrollbar-thin">
                   {lawHits.length === 0 ? (
                     <div className="px-3 py-3 text-center text-[12px] text-muted">
-                      {lawQuery.trim().length < 2 ? 'Escribe al menos 2 caracteres.' : 'Sin leyes para esta búsqueda.'}
+                      {lawQuery.trim().length < 2 ? t('editor.templateFill.lawMinChars') : t('editor.templateFill.lawNoResults')}
                     </div>
                   ) : (
                     lawHits.map((h) => (
@@ -121,15 +123,15 @@ export function TemplateFillForm({ template, onApply, onBack }: TemplateFillForm
         {/* Free-text variables. */}
         {customVars.length > 0 && (
           <section className="space-y-2">
-            <div className="label-caps">Variables</div>
+            <div className="label-caps">{t('editor.templateFill.variablesSection')}</div>
             {customVars.map((v) => (
               <label key={v} className="block space-y-1">
                 <span className="font-mono text-[12px] text-muted">{`{{${v}}}`}</span>
                 <input
                   value={customValues[v] ?? ''}
                   onChange={(e) => setCustomValues((prev) => ({ ...prev, [v]: e.target.value }))}
-                  aria-label={`Valor para ${v}`}
-                  placeholder={`Valor para ${v}`}
+                  aria-label={t('editor.templateFill.valueForAria', { name: v })}
+                  placeholder={t('editor.templateFill.valueForPlaceholder', { name: v })}
                   className="w-full rounded-lg border border-border bg-surface px-3 py-1.5 text-[13.5px] outline-none focus:ring-2 focus:ring-indigo-400"
                 />
               </label>
@@ -140,10 +142,10 @@ export function TemplateFillForm({ template, onApply, onBack }: TemplateFillForm
 
       <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
         <Button variant="ghost" size="sm" onClick={onBack}>
-          Cancelar
+          {t('editor.templateFill.cancel')}
         </Button>
         <Button variant="primary" size="sm" onClick={apply}>
-          Aplicar plantilla
+          {t('editor.templateFill.apply')}
         </Button>
       </div>
     </div>

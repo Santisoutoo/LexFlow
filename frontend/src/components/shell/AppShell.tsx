@@ -45,7 +45,7 @@ export function AppShell() {
   return (
     <ConfirmProvider>
     <div className="flex h-full w-full overflow-hidden bg-bg text-fg">
-      <a href="#main" className="skip-link">Saltar al contenido principal</a>
+      <a href="#main" className="skip-link">{t('shell.skipToContent')}</a>
       <LeftRail />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar />
@@ -69,7 +69,7 @@ export function AppShell() {
       {/* Mobile-only floating search/command trigger (desktop uses the TopBar search). */}
       <button
         type="button"
-        aria-label="Buscar (paleta de comandos)"
+        aria-label={t('shell.openCommandPalette')}
         onClick={() => setPaletteOpen(true)}
         className="fixed bottom-[68px] right-4 z-dropdown flex size-12 items-center justify-center rounded-full bg-indigo-600 text-white shadow-2 hover:bg-indigo-500 md:hidden"
       >

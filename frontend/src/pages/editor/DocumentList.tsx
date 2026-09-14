@@ -34,7 +34,7 @@ export function DocumentList({ activeId }: { activeId?: string }) {
   const docs = useMemo(() => listDocuments(documents), [documents]);
 
   const handleCreate = () => {
-    const id = createDocument(t('editor.untitled'));
+    const id = createDocument();
     navigate(`/editor/${id}`);
   };
 

@@ -16,6 +16,7 @@
  * - The corpus query → `useSearch` in `@/lib/queries`.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Editor } from '@tiptap/react';
 import { BookOpenText, FileText, Scale } from 'lucide-react';
 import { Kbd } from '@/components/ui';
@@ -30,6 +31,7 @@ interface CitationPickerProps {
 }
 
 export function CitationPicker({ editor, onClose }: CitationPickerProps) {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [q, setQ] = useState('');
   const [active, setActive] = useState(0);
@@ -93,7 +95,7 @@ export function CitationPicker({ editor, onClose }: CitationPickerProps) {
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Insertar cita legal"
+      aria-label={t('editor.citationPicker.dialogAria')}
       className="fixed inset-0 z-overlay flex items-start justify-center pt-[12vh] bg-black/35 backdrop-blur-[2px] animate-in"
       onClick={onClose}
     >
@@ -104,22 +106,22 @@ export function CitationPicker({ editor, onClose }: CitationPickerProps) {
             ref={inputRef}
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            aria-label="Buscar una ley o artículo para citar"
-            placeholder="Buscar una ley o artículo para citar…"
+            aria-label={t('editor.citationPicker.searchAria')}
+            placeholder={t('editor.citationPicker.searchPlaceholder')}
             className="flex-1 bg-transparent text-[14.5px] outline-none placeholder:text-muted"
           />
           <Kbd>esc</Kbd>
         </div>
 
-        <div role="listbox" aria-label="Resultados" className="max-h-[420px] overflow-auto p-2 scrollbar-thin">
+        <div role="listbox" aria-label={t('editor.citationPicker.resultsAria')} className="max-h-[420px] overflow-auto p-2 scrollbar-thin">
           {showHint && (
             <div className="px-6 py-10 text-center text-sm text-muted">
-              Escribe al menos 2 caracteres para buscar en el corpus.
+              {t('editor.citationPicker.minChars')}
             </div>
           )}
           {!showHint && resolvable.length === 0 && (
             <div className="px-6 py-10 text-center text-sm text-muted">
-              {searchPending ? 'Buscando…' : `Sin resultados para "${q}".`}
+              {searchPending ? t('editor.citationPicker.searching') : t('editor.citationPicker.noResults', { query: q })}
             </div>
           )}
           {resolvable.map(({ hit }, idx) => (
@@ -163,12 +165,12 @@ export function CitationPicker({ editor, onClose }: CitationPickerProps) {
         <div className="flex items-center gap-3.5 border-t border-border px-4 py-2 text-[11px] text-muted">
           <span className="inline-flex items-center gap-1">
             <Kbd>↑</Kbd>
-            <Kbd>↓</Kbd> navegar
+            <Kbd>↓</Kbd> {t('editor.citationPicker.navigate')}
           </span>
           <span className="inline-flex items-center gap-1">
-            <Kbd>↵</Kbd> insertar cita
+            <Kbd>↵</Kbd> {t('editor.citationPicker.insert')}
           </span>
-          <span className="ml-auto font-mono">{resolvable.length} resultados</span>
+          <span className="ml-auto font-mono">{t('editor.citationPicker.resultCount', { count: resolvable.length })}</span>
         </div>
       </div>
     </div>

@@ -10,6 +10,7 @@
  * so the editor stays interactive.
  */
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Editor } from '@tiptap/react';
 import { MessageSquare, X, MapPin, Check, RotateCcw, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui';
@@ -40,6 +41,7 @@ function findCommentRange(editor: Editor, commentId: string): { from: number; to
 }
 
 export function CommentsPanel({ editor, docId, focusCommentId, onClose }: CommentsPanelProps) {
+  const { t } = useTranslation();
   const { comments, updateNote, toggleResolved, deleteComment } = useCommentStore();
   const all = filterDocComments(comments, docId, true);
   const active = all.filter((c) => !c.resolved);
@@ -83,7 +85,7 @@ export function CommentsPanel({ editor, docId, focusCommentId, onClose }: Commen
       <button
         type="button"
         onClick={() => locate(c.id)}
-        title="Localizar en el documento"
+        title={t('editor.comments.locateTitle')}
         className="block w-full border-l-2 border-amber-400 pl-2 text-left text-[12.5px] italic text-muted line-clamp-2 hover:text-fg"
       >
         “{c.quote}”
@@ -92,14 +94,14 @@ export function CommentsPanel({ editor, docId, focusCommentId, onClose }: Commen
         ref={focusCommentId === c.id ? focusRef : undefined}
         value={c.note}
         onChange={(e) => updateNote(c.id, e.target.value)}
-        aria-label="Nota del comentario"
-        placeholder="Escribe tu nota…"
+        aria-label={t('editor.comments.noteAria')}
+        placeholder={t('editor.comments.notePlaceholder')}
         rows={2}
         className="w-full resize-none rounded border border-border bg-surface px-2 py-1.5 text-[13px] outline-none focus:ring-2 focus:ring-indigo-400 placeholder:text-muted"
       />
       <div className="flex items-center gap-1">
         <Button variant="ghost" size="sm" icon={<MapPin className="size-3.5" />} onClick={() => locate(c.id)}>
-          Localizar
+          {t('editor.comments.locate')}
         </Button>
         <Button
           variant="ghost"
@@ -107,13 +109,13 @@ export function CommentsPanel({ editor, docId, focusCommentId, onClose }: Commen
           icon={c.resolved ? <RotateCcw className="size-3.5" /> : <Check className="size-3.5" />}
           onClick={() => resolve(c)}
         >
-          {c.resolved ? 'Reabrir' : 'Resolver'}
+          {c.resolved ? t('editor.comments.reopen') : t('editor.comments.resolve')}
         </Button>
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label="Eliminar comentario"
-          title="Eliminar"
+          aria-label={t('editor.comments.deleteAria')}
+          title={t('editor.comments.delete')}
           className="ml-auto"
           onClick={() => remove(c.id)}
         >
@@ -126,13 +128,13 @@ export function CommentsPanel({ editor, docId, focusCommentId, onClose }: Commen
   return (
     <aside
       role="complementary"
-      aria-label="Comentarios del documento"
+      aria-label={t('editor.comments.panelAria')}
       className="fixed inset-y-0 right-0 z-40 flex w-[340px] max-w-[92vw] flex-col border-l border-border bg-surface shadow-xl"
     >
       <header className="flex items-center gap-2 border-b border-border px-4 py-3">
         <MessageSquare className="size-4 text-amber-600" />
-        <span className="flex-1 text-[14px] font-semibold">Comentarios</span>
-        <Button variant="ghost" size="icon-sm" aria-label="Cerrar comentarios" title="Cerrar" onClick={onClose}>
+        <span className="flex-1 text-[14px] font-semibold">{t('editor.comments.title')}</span>
+        <Button variant="ghost" size="icon-sm" aria-label={t('editor.comments.closeAria')} title={t('editor.comments.close')} onClick={onClose}>
           <X className="size-4" />
         </Button>
       </header>
@@ -140,13 +142,13 @@ export function CommentsPanel({ editor, docId, focusCommentId, onClose }: Commen
       <div className="flex-1 space-y-3 overflow-auto p-4 scrollbar-thin">
         {all.length === 0 && (
           <div className="px-2 py-10 text-center text-sm text-muted">
-            No hay comentarios. Selecciona texto en el documento y pulsa <span className="font-medium">Comentar</span>.
+            {t('editor.comments.empty')}
           </div>
         )}
         {active.map(renderCard)}
         {resolved.length > 0 && (
           <div className="space-y-3 pt-1">
-            <div className="label-caps">Resueltos</div>
+            <div className="label-caps">{t('editor.comments.resolvedSection')}</div>
             <div className="space-y-3 opacity-60">{resolved.map(renderCard)}</div>
           </div>
         )}
