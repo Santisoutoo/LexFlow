@@ -54,7 +54,7 @@ export function HomePage() {
   const { data: laws, isLoading: lawsLoading } = useLawsList({ sort: 'date', limit: 12 });
   const { data: sync, isError: syncError, isLoading: syncLoading } = useSyncStatus();
   const { data: vocab = [] } = useTags();
-  const greeting = useMemo(() => pickGreeting(), []);
+  const greeting = useMemo(() => pickGreeting(t), [t]);
   const recent = laws?.items.slice(0, 3) ?? [];
   const changedByDate = useMemo(
     () => (laws?.items ? groupByRecency(laws.items.slice(0, 10), new Date()) : []),

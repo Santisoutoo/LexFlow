@@ -75,7 +75,7 @@ async function goToStepPick() {
 async function goToStep4Confirm() {
   await userEvent.click(screen.getByRole('button', { name: /continuar/i }));
   await userEvent.click(screen.getByRole('button', { name: /continuar/i }));
-  await userEvent.click(screen.getByRole('button', { name: /free local — small/i }));
+  await userEvent.click(screen.getByRole('button', { name: /local gratuito — pequeño/i }));
   await userEvent.click(screen.getByRole('button', { name: /continuar/i }));
 }
 
@@ -88,7 +88,7 @@ async function goToStep5Telemetry() {
   ]);
   await goToStep4Confirm();
   await userEvent.click(screen.getByRole('button', { name: /instalar/i }));
-  await userEvent.click(screen.getByRole('button', { name: /usar free local/i }));
+  await userEvent.click(screen.getByRole('button', { name: /usar local gratuito/i }));
   await waitFor(() => {
     expect(screen.getByText(/paso 5 de 5/i)).toBeInTheDocument();
   });
@@ -156,7 +156,7 @@ describe('ModelWizard finish gate', () => {
     renderWizard();
     await goToStep4Confirm();
 
-    expect(screen.getByRole('button', { name: /usar free local/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /usar local gratuito/i })).toBeDisabled();
     expect(screen.getByText(/instala el modelo primero/i)).toBeInTheDocument();
   });
 
@@ -169,7 +169,7 @@ describe('ModelWizard finish gate', () => {
     await goToStep4Confirm();
     await userEvent.click(screen.getByRole('button', { name: /instalar/i }));
 
-    expect(screen.getByRole('button', { name: /usar free local/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /usar local gratuito/i })).toBeEnabled();
   });
 
   it('sets defaultModel with provider:model id on verified finish', async () => {
@@ -185,7 +185,7 @@ describe('ModelWizard finish gate', () => {
     const { queryClient } = renderWizard(onComplete);
     await goToStep4Confirm();
     await userEvent.click(screen.getByRole('button', { name: /instalar/i }));
-    await userEvent.click(screen.getByRole('button', { name: /usar free local/i }));
+    await userEvent.click(screen.getByRole('button', { name: /usar local gratuito/i }));
 
     expect(useUi.getState().defaultModel).toBe('ollama:llama3.2:3b');
     expect(queryClient.getQueryData(qk.models())).toEqual(freshModels);
@@ -198,7 +198,7 @@ describe('ModelWizard finish gate', () => {
 async function goToStep4Cloud() {
   await userEvent.click(screen.getByRole('button', { name: /continuar/i }));
   await userEvent.click(screen.getByRole('button', { name: /continuar/i }));
-  await userEvent.click(screen.getByRole('button', { name: /best cloud — pay-per-use/i }));
+  await userEvent.click(screen.getByRole('button', { name: /mejor nube — pago por uso/i }));
   await userEvent.click(screen.getByRole('button', { name: /continuar/i }));
 }
 
@@ -230,7 +230,7 @@ describe('ModelWizard cloud key gate', () => {
     renderWizard();
     await goToStep4Cloud();
 
-    expect(screen.getByRole('button', { name: /usar best cloud/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /usar nube/i })).toBeDisabled();
     expect(screen.getByText(/pega y valida tu clave api/i)).toBeInTheDocument();
   });
 
@@ -245,7 +245,7 @@ describe('ModelWizard cloud key gate', () => {
     await waitFor(() => {
       expect(liveSecretsApi.set).toHaveBeenCalledWith('anthropic', 'sk-good');
       expect(liveSecretsApi.test).toHaveBeenCalledWith('anthropic');
-      expect(screen.getByRole('button', { name: /usar best cloud/i })).toBeEnabled();
+      expect(screen.getByRole('button', { name: /usar nube/i })).toBeEnabled();
     });
   });
 });
@@ -276,7 +276,7 @@ describe('ModelWizard Ollama install guide', () => {
 
     expect(screen.getByText(/instalar ollama/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^instalar$/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /usar free local/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /usar local gratuito/i })).toBeDisabled();
   });
 
   it('enables Instalar after refetch reports ollamaRunning', async () => {
@@ -397,10 +397,10 @@ describe('ModelWizardGate tour trigger', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /continuar/i }));
     await userEvent.click(screen.getByRole('button', { name: /continuar/i }));
-    await userEvent.click(screen.getByRole('button', { name: /free local — small/i }));
+    await userEvent.click(screen.getByRole('button', { name: /local gratuito — pequeño/i }));
     await userEvent.click(screen.getByRole('button', { name: /continuar/i }));
     await userEvent.click(screen.getByRole('button', { name: /instalar/i }));
-    await userEvent.click(screen.getByRole('button', { name: /usar free local/i }));
+    await userEvent.click(screen.getByRole('button', { name: /usar local gratuito/i }));
     await userEvent.click(screen.getByRole('button', { name: /empezar a usar lexflow/i }));
 
     expect(useUi.getState().tourRequested).toBe(true);

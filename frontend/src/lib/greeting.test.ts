@@ -11,7 +11,10 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import i18n from '@/i18n';
 import { LAST_GREETING_STORAGE_KEY, USER_NAME_STORAGE_KEY, displayInitials, pickGreeting } from './greeting';
+
+const t = i18n.t.bind(i18n);
 
 const MORNING = new Date('2026-01-01T08:00:00');
 const AFTERNOON = new Date('2026-01-01T14:00:00');
@@ -30,17 +33,17 @@ afterEach(() => {
 
 describe('pickGreeting — time bucket', () => {
   it('returns morning bucket before 12:00', () => {
-    const g = pickGreeting(MORNING, pickFirst);
+    const g = pickGreeting(t, MORNING, pickFirst);
     expect(g.bucket).toBe('morning');
   });
 
   it('returns afternoon bucket between 12:00 and 18:59', () => {
-    const g = pickGreeting(AFTERNOON, pickFirst);
+    const g = pickGreeting(t, AFTERNOON, pickFirst);
     expect(g.bucket).toBe('afternoon');
   });
 
   it('returns evening bucket from 19:00 onwards', () => {
-    const g = pickGreeting(EVENING, pickFirst);
+    const g = pickGreeting(t, EVENING, pickFirst);
     expect(g.bucket).toBe('evening');
   });
 });
@@ -48,14 +51,14 @@ describe('pickGreeting — time bucket', () => {
 describe('pickGreeting — name awareness', () => {
   it('reports `named: true` when the user-name key is present', () => {
     localStorage.setItem(USER_NAME_STORAGE_KEY, 'Victor');
-    const g = pickGreeting(AFTERNOON, pickFirst);
+    const g = pickGreeting(t, AFTERNOON, pickFirst);
     expect(g.named).toBe(true);
   });
 
   it('reports `named: false` when the user-name key is absent or empty', () => {
-    expect(pickGreeting(AFTERNOON, pickFirst).named).toBe(false);
+    expect(pickGreeting(t, AFTERNOON, pickFirst).named).toBe(false);
     localStorage.setItem(USER_NAME_STORAGE_KEY, '   ');
-    expect(pickGreeting(AFTERNOON, pickFirst).named).toBe(false);
+    expect(pickGreeting(t, AFTERNOON, pickFirst).named).toBe(false);
   });
 
   it('never returns a playful name-aware line when no name is stored', () => {
@@ -64,7 +67,7 @@ describe('pickGreeting — name awareness', () => {
     // `name: null` and are filtered out before the random pick.
     const seen = new Set<string>();
     for (let i = 0; i < 30; i++) {
-      const g = pickGreeting(AFTERNOON, () => i / 30);
+      const g = pickGreeting(t, AFTERNOON, () => i / 30);
       seen.add(g.category);
     }
     expect(seen.has('playful')).toBe(false);
@@ -77,7 +80,7 @@ describe('pickGreeting — name awareness', () => {
       // Reset last-id every iteration so the no-repeat guard doesn't
       // bias the sample.
       localStorage.removeItem(LAST_GREETING_STORAGE_KEY);
-      seen.add(pickGreeting(AFTERNOON, () => i / 30).category);
+      seen.add(pickGreeting(t, AFTERNOON, () => i / 30).category);
     }
     expect(seen.has('playful')).toBe(true);
   });
@@ -85,13 +88,13 @@ describe('pickGreeting — name awareness', () => {
 
 describe('pickGreeting — no-repeat-twice guard', () => {
   it('does not return the same id twice in a row when alternatives exist', () => {
-    const first = pickGreeting(AFTERNOON, pickFirst);
-    const second = pickGreeting(AFTERNOON, pickFirst);
+    const first = pickGreeting(t, AFTERNOON, pickFirst);
+    const second = pickGreeting(t, AFTERNOON, pickFirst);
     expect(second.id).not.toBe(first.id);
   });
 
   it('persists the last id to localStorage', () => {
-    const g = pickGreeting(AFTERNOON, pickFirst);
+    const g = pickGreeting(t, AFTERNOON, pickFirst);
     expect(localStorage.getItem(LAST_GREETING_STORAGE_KEY)).toBe(g.id);
   });
 
@@ -101,14 +104,14 @@ describe('pickGreeting — no-repeat-twice guard', () => {
     // there isn't a corpus where the candidate set shrinks to 1.
     // Instead we assert the safety invariant: the function never
     // returns `undefined` even with a custom rng of 1.
-    const g = pickGreeting(AFTERNOON, pickLast);
+    const g = pickGreeting(t, AFTERNOON, pickLast);
     expect(g.text.length).toBeGreaterThan(0);
   });
 });
 
 describe('pickGreeting — return shape', () => {
   it('returns text + bucket + named + id + category', () => {
-    const g = pickGreeting(AFTERNOON, pickFirst);
+    const g = pickGreeting(t, AFTERNOON, pickFirst);
     expect(g).toMatchObject({
       bucket: expect.any(String),
       named: expect.any(Boolean),
@@ -121,7 +124,7 @@ describe('pickGreeting — return shape', () => {
   it('interpolates the stored name into the time-plain greeting', () => {
     localStorage.setItem(USER_NAME_STORAGE_KEY, 'Victor');
     // The first entry in the pool is `time-plain`; with pickFirst we hit it.
-    const g = pickGreeting(AFTERNOON, pickFirst);
+    const g = pickGreeting(t, AFTERNOON, pickFirst);
     expect(g.id).toBe('time-plain');
     expect(g.text).toBe('Buenas tardes, Victor');
   });

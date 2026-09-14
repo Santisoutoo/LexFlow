@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { X } from 'lucide-react';
 
@@ -10,6 +11,7 @@ export interface ChipProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonEle
 }
 
 export function Chip({ active, dismissable, onDismiss, icon, className, children, onClick, ...rest }: ChipProps) {
+  const { t } = useTranslation();
   const base = cn(
     'inline-flex h-7 items-center gap-1.5 rounded-full text-[12.5px] font-medium transition-colors',
     active
@@ -36,7 +38,7 @@ export function Chip({ active, dismissable, onDismiss, icon, className, children
         </button>
         <button
           type="button"
-          aria-label="quitar filtro"
+          aria-label={t('chip.removeFilterAria')}
           onClick={(e) => { e.stopPropagation(); onDismiss?.(); }}
           className="ml-1 flex rounded p-0.5 opacity-70 hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-indigo-400 outline-none"
         >

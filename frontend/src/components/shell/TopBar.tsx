@@ -165,7 +165,7 @@ function Breadcrumb({
       items.push({ label: t(`settings.sections.${section}`) });
     }
   } else if (path === '/communities' || path.startsWith('/communities/')) {
-    items.push({ label: t('nav.communities', 'Comunidades') });
+    items.push({ label: t('nav.communities') });
   } else if (path === '/editor' || path.startsWith('/editor/')) {
     items.push({ label: t('nav.editor') });
   } else if (path === '/search' || path.startsWith('/search/')) {

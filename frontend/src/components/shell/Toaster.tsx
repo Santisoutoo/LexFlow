@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AlertTriangle, CheckCircle2, Info, X, XCircle } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -33,6 +34,7 @@ const TONE_CLS: Record<ToastTone, { bd: string; bg: string; fg: string }> = {
 };
 
 export function Toaster() {
+  const { t } = useTranslation();
   const toasts = useToast((s) => s.toasts);
   const dismiss = useToast((s) => s.dismiss);
 
@@ -53,12 +55,12 @@ export function Toaster() {
       aria-live="polite"
       aria-atomic="false"
     >
-      {toasts.map((t) => {
-        const Icon = ICONS[t.tone];
-        const tone = TONE_CLS[t.tone];
+      {toasts.map((toast) => {
+        const Icon = ICONS[toast.tone];
+        const tone = TONE_CLS[toast.tone];
         return (
           <div
-            key={t.id}
+            key={toast.id}
             role="status"
             className={cn(
               // pointer-events:auto so the dismiss button is clickable —
@@ -72,15 +74,15 @@ export function Toaster() {
           >
             <Icon className={cn('mt-0.5 size-4 shrink-0', tone.fg)} />
             <div className="min-w-0 flex-1">
-              {t.title && (
-                <div className={cn('text-[13.5px] font-semibold', tone.fg)}>{t.title}</div>
+              {toast.title && (
+                <div className={cn('text-[13.5px] font-semibold', tone.fg)}>{toast.title}</div>
               )}
-              <div className="text-[13px] leading-relaxed text-fg break-words">{t.message}</div>
+              <div className="text-[13px] leading-relaxed text-fg break-words">{toast.message}</div>
             </div>
             <button
               type="button"
-              onClick={() => dismiss(t.id)}
-              aria-label="Cerrar notificación"
+              onClick={() => dismiss(toast.id)}
+              aria-label={t('toast.dismissAria')}
               className="text-muted transition hover:text-fg"
             >
               <X className="size-4" />

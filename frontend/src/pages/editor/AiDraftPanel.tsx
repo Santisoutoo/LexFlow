@@ -50,19 +50,22 @@ function draftToBlocks(text: string): JSONContent[] {
 
 interface Preset {
   id: string;
-  label: string;
+  labelKey: 'editor.aiDraft.presetImprove' | 'editor.aiDraft.presetSummary' | 'editor.aiDraft.presetExplain';
   build: (selection: string) => string;
 }
 
-/** Selection-based quick actions. All operate on the current editor selection. */
-const PRESETS: Preset[] = [
-  { id: 'improve', label: 'Mejorar', build: (s) => `Mejora la redacción de este texto legal, conservando su sentido:\n\n${s}` },
-  { id: 'summary', label: 'Resumir', build: (s) => `Resume de forma concisa este texto:\n\n${s}` },
-  { id: 'explain', label: 'Explicar', build: (s) => `Explica en lenguaje claro este texto:\n\n${s}` },
-];
-
 export function AiDraftPanel({ editor, onClose }: AiDraftPanelProps) {
   const { t } = useTranslation();
+
+  /** Selection-based quick actions. All operate on the current editor selection. */
+  const presets: Preset[] = useMemo(
+    () => [
+      { id: 'improve', labelKey: 'editor.aiDraft.presetImprove', build: (s) => `Mejora la redacción de este texto legal, conservando su sentido:\n\n${s}` },
+      { id: 'summary', labelKey: 'editor.aiDraft.presetSummary', build: (s) => `Resume de forma concisa este texto:\n\n${s}` },
+      { id: 'explain', labelKey: 'editor.aiDraft.presetExplain', build: (s) => `Explica en lenguaje claro este texto:\n\n${s}` },
+    ],
+    [],
+  );
   const navigate = useNavigate();
   const { data: models = [] } = useModels();
   const defaultModel = useUi((s) => s.defaultModel);
@@ -99,7 +102,7 @@ export function AiDraftPanel({ editor, onClose }: AiDraftPanelProps) {
     const content = text.trim();
     if (busy || !content) return;
     if (!model) {
-      setError('Configura un modelo en Ajustes › Modelos para usar el asistente.');
+      setError(t('editor.aiDraft.noModel'));
       return;
     }
     setBusy(true);
@@ -108,7 +111,7 @@ export function AiDraftPanel({ editor, onClose }: AiDraftPanelProps) {
     try {
       let threadId = threadIdRef.current;
       if (!threadId) {
-        const created = await api.chat.create({ title: 'Asistente de redacción', model });
+        const created = await api.chat.create({ title: t('editor.aiDraft.threadTitle'), model });
         threadId = created.id;
         threadIdRef.current = threadId;
       }
@@ -118,7 +121,7 @@ export function AiDraftPanel({ editor, onClose }: AiDraftPanelProps) {
         setStream(current);
       }
     } catch (exc) {
-      setError(exc instanceof Error ? exc.message : 'No se pudo generar el texto.');
+      setError(exc instanceof Error ? exc.message : t('editor.aiDraft.generateError'));
     } finally {
       setBusy(false);
     }
@@ -137,7 +140,7 @@ export function AiDraftPanel({ editor, onClose }: AiDraftPanelProps) {
         .map(citationFromSource)
         .filter((c): c is CitationAttrs => c !== null);
       if (citations.length > 0) {
-        chain = chain.insertContent({ type: 'paragraph', content: [{ type: 'text', text: 'Fuentes: ' }] });
+        chain = chain.insertContent({ type: 'paragraph', content: [{ type: 'text', text: `${t('editor.aiDraft.sourcesPrefix')} ` }] });
         for (const citation of citations) {
           chain = chain.insertLegalCitation(citation);
         }
@@ -152,13 +155,13 @@ export function AiDraftPanel({ editor, onClose }: AiDraftPanelProps) {
   return (
     <aside
       role="complementary"
-      aria-label="Asistente de redacción"
+      aria-label={t('editor.aiDraft.panelAria')}
       className="fixed inset-y-0 right-0 z-40 flex w-[380px] max-w-[92vw] flex-col border-l border-border bg-surface shadow-xl"
     >
       <header className="flex items-center gap-2 border-b border-border px-4 py-3">
         <Sparkles className="size-4 text-indigo-600" />
-        <span className="flex-1 text-[14px] font-semibold">Asistente de redacción</span>
-        <Button variant="ghost" size="icon-sm" aria-label="Cerrar asistente" title="Cerrar" onClick={onClose}>
+        <span className="flex-1 text-[14px] font-semibold">{t('editor.aiDraft.title')}</span>
+        <Button variant="ghost" size="icon-sm" aria-label={t('editor.aiDraft.closeAria')} title={t('editor.aiDraft.close')} onClick={onClose}>
           <X className="size-4" />
         </Button>
       </header>
@@ -166,7 +169,7 @@ export function AiDraftPanel({ editor, onClose }: AiDraftPanelProps) {
       <div className="flex-1 space-y-4 overflow-auto p-4 scrollbar-thin">
         {!model && (
           <div className="rounded-lg border border-amber-300/60 bg-amber-soft px-3 py-2 text-[12.5px] text-amber-700 dark:text-amber-300">
-            Configura un modelo en Ajustes › Modelos para usar el asistente.
+            {t('editor.aiDraft.noModel')}
           </div>
         )}
 
@@ -174,16 +177,16 @@ export function AiDraftPanel({ editor, onClose }: AiDraftPanelProps) {
 
         {/* Selection-based quick actions. */}
         <section className="space-y-2">
-          <div className="label-caps">Acciones sobre la selección</div>
+          <div className="label-caps">{t('editor.aiDraft.selectionSection')}</div>
           {selectionText ? (
             <div className="truncate rounded bg-surface-2 px-2 py-1 text-[12px] text-muted" title={selectionText}>
-              {selectionText.length} caracteres seleccionados
+              {t('editor.aiDraft.charsSelected', { count: selectionText.length })}
             </div>
           ) : (
-            <div className="text-[12px] text-muted">Selecciona texto en el documento para mejorar, resumir o explicar.</div>
+            <div className="text-[12px] text-muted">{t('editor.aiDraft.selectTextHint')}</div>
           )}
           <div className="flex flex-wrap gap-1.5">
-            {PRESETS.map((preset) => (
+            {presets.map((preset) => (
               <Button
                 key={preset.id}
                 variant="secondary"
@@ -191,7 +194,7 @@ export function AiDraftPanel({ editor, onClose }: AiDraftPanelProps) {
                 disabled={!selectionText || busy || !model}
                 onClick={() => runPreset(preset)}
               >
-                {preset.label}
+                {t(preset.labelKey)}
               </Button>
             ))}
           </div>
@@ -199,12 +202,12 @@ export function AiDraftPanel({ editor, onClose }: AiDraftPanelProps) {
 
         {/* Free-text drafting prompt. */}
         <section className="space-y-2">
-          <div className="label-caps">Redactar desde una instrucción</div>
+          <div className="label-caps">{t('editor.aiDraft.promptSection')}</div>
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            aria-label="Instrucción para redactar"
-            placeholder="p. ej. Redacta una cláusula sobre protección de datos…"
+            aria-label={t('editor.aiDraft.promptAria')}
+            placeholder={t('editor.aiDraft.promptPlaceholder')}
             rows={3}
             className="w-full resize-none rounded-lg border border-border bg-bg px-3 py-2 text-[13.5px] outline-none focus:ring-2 focus:ring-indigo-400 placeholder:text-muted"
           />
@@ -216,7 +219,7 @@ export function AiDraftPanel({ editor, onClose }: AiDraftPanelProps) {
             disabled={!prompt.trim() || busy || !model}
             onClick={() => void generate(prompt)}
           >
-            {busy ? 'Generando…' : 'Generar'}
+            {busy ? t('editor.aiDraft.generating') : t('editor.aiDraft.generate')}
           </Button>
         </section>
 
@@ -227,9 +230,9 @@ export function AiDraftPanel({ editor, onClose }: AiDraftPanelProps) {
         {/* Streamed result. */}
         {(busy || draftText) && (
           <section className="space-y-2">
-            <div className="label-caps">Borrador</div>
+            <div className="label-caps">{t('editor.aiDraft.draftSection')}</div>
             <div className="whitespace-pre-wrap rounded-lg border border-border bg-bg px-3 py-2 text-[13px] leading-relaxed">
-              {draftText || <span className="text-muted">Generando…</span>}
+              {draftText || <span className="text-muted">{t('editor.aiDraft.generating')}</span>}
             </div>
 
             {sources.length > 0 && (
@@ -253,10 +256,12 @@ export function AiDraftPanel({ editor, onClose }: AiDraftPanelProps) {
             {draftText && !busy && (
               <div className="flex flex-wrap gap-1.5">
                 <Button variant="primary" size="sm" onClick={() => insertDraft(true)} disabled={citableCount === 0}>
-                  {citableCount > 0 ? `Insertar con ${citableCount} cita${citableCount === 1 ? '' : 's'}` : 'Insertar con citas'}
+                  {citableCount > 0
+                    ? t('editor.aiDraft.insertWithCitations', { count: citableCount })
+                    : t('editor.aiDraft.insertWithCitationsEmpty')}
                 </Button>
                 <Button variant="secondary" size="sm" onClick={() => insertDraft(false)}>
-                  Insertar solo texto
+                  {t('editor.aiDraft.insertTextOnly')}
                 </Button>
               </div>
             )}

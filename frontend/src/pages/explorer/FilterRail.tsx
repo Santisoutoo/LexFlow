@@ -278,7 +278,7 @@ function FilterRailBody({
           The list uses chip-toggle buttons so the visual pattern matches
           the tags facet rather than the checkbox facets, since only one
           value is active at a time. */}
-      <FilterGroup title={t('explorer.groups.comunidad', 'Comunidad')}>
+      <FilterGroup title={t('explorer.groups.comunidad')}>
         <div className="flex flex-wrap gap-1.5">
           {COMMUNITIES.map(({ code, name }) => {
             const active = jurisdiction === code;
@@ -306,7 +306,7 @@ function FilterRailBody({
           chip-toggle pattern as Comunidad above (one value active at a
           time); renders nothing until the corpus vocabulary loads. */}
       {departments && departments.length > 0 && (
-        <FilterGroup title={t('explorer.groups.department', 'Ministerio')}>
+        <FilterGroup title={t('explorer.groups.department')}>
           <div className="flex flex-wrap gap-1.5">
             {departments.map(({ department, count }) => {
               const active = activeDepartment === department;
@@ -384,7 +384,7 @@ function FilterRailBody({
 
       {/* Custom user tags (#670) — browse-only; corpus search ignores them (#49 S13). */}
       {!isSearchMode && userTagVocab && userTagVocab.length > 0 && (
-        <FilterGroup title={t('explorer.groups.userTags', 'Mis tags')}>
+        <FilterGroup title={t('explorer.groups.userTags')}>
           <div className="flex flex-wrap gap-1.5">
             {userTagVocab.map(({ tag, label, count }) => {
               const active = activeUserTag === tag;

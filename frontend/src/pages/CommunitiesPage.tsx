@@ -51,13 +51,10 @@ export function CommunitiesPage() {
       <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div className="max-w-2xl">
           <h1 className="font-display text-2xl font-semibold">
-            {t('communities.title', 'Comunidades autónomas')}
+            {t('communities.title')}
           </h1>
           <p className="mt-1.5 text-[13.5px] text-muted">
-            {t(
-              'communities.subtitle',
-              'Explora la legislación por ámbito territorial: normativa estatal o de cada comunidad autónoma.',
-            )}
+            {t('communities.subtitle')}
           </p>
         </div>
         {/* Map / list toggle (#846) — the map is the visual, spatial way in;
@@ -72,7 +69,7 @@ export function CommunitiesPage() {
               view === 'map' ? 'bg-primary-soft font-medium text-indigo-700 dark:text-indigo-200' : 'text-muted hover:text-fg',
             )}
           >
-            <Map className="size-3.5" /> {t('communities.mapView', 'Mapa')}
+            <Map className="size-3.5" /> {t('communities.mapView')}
           </button>
           <button
             type="button"
@@ -83,7 +80,7 @@ export function CommunitiesPage() {
               view === 'list' ? 'bg-primary-soft font-medium text-indigo-700 dark:text-indigo-200' : 'text-muted hover:text-fg',
             )}
           >
-            <List className="size-3.5" /> {t('communities.listView', 'Lista')}
+            <List className="size-3.5" /> {t('communities.listView')}
           </button>
         </div>
       </header>
@@ -97,7 +94,7 @@ export function CommunitiesPage() {
               className="inline-flex items-center gap-2 rounded-lg border border-border-strong bg-surface px-3.5 py-2 text-[13.5px] font-medium transition-colors hover:border-indigo-300 hover:bg-primary-soft"
             >
               <Landmark className="size-4 text-indigo-600 dark:text-indigo-300" />
-              {t('communities.national', 'Normativa estatal (todo el Estado)')}
+              {t('communities.national')}
             </button>
           )}
           <SpainMap className="w-full" />
@@ -105,7 +102,7 @@ export function CommunitiesPage() {
       ) : (
         <div
           role="list"
-          aria-label={t('communities.title', 'Comunidades autónomas')}
+          aria-label={t('communities.title')}
           className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
         >
           {COMMUNITIES.map(({ code, name }) => (
@@ -153,7 +150,7 @@ function CommunityCard({
       tabIndex={0}
       onClick={() => onSelect(code)}
       onKeyDown={(e) => e.key === 'Enter' && onSelect(code)}
-      aria-label={t('communities.openFor', 'Ver leyes de {{name}} en el Explorador', { name })}
+      aria-label={t('communities.openFor', { name })}
       className="group flex items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
     >
       <span

@@ -532,7 +532,7 @@ export function ExplorerPage() {
                 {userTagVocab.find((v) => v.tag === activeUserTag)?.label ?? activeUserTag}
                 <button
                   type="button"
-                  aria-label={t('explorer.removeUserTagFilter', 'quitar filtro de tag')}
+                  aria-label={t('explorer.removeUserTagFilter')}
                   onClick={() => setActiveUserTag(null)}
                   className="ml-1 flex rounded p-0.5 opacity-70 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
                 >

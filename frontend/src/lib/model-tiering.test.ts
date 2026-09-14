@@ -8,7 +8,6 @@
 
 import { describe, expect, it } from 'vitest';
 import {
-  FIT_LABELS,
   TIER_CATALOG,
   fitForModel,
   getTier,
@@ -155,18 +154,6 @@ describe('TIER_CATALOG', () => {
     const localSizes = TIER_CATALOG.filter((t) => !t.cloud).map((t) => t.sizeGb);
     const sorted = [...localSizes].sort((a, b) => a - b);
     expect(localSizes).toEqual(sorted);
-  });
-});
-
-// ─── Labels ─────────────────────────────────────────────────────────────
-
-describe('FIT_LABELS', () => {
-  it('uses the agreed Spanish vocabulary', () => {
-    expect(FIT_LABELS.great).toBe('Va sobrado');
-    expect(FIT_LABELS.well).toBe('Va bien');
-    expect(FIT_LABELS.decent).toBe('Va decente');
-    expect(FIT_LABELS.tight).toBe('Justo justo');
-    expect(FIT_LABELS['too-heavy']).toBe('Demasiado pesado');
   });
 });
 

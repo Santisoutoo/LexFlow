@@ -42,7 +42,6 @@ import { Skeleton } from '@/components/domain/Skeleton';
 import { api } from '@/lib/api';
 import { liveSecretsApi, type SecretStatusItem } from '@/lib/api/secrets';
 import {
-  FIT_LABELS,
   FIT_TONES,
   TIER_CATALOG,
   fitForModel,
@@ -390,7 +389,7 @@ function WizardFooter({
   const primaryLabel = isFinalStep
     ? t('wizard.startUsing')
     : isModelStep
-      ? t('wizard.use', { tier: tier.title.split(' — ')[0].toLowerCase() })
+      ? t('wizard.use', { tier: t(`modelTier.shortLabel.${tier.key}`) })
       : t('wizard.continue');
 
   const primaryAction = isFinalStep ? onFinishWizard : isModelStep ? onFinishModel : onNext;
@@ -678,10 +677,10 @@ function TierCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             {selected && <CheckCircle2 className="size-4 shrink-0 text-indigo-600 dark:text-indigo-300" />}
-            <span className="font-display text-[15px] font-semibold">{tier.title}</span>
+            <span className="font-display text-[15px] font-semibold">{t(`modelTier.${tier.key}.title`)}</span>
           </div>
           <div className="mt-0.5 font-mono text-[11.5px] text-muted">{tier.model}</div>
-          <p className="mt-1.5 text-[12.5px] text-muted">{tier.blurb}</p>
+          <p className="mt-1.5 text-[12.5px] text-muted">{t(`modelTier.${tier.key}.blurb`)}</p>
           <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[11px]">
             <span className="inline-flex items-center gap-1 rounded-md bg-surface-2 px-1.5 py-0.5 text-muted">
               {tier.cloud ? <Cloud className="size-3" /> : <HardDrive className="size-3" />}
@@ -694,7 +693,7 @@ function TierCard({
             )}
           </div>
         </div>
-        <Badge tone={tone} className="mt-0.5 shrink-0">{FIT_LABELS[fit]}</Badge>
+        <Badge tone={tone} className="mt-0.5 shrink-0">{t(`modelTier.fit.${fit}`)}</Badge>
       </div>
     </button>
   );
@@ -802,7 +801,7 @@ function CloudKeyConfirm({
   return (
     <div className="flex flex-col gap-3 text-[13.5px]">
       <p>
-        {t('wizard.cloudChosen')} <strong>{tier.title}</strong>. {t('wizard.cloudKeyInstructions')}
+        {t('wizard.cloudChosen')} <strong>{t(`modelTier.${tier.key}.title`)}</strong>. {t('wizard.cloudKeyInstructions')}
       </p>
       <p className="text-muted">
         <Trans

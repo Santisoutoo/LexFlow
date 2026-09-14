@@ -15,11 +15,13 @@
  * returned `Greeting.text`.
  *
  * --- WHERE TO CHANGE IF X CHANGES ---
- * * Add a phrase           → append a `GreetingEntry` to GREETING_POOL.
+ * * Add a phrase           → append a `GreetingEntry` to GREETING_POOL + locale keys.
  * * Change weighting        → wrap the uniform `pick` below in a weighted variant.
  * * New name source         → swap `readStoredUserName`.
- * * New time bucket         → extend `bucketFor` + `BUCKET_GREETING`.
+ * * New time bucket         → extend `bucketFor` + `greeting.bucket.*` keys.
  */
+
+import type { TFunction } from 'i18next';
 
 /** localStorage key for the user-typed display name (set by #229 step 2 / #115). */
 export const USER_NAME_STORAGE_KEY = 'lexflow.user-name';
@@ -34,12 +36,6 @@ export const DEFAULT_AVATAR_INITIALS = 'LF';
 export const LAST_GREETING_STORAGE_KEY = 'lexflow.last-greeting-id';
 
 type TimeBucket = 'morning' | 'afternoon' | 'evening';
-
-const BUCKET_GREETING: Record<TimeBucket, string> = {
-  morning: 'Buenos días',
-  afternoon: 'Buenas tardes',
-  evening: 'Buenas noches',
-};
 
 function bucketFor(hour: number): TimeBucket {
   if (hour < 12) return 'morning';
@@ -126,84 +122,90 @@ interface GreetingContext {
 interface GreetingEntry {
   id: string;
   category: GreetingCategory;
-  render: (ctx: GreetingContext) => string | null;
+  render: (ctx: GreetingContext, t: TFunction) => string | null;
 }
 
 const GREETING_POOL: GreetingEntry[] = [
-  // ── time-aware (always available) ────────────────────────────────────
   {
     id: 'time-plain',
     category: 'time',
-    render: ({ bucket, name }) => (name ? `${BUCKET_GREETING[bucket]}, ${name}` : BUCKET_GREETING[bucket]),
+    render: ({ bucket, name }, t) => {
+      const greeting = t(`greeting.bucket.${bucket}`);
+      const nameSuffix = name ? t('greeting.poolMeta.nameSuffix', { name }) : '';
+      return t('greeting.pool.time-plain', { greeting, nameSuffix });
+    },
   },
   {
     id: 'time-corpus-update',
     category: 'time',
-    render: ({ bucket }) => `${BUCKET_GREETING[bucket]} — el corpus te espera`,
+    render: ({ bucket }, t) =>
+      t('greeting.pool.time-corpus-update', { greeting: t(`greeting.bucket.${bucket}`) }),
   },
-  // ── free-tone (no name / no bucket dependency) ──────────────────────
   {
     id: 'free-question',
     category: 'free',
-    render: () => '¿Qué buscamos hoy?',
+    render: (_, t) => t('greeting.pool.free-question'),
   },
   {
     id: 'free-where-to-start',
     category: 'free',
-    render: () => '¿Por dónde empezamos?',
+    render: (_, t) => t('greeting.pool.free-where-to-start'),
   },
   {
     id: 'free-corpus-ready',
     category: 'free',
-    render: () => 'Tu corpus está al día',
+    render: (_, t) => t('greeting.pool.free-corpus-ready'),
   },
   {
     id: 'free-ready-to-review',
     category: 'free',
-    render: () => 'Listo para revisar',
+    render: (_, t) => t('greeting.pool.free-ready-to-review'),
   },
   {
     id: 'free-pick-a-thread',
     category: 'free',
-    render: () => 'Elige por dónde tirar del hilo',
+    render: (_, t) => t('greeting.pool.free-pick-a-thread'),
   },
-  // ── playful name-aware (filtered out when no name stored) ────────────
   {
     id: 'playful-welcome-back',
     category: 'playful',
-    render: ({ name }) => (name ? `Bienvenido de vuelta, ${name}` : null),
+    render: ({ name }, t) => (name ? t('greeting.pool.playful-welcome-back', { name }) : null),
   },
   {
     id: 'playful-hello-again',
     category: 'playful',
-    render: ({ name }) => (name ? `Hola de nuevo, ${name}` : null),
+    render: ({ name }, t) => (name ? t('greeting.pool.playful-hello-again', { name }) : null),
   },
   {
     id: 'playful-good-to-see',
     category: 'playful',
-    render: ({ name }) => (name ? `Qué bien verte, ${name}` : null),
+    render: ({ name }, t) => (name ? t('greeting.pool.playful-good-to-see', { name }) : null),
   },
   {
     id: 'playful-greeting-question',
     category: 'playful',
-    render: ({ name }) => (name ? `${name}, ¿qué leemos hoy?` : null),
+    render: ({ name }, t) => (name ? t('greeting.pool.playful-greeting-question', { name }) : null),
   },
-  // ── extra time-aware variants for breadth ───────────────────────────
   {
     id: 'time-morning-coffee',
     category: 'time',
-    render: ({ bucket, name }) =>
-      bucket === 'morning' ? (name ? `Café y al lío, ${name}` : 'Café y al lío') : null,
+    render: ({ bucket, name }, t) => {
+      if (bucket !== 'morning') return null;
+      const text = name
+        ? t('greeting.poolMeta.time-morning-coffee-named', { name })
+        : t('greeting.poolMeta.time-morning-coffee-plain');
+      return t('greeting.pool.time-morning-coffee', { text });
+    },
   },
   {
     id: 'time-afternoon-focus',
     category: 'time',
-    render: ({ bucket }) => (bucket === 'afternoon' ? 'Foco para la tarde' : null),
+    render: ({ bucket }, t) => (bucket === 'afternoon' ? t('greeting.pool.time-afternoon-focus') : null),
   },
   {
     id: 'time-evening-quiet',
     category: 'time',
-    render: ({ bucket }) => (bucket === 'evening' ? 'Tarde tranquila para leer' : null),
+    render: ({ bucket }, t) => (bucket === 'evening' ? t('greeting.pool.time-evening-quiet') : null),
   },
 ];
 
@@ -237,7 +239,11 @@ export interface Greeting {
  * Determinism for tests: pass a custom `rng` (defaults to `Math.random`).
  * The `now` param lets tests fix the time without monkey-patching globals.
  */
-export function pickGreeting(now: Date = new Date(), rng: () => number = Math.random): Greeting {
+export function pickGreeting(
+  t: TFunction,
+  now: Date = new Date(),
+  rng: () => number = Math.random,
+): Greeting {
   const ctx: GreetingContext = {
     bucket: bucketFor(now.getHours()),
     name: readStoredUserName(),
@@ -245,12 +251,9 @@ export function pickGreeting(now: Date = new Date(), rng: () => number = Math.ra
 
   const lastId = readLastGreetingId();
 
-  // Materialise text once so we know which entries are applicable.
-  const applicable = GREETING_POOL.map((entry) => ({ entry, text: entry.render(ctx) }))
+  const applicable = GREETING_POOL.map((entry) => ({ entry, text: entry.render(ctx, t) }))
     .filter((row): row is { entry: GreetingEntry; text: string } => row.text !== null);
 
-  // Drop the previous pick when we have alternatives left — never strand
-  // ourselves with an empty set (e.g. only one applicable entry).
   const candidates = applicable.length > 1
     ? applicable.filter((row) => row.entry.id !== lastId)
     : applicable;

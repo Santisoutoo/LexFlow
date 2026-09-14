@@ -19,7 +19,10 @@
   "communities": {
     "title": "Comunidades autónomas",
     "subtitle": "Explora la legislación por ámbito territorial: normativa estatal o de cada comunidad autónoma.",
-    "openFor": "Ver leyes de {{name}} en el Explorador"
+    "openFor": "Ver leyes de {{name}} en el Explorador",
+    "mapView": "Mapa",
+    "listView": "Lista",
+    "national": "Normativa estatal (todo el Estado)"
   },
   "shell": {
     "searchPlaceholder": "Buscar leyes, artículos…",
@@ -27,6 +30,8 @@
     "toggleRightPanel": "Alternar panel derecho",
     "breadcrumb": "Migas",
     "diff": "Diff",
+    "skipToContent": "Saltar al contenido principal",
+    "openCommandPalette": "Buscar (paleta de comandos)",
     "mockDataRibbon": "Datos de demostración",
     "mobileMenu": {
       "title": "Más",
@@ -47,8 +52,179 @@
     "documentTitleAria": "Título del documento",
     "placeholder": "Documento sin título",
     "savedAt": "Guardado {{time}}",
+    "contentPlaceholder": "Empieza a escribir tu documento…",
+    "toolbar": {
+      "aria": "Barra de herramientas del editor",
+      "heading1": "Título 1",
+      "heading2": "Título 2",
+      "heading3": "Título 3",
+      "bold": "Negrita",
+      "italic": "Cursiva",
+      "bulletList": "Lista con viñetas",
+      "orderedList": "Lista numerada",
+      "insertCitation": "Insertar cita legal",
+      "blockquote": "Cita en bloque (cita legal)",
+      "templates": "Plantillas",
+      "aiDraft": "Asistente de redacción IA",
+      "commentSelection": "Comentar la selección",
+      "viewComments": "Ver comentarios",
+      "undo": "Deshacer",
+      "redo": "Rehacer",
+      "switchToEdit": "Cambiar a modo edición",
+      "switchToRead": "Cambiar a modo lectura",
+      "edit": "Editar",
+      "read": "Lectura"
+    },
+    "citationPicker": {
+      "dialogAria": "Insertar cita legal",
+      "searchAria": "Buscar una ley o artículo para citar",
+      "searchPlaceholder": "Buscar una ley o artículo para citar…",
+      "resultsAria": "Resultados",
+      "minChars": "Escribe al menos 2 caracteres para buscar en el corpus.",
+      "searching": "Buscando…",
+      "noResults": "Sin resultados para \"{{query}}\".",
+      "navigate": "navegar",
+      "insert": "insertar cita",
+      "resultCount": "{{count}} resultados"
+    },
+    "templates": {
+      "dialogAria": "Plantillas de documento",
+      "title": "Plantillas",
+      "nameAria": "Nombre de la plantilla",
+      "savePlaceholder": "Guardar documento actual como…",
+      "save": "Guardar",
+      "upload": "Subir",
+      "uploadTitle": "Subir un .docx o .md como plantilla",
+      "importError": "No se pudo importar el archivo.",
+      "empty": "Aún no tienes plantillas. Guarda el documento actual para reutilizarlo.",
+      "applyTitle": "Aplicar plantilla",
+      "apply": "Aplicar",
+      "deleteAria": "Eliminar plantilla {{name}}",
+      "delete": "Eliminar",
+      "variable": "variable",
+      "variables": "variables",
+      "noVariables": "Sin variables"
+    },
+    "templateFill": {
+      "backAria": "Volver a la lista",
+      "back": "Volver",
+      "subtitle": "Rellena las variables para generar el borrador",
+      "lawSection": "Datos de la ley",
+      "removeLawAria": "Quitar ley",
+      "removeLaw": "Quitar",
+      "lawSearchAria": "Buscar la ley con la que rellenar",
+      "lawSearchPlaceholder": "Buscar la ley con la que rellenar…",
+      "lawMinChars": "Escribe al menos 2 caracteres.",
+      "lawNoResults": "Sin leyes para esta búsqueda.",
+      "variablesSection": "Variables",
+      "valueForAria": "Valor para {{name}}",
+      "valueForPlaceholder": "Valor para {{name}}",
+      "cancel": "Cancelar",
+      "apply": "Aplicar plantilla"
+    },
+    "comments": {
+      "panelAria": "Comentarios del documento",
+      "title": "Comentarios",
+      "closeAria": "Cerrar comentarios",
+      "close": "Cerrar",
+      "locateTitle": "Localizar en el documento",
+      "noteAria": "Nota del comentario",
+      "notePlaceholder": "Escribe tu nota…",
+      "locate": "Localizar",
+      "resolve": "Resolver",
+      "reopen": "Reabrir",
+      "deleteAria": "Eliminar comentario",
+      "delete": "Eliminar",
+      "empty": "No hay comentarios. Selecciona texto en el documento y pulsa Comentar.",
+      "resolvedSection": "Resueltos"
+    },
+    "aiDraft": {
+      "panelAria": "Asistente de redacción",
+      "title": "Asistente de redacción",
+      "closeAria": "Cerrar asistente",
+      "close": "Cerrar",
+      "noModel": "Configura un modelo en Ajustes › Modelos para usar el asistente.",
+      "selectionSection": "Acciones sobre la selección",
+      "charsSelected": "{{count}} caracteres seleccionados",
+      "selectTextHint": "Selecciona texto en el documento para mejorar, resumir o explicar.",
+      "presetImprove": "Mejorar",
+      "presetSummary": "Resumir",
+      "presetExplain": "Explicar",
+      "promptSection": "Redactar desde una instrucción",
+      "promptAria": "Instrucción para redactar",
+      "promptPlaceholder": "p. ej. Redacta una cláusula sobre protección de datos…",
+      "generating": "Generando…",
+      "generate": "Generar",
+      "draftSection": "Borrador",
+      "sourcesPrefix": "Fuentes:",
+      "insertWithCitations_one": "Insertar con {{count}} cita",
+      "insertWithCitations_other": "Insertar con {{count}} citas",
+      "insertWithCitationsEmpty": "Insertar con citas",
+      "insertTextOnly": "Insertar solo texto",
+      "generateError": "No se pudo generar el texto.",
+      "threadTitle": "Asistente de redacción"
+    },
     "aiDraftDisclaimer": "Texto generado por IA — revísalo antes de usarlo.",
     "aiDraftAttribution": "— Generado por IA. Revisa antes de usar."
+  },
+  "modelTier": {
+    "small": {
+      "title": "Local gratuito — pequeño",
+      "blurb": "Respuestas rápidas en cualquier portátil moderno. Calidad básica."
+    },
+    "balanced": {
+      "title": "Mejor local — equilibrado",
+      "blurb": "Calidad sólida para análisis legal. Necesita una GPU o 16+ GB de RAM."
+    },
+    "large": {
+      "title": "Mejor local — grande",
+      "blurb": "Calidad de despacho profesional. Solo equipos con 24+ GB de VRAM o Apple Silicon top."
+    },
+    "cloud": {
+      "title": "Mejor nube — pago por uso",
+      "blurb": "Mejor calidad disponible, sin requisitos de hardware. Requiere una API key tuya."
+    },
+    "shortLabel": {
+      "small": "local gratuito",
+      "balanced": "local equilibrado",
+      "large": "local grande",
+      "cloud": "nube"
+    },
+    "fit": {
+      "great": "Va sobrado",
+      "well": "Va bien",
+      "decent": "Va decente",
+      "tight": "Justo justo",
+      "too-heavy": "Demasiado pesado"
+    }
+  },
+  "greeting": {
+    "bucket": {
+      "morning": "Buenos días",
+      "afternoon": "Buenas tardes",
+      "evening": "Buenas noches"
+    },
+    "pool": {
+      "time-plain": "{{greeting}}{{nameSuffix}}",
+      "time-corpus-update": "{{greeting}} — el corpus te espera",
+      "free-question": "¿Qué buscamos hoy?",
+      "free-where-to-start": "¿Por dónde empezamos?",
+      "free-corpus-ready": "Tu corpus está al día",
+      "free-ready-to-review": "Listo para revisar",
+      "free-pick-a-thread": "Elige por dónde tirar del hilo",
+      "playful-welcome-back": "Bienvenido de vuelta, {{name}}",
+      "playful-hello-again": "Hola de nuevo, {{name}}",
+      "playful-good-to-see": "Qué bien verte, {{name}}",
+      "playful-greeting-question": "{{name}}, ¿qué leemos hoy?",
+      "time-morning-coffee": "{{text}}",
+      "time-afternoon-focus": "Foco para la tarde",
+      "time-evening-quiet": "Tarde tranquila para leer"
+    },
+    "poolMeta": {
+      "time-morning-coffee-named": "Café y al lío, {{name}}",
+      "time-morning-coffee-plain": "Café y al lío",
+      "nameSuffix": ", {{name}}"
+    }
   },
   "model": {
     "local": "local",
@@ -65,13 +241,15 @@
     "disclaimerBody": "LexFlow es una herramienta de consulta; no constituye asesoramiento jurídico. Fuente: legalize-es (última sync {{syncAgo}}). Verifica siempre en <0>boe.es</0>"
   },
   "lawHeader": {
-    "save": "Guardar",
     "addUserTag": "tag",
     "addUserTagPlaceholder": "nueva etiqueta",
-    "share": "Compartir",
-    "export": "Exportar",
+    "removeUserTag": "Quitar \"{{label}}\"",
     "viewOnBoe": "Ver en BOE",
     "version": "Versión",
+    "versionTimeline": {
+      "title": "Historial",
+      "count": "{{n}} versiones"
+    },
     "stats": {
       "articles": "Artículos",
       "versions": "Versiones",
@@ -330,7 +508,20 @@
       }
     }
   },
+  "toast": {
+    "dismissAria": "Cerrar notificación"
+  },
+  "chip": {
+    "removeFilterAria": "quitar filtro"
+  },
   "chat": {
+    "closeThreads": "Cerrar conversaciones",
+    "openThreads": "Conversaciones",
+    "toolCall": {
+      "openParen": "(",
+      "closeParen": ")",
+      "arrow": "→"
+    },
     "newThread": "Nueva conversación",
     "emptyRailPre": "Aún no hay conversaciones. Pulsa",
     "emptyRailPost": "para empezar.",
@@ -516,7 +707,6 @@
       "about": "Acerca de"
     },
     "title": "Ajustes",
-    "underConstruction": "Sección por completar — se conectará al endpoint correspondiente.",
     "updates": {
       "title": "Actualizaciones del corpus",
       "subtitle": "Resumen de lo que cambió en legalize-es desde la última sincronización. Para ejecutar una sincronización, ve a Ajustes → Datos.",
@@ -754,6 +944,8 @@
       "status": "Estado",
       "rango": "Rango normativo",
       "ambito": "Ámbito territorial",
+      "comunidad": "Comunidad",
+      "department": "Ministerio",
       "year": "Año",
       "tags": "Tags",
       "userTags": "Mis tags"
@@ -820,6 +1012,7 @@
     "reload": "Recargar"
   },
   "graph": {
+    "fit": "Ajustar a la vista",
     "searchPlaceholder": "Buscar en el grafo…",
     "advancedFilters": "Filtros avanzados",
     "legendTitle": "Leyenda",

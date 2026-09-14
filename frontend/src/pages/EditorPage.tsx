@@ -82,8 +82,12 @@ export function EditorPage() {
   return <EditorWorkspace docId={docId} />;
 }
 
+function intlLocale(language: string): string {
+  return language.startsWith('en') ? 'en-GB' : 'es-ES';
+}
+
 function EditorWorkspace({ docId }: { docId: string }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const { getDocument, saveDocument, persistError, clearPersistError } = useEditorStore();
 
@@ -134,7 +138,7 @@ function EditorWorkspace({ docId }: { docId: string }) {
       // Empty-state hint. Sets `is-editor-empty` + `data-placeholder` on the
       // first empty paragraph; the CSS that renders it lives in the editor
       // container below (`is-editor-empty:first-child::before`).
-      Placeholder.configure({ placeholder: 'Empieza a escribir tu documento…' }),
+      Placeholder.configure({ placeholder: t('editor.contentPlaceholder') }),
       // Typed, corpus-resolved legal citations (#599). Inserted via CitationPicker.
       LegalCitation,
       // Inline comment anchors (#602). The note text lives in comment-store.
@@ -199,6 +203,15 @@ function EditorWorkspace({ docId }: { docId: string }) {
     if (!editor) return;
     editor.setEditable(!isReadOnly);
   }, [editor, isReadOnly]);
+
+  // Keep the TipTap placeholder in sync when the UI language changes.
+  useEffect(() => {
+    if (!editor?.extensionManager) return;
+    const extension = editor.extensionManager.extensions.find((ext) => ext.name === 'placeholder');
+    if (!extension) return;
+    extension.options.placeholder = t('editor.contentPlaceholder');
+    editor.view.dispatch(editor.state.tr);
+  }, [editor, t, i18n.language]);
 
   /** Flush the title change to the store immediately (no debounce needed — titles are short). */
   const handleTitleChange = useCallback(
@@ -296,7 +309,10 @@ function EditorWorkspace({ docId }: { docId: string }) {
             {stored?.updatedAt && (
               <>
                 {t('editor.savedAt', {
-                  time: new Date(stored.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                  time: new Date(stored.updatedAt).toLocaleTimeString(intlLocale(i18n.language), {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  }),
                 })}
               </>
             )}
