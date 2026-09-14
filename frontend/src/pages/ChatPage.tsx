@@ -148,6 +148,11 @@ export function ChatPage() {
     () => msgs.reduce((acc, m) => acc + (m.role === 'assistant' && 'sources' in m ? m.sources.length : 0), 0),
     [msgs],
   );
+  const renderedSourcesCount = useMemo(
+    () => visible.reduce((acc, m) => acc + (m.role === 'assistant' && 'sources' in m ? m.sources.length : 0), 0),
+    [visible],
+  );
+  const showSourcesCited = sourcesCited > 0 && sourcesCited === renderedSourcesCount;
   const showFirstTurnNotice =
     activeId != null && !msgs.some((m) => m.role === 'assistant');
 
@@ -405,7 +410,10 @@ export function ChatPage() {
           />
           <div className="min-w-0">
             <div className="truncate font-display text-[15px] font-semibold">{activeId ? (threadsById.get(activeId)?.title ?? t('chat.threadFallback')) : t('chat.threadFallback')}</div>
-            <div className="truncate text-[12px] text-muted">{t('chat.turns', { n: visible.length })} · {t('chat.sourcesCited', { n: sourcesCited })}</div>
+            <div className="truncate text-[12px] text-muted">
+              {t('chat.turns', { n: visible.length })}
+              {showSourcesCited && <> · {t('chat.sourcesCited', { n: sourcesCited })}</>}
+            </div>
           </div>
           <span className="ml-auto shrink-0"><ModelChip /></span>
         </header>

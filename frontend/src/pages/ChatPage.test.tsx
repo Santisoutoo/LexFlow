@@ -155,6 +155,87 @@ describe('ChatPage empty state and accessibility', () => {
   });
 });
 
+describe('ChatPage sources cited header', () => {
+  const thread = { id: 't1', title: 'Test', updatedAt: new Date().toISOString() };
+  const source = {
+    law: 'LO 3/2018',
+    article: '14',
+    date: '2018-12-05',
+    snippet: 'texto',
+    target: { lawId: 'BOE-A-2018-16673', articleNum: '14' },
+  };
+
+  beforeEach(() => {
+    useUi.setState({ defaultModel: 'ollama:qwen2.5:7b', wizardRequested: false });
+    useChatStream.setState({ threads: {} });
+    useChatThreadsMock.mockReturnValue({ data: [thread] });
+    useModelsMock.mockReturnValue({
+      data: [
+        { id: 'ollama:qwen2.5:7b', available: true, label: 'qwen2.5:7b', vendor: 'ollama', kind: 'local' },
+      ],
+    });
+  });
+
+  it('shows the sources cited count when persisted sources match rendered history', () => {
+    useChatThreadMock.mockReturnValue({
+      data: [
+        { id: 'm1', role: 'user', createdAt: new Date().toISOString(), content: 'hola' },
+        {
+          id: 'm2',
+          role: 'assistant',
+          createdAt: new Date().toISOString(),
+          content: ['respuesta'],
+          sources: [source],
+        },
+      ],
+    });
+    renderChatAt('/chat/t1');
+    expect(screen.getByText(/1 fuentes citadas|1 cited sources/i)).toBeInTheDocument();
+  });
+
+  it('hides the sources cited count while streaming sources before persistence', () => {
+    useChatThreadMock.mockReturnValue({ data: [] });
+    useChatStream.setState({
+      threads: {
+        t1: {
+          stream: {
+            id: 'stream-1',
+            role: 'assistant',
+            createdAt: new Date().toISOString(),
+            content: ['parcial'],
+            sources: [source],
+            streaming: true,
+          },
+          pendingUser: null,
+          sending: true,
+          abortController: null,
+        },
+      },
+    });
+    renderChatAt('/chat/t1');
+    expect(screen.queryByText(/0 fuentes citadas|0 cited sources/i)).toBeNull();
+    expect(screen.queryByText(/1 fuentes citadas|1 cited sources/i)).toBeNull();
+  });
+
+  it('shows turns only when there are no cited sources', () => {
+    useChatThreadMock.mockReturnValue({
+      data: [
+        { id: 'm1', role: 'user', createdAt: new Date().toISOString(), content: 'hola' },
+        {
+          id: 'm2',
+          role: 'assistant',
+          createdAt: new Date().toISOString(),
+          content: ['respuesta'],
+          sources: [],
+        },
+      ],
+    });
+    renderChatAt('/chat/t1');
+    expect(screen.getByText(/2 turnos|2 turns/i)).toBeInTheDocument();
+    expect(screen.queryByText(/fuentes citadas|cited sources/i)).toBeNull();
+  });
+});
+
 describe('ChatPage thread-scoped streaming', () => {
   beforeEach(() => {
     useUi.setState({ defaultModel: 'ollama:qwen2.5:7b', wizardRequested: false });

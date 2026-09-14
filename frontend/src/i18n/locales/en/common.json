@@ -423,7 +423,7 @@
       "disc": "Discussion"
     },
     "changesByVersion": "Changes by version",
-    "compareVersions": "Compare v1.0 ↔ v1.3",
+    "compareVersions": "Compare versions",
     "viewChanges": "View changes →",
     "tabPending": "{{tab}} tab — available in the backend.",
     "openGlobalGraph": "Open global graph",
@@ -487,6 +487,7 @@
     "seeAll": "See all →",
     "title": "Search",
     "semanticUnavailable": "Semantic search is not active. Enable it in Settings → Models.",
+    "basicModeNotice": "Basic mode — approximate results; install semantic search in Settings › Models",
     "openSettings": "Open Settings",
     "modeFullText": "Text",
     "modeSemantic": "Semantic",
@@ -794,7 +795,7 @@
       "diffSub": "{{short}} · {{from}} → {{to}}",
       "diffSubFallback": "Compare two versions of a law",
       "dashboardsTitle": "Dashboards",
-      "dashboardsSub": "Compliance · 6 indicators"
+      "dashboardsSub": "Corpus indicators"
     },
     "units": {
       "articles": "arts.",
@@ -893,7 +894,7 @@
     "last12Months": "Last 12 months",
     "sectorAll": "Sector: All",
     "chartTitle": "Legislative amendments per month",
-    "chartSubtitle": "2023 – 2024 · cumulative",
+    "chartSubtitleRange": "{{range}} · cumulative",
     "exportCsv": "CSV",
     "tabs": {
       "compliance": "Compliance",

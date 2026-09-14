@@ -423,7 +423,7 @@
       "disc": "Discusión"
     },
     "changesByVersion": "Cambios por versión",
-    "compareVersions": "Comparar v1.0 ↔ v1.3",
+    "compareVersions": "Comparar versiones",
     "viewChanges": "Ver cambios →",
     "tabPending": "Pestaña {{tab}} — disponible en el backend.",
     "openGlobalGraph": "Abrir grafo global",
@@ -487,6 +487,7 @@
     "seeAll": "Ver todo →",
     "title": "Búsqueda",
     "semanticUnavailable": "La búsqueda semántica no está activa. Actívala en Ajustes → Modelos.",
+    "basicModeNotice": "Modo básico — resultados aproximados; instala la búsqueda semántica en Ajustes › Modelos",
     "openSettings": "Abrir Ajustes",
     "modeFullText": "Texto",
     "modeSemantic": "Semántico",
@@ -794,7 +795,7 @@
       "diffSub": "{{short}} · {{from}} → {{to}}",
       "diffSubFallback": "Compara dos versiones de una norma",
       "dashboardsTitle": "Cuadros de mando",
-      "dashboardsSub": "Compliance · 6 indicadores"
+      "dashboardsSub": "Indicadores del corpus"
     },
     "units": {
       "articles": "arts.",
@@ -893,7 +894,7 @@
     "last12Months": "Últimos 12 meses",
     "sectorAll": "Sector: Todos",
     "chartTitle": "Reformas legislativas por mes",
-    "chartSubtitle": "2023 – 2024 · acumulado",
+    "chartSubtitleRange": "{{range}} · acumulado",
     "exportCsv": "CSV",
     "tabs": {
       "compliance": "Compliance",
