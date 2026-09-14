@@ -110,6 +110,20 @@ describe('HomePage sync banner', () => {
   });
 });
 
+describe('HomePage quick tiles', () => {
+  beforeEach(() => {
+    versionsMock.mockReset();
+    useLawsListMock.mockReturnValue({ data: { items: [] }, isLoading: false });
+    useSyncStatusMock.mockReturnValue({ data: undefined, isError: false, isLoading: false });
+  });
+
+  it('does not show a fabricated dashboards indicator count', () => {
+    renderHome();
+    expect(screen.getByText(/indicadores del corpus|corpus indicators/i)).toBeInTheDocument();
+    expect(screen.queryByText(/6 indicadores|6 indicators/i)).toBeNull();
+  });
+});
+
 describe('HomePage diff targets', () => {
   beforeEach(() => {
     versionsMock.mockReset();

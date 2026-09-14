@@ -94,9 +94,9 @@ export function SearchResultsPage() {
             <EmptyState title={t('search.empty.title')} description={t('search.semanticEmptyQuery')} />
           </div>
         ) : mode === 'semantic' ? (
-          <SemanticResults q={plainQ} />
+          <SemanticResults q={plainQ} semanticActive={semanticActive} />
         ) : mode === 'hybrid' ? (
-          <HybridResults q={plainQ} />
+          <HybridResults q={plainQ} semanticActive={semanticActive} />
         ) : (
           <FullTextResults q={plainQ} />
         )}
@@ -135,7 +135,7 @@ function FullTextResults({ q }: { q: string }) {
   );
 }
 
-function SemanticResults({ q }: { q: string }) {
+function SemanticResults({ q, semanticActive }: { q: string; semanticActive: boolean }) {
   const { t } = useTranslation();
   const { data, isLoading, isError, error, refetch } = useSemanticSearch(q);
   if (isError) {
@@ -153,19 +153,42 @@ function SemanticResults({ q }: { q: string }) {
       </div>
     );
   }
+  const maxScore = hits.length > 0 ? Math.max(...hits.map((hit) => hit.score), 0) : 0;
   return (
     <ResultList
       loading={isLoading && !data}
       heading={t('search.semanticHeading', { n: hits.length })}
+      notice={
+        !semanticActive && hits.length > 0 ? (
+          <BasicModeNotice />
+        ) : undefined
+      }
     >
       {hits.map((hit) => (
-        <SemanticRow key={`${hit.lawId}-${hit.articleNumber}`} hit={hit} />
+        <SemanticRow
+          key={`${hit.lawId}-${hit.articleNumber}`}
+          hit={hit}
+          semanticActive={semanticActive}
+          scoreRatio={maxScore > 0 ? hit.score / maxScore : 0}
+        />
       ))}
     </ResultList>
   );
 }
 
-function HybridResults({ q }: { q: string }) {
+function BasicModeNotice() {
+  const { t } = useTranslation();
+  return (
+    <div className="border-b border-border px-5 py-2.5 text-[12.5px] text-muted md:px-8">
+      <p>{t('search.basicModeNotice')}</p>
+      <Link to="/settings" className="mt-1 inline-block text-[13px] font-medium text-indigo-600 hover:underline">
+        {t('search.openSettings')}
+      </Link>
+    </div>
+  );
+}
+
+function HybridResults({ q, semanticActive }: { q: string; semanticActive: boolean }) {
   const { t } = useTranslation();
   const { data, isLoading, isError, error, refetch } = useHybridSearch(q);
   if (isError) {
@@ -187,6 +210,11 @@ function HybridResults({ q }: { q: string }) {
     <ResultList
       loading={isLoading && !data}
       heading={t('search.hybridHeading', { n: hits.length })}
+      notice={
+        !semanticActive && hits.length > 0 ? (
+          <BasicModeNotice />
+        ) : undefined
+      }
     >
       {hits.map((hit) => (
         <HybridRow key={`${hit.lawId}-${hit.articleNumber ?? 'law'}`} hit={hit} />
@@ -198,15 +226,18 @@ function HybridResults({ q }: { q: string }) {
 function ResultList({
   loading,
   heading,
+  notice,
   children,
 }: {
   loading: boolean;
   heading: string;
+  notice?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <div className="divide-y divide-border">
       <p className="px-5 py-3 text-[12.5px] text-muted md:px-8">{heading}</p>
+      {notice}
       {loading &&
         Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className="flex flex-col gap-2 px-8 py-4">
@@ -244,7 +275,15 @@ function FullTextRow({ hit }: { hit: SearchHit }) {
   );
 }
 
-function SemanticRow({ hit }: { hit: SemanticSearchHit }) {
+function SemanticRow({
+  hit,
+  semanticActive,
+  scoreRatio,
+}: {
+  hit: SemanticSearchHit;
+  semanticActive: boolean;
+  scoreRatio: number;
+}) {
   const navigate = useNavigate();
   const href = lawDetailHref(hit.lawId, hit.articleNumber);
   return (
@@ -255,7 +294,9 @@ function SemanticRow({ hit }: { hit: SemanticSearchHit }) {
       heading={`Art. ${hit.articleNumber}`}
       articleNum={hit.articleNumber}
       snippet={hit.snippet}
-      scorePercent={Math.round(hit.score * 100)}
+      semanticActive={semanticActive}
+      scorePercent={semanticActive ? Math.round(hit.score * 100) : undefined}
+      scoreRatio={semanticActive ? undefined : scoreRatio}
     />
   );
 }
@@ -291,6 +332,8 @@ function HitRow({
   snippet,
   match,
   scorePercent,
+  scoreRatio,
+  semanticActive = true,
   badges,
 }: {
   href: string;
@@ -304,6 +347,8 @@ function HitRow({
   snippet?: string;
   match?: HighlightRange | HighlightRange[] | null;
   scorePercent?: number;
+  scoreRatio?: number;
+  semanticActive?: boolean;
   badges?: string[];
 }) {
   const metaLine = meta?.filter(Boolean).join(' · ');
@@ -330,8 +375,23 @@ function HitRow({
           {articleNum && (
             <span className="shrink-0 font-mono text-[11px] text-muted">Art.&nbsp;{articleNum}</span>
           )}
-          {scorePercent != null && (
+          {semanticActive && scorePercent != null && (
             <span className="shrink-0 font-mono text-[11px] text-muted">{scorePercent}%</span>
+          )}
+          {!semanticActive && scoreRatio != null && (
+            <span
+              role="progressbar"
+              aria-valuenow={Math.round(scoreRatio * 100)}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              data-testid="search-score-bar"
+              className="h-1.5 w-12 shrink-0 overflow-hidden rounded-full bg-surface-2"
+            >
+              <span
+                className="block h-full rounded-full bg-primary-soft"
+                style={{ width: `${Math.round(scoreRatio * 100)}%` }}
+              />
+            </span>
           )}
           {badges?.map((label) => (
             <Badge key={label} tone="outline">{label}</Badge>

@@ -97,4 +97,41 @@ describe('SearchResultsPage', () => {
     expect(screen.getByText(/no está activa|not active/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /abrir ajustes|open settings/i })).toHaveAttribute('href', '/settings');
   });
+
+  it('hides calibrated score labels in basic mode and shows relative bars', () => {
+    useSemanticStatusMock.mockReturnValue({
+      data: { active: false, installed: false, backend: 'hash', model: 'x' } satisfies SemanticStatus,
+    });
+    useSemanticSearchMock.mockReturnValue(idleQuery<SemanticSearchResults>({
+      hits: [{
+        lawId: 'BOE-A-1',
+        articleNumber: '14',
+        snippet: 'texto',
+        score: 0.82,
+      }],
+      query: 'despido',
+    }));
+    renderSearch('/search?q=despido&mode=semantic');
+    expect(screen.queryByText(/\d+%/)).toBeNull();
+    expect(screen.getAllByTestId('search-score-bar').length).toBeGreaterThan(0);
+    expect(screen.getByText(/modo básico|basic mode/i)).toBeInTheDocument();
+  });
+
+  it('shows calibrated score labels when semantic search is active', () => {
+    useSemanticStatusMock.mockReturnValue({
+      data: { active: true, installed: true, backend: 'sentence-transformers', model: 'x' } satisfies SemanticStatus,
+    });
+    useSemanticSearchMock.mockReturnValue(idleQuery<SemanticSearchResults>({
+      hits: [{
+        lawId: 'BOE-A-1',
+        articleNumber: '14',
+        snippet: 'texto',
+        score: 0.82,
+      }],
+      query: 'despido',
+    }));
+    renderSearch('/search?q=despido&mode=semantic');
+    expect(screen.getByText('82%')).toBeInTheDocument();
+    expect(screen.queryByTestId('search-score-bar')).toBeNull();
+  });
 });

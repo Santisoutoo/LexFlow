@@ -207,6 +207,18 @@ describe('LawDetailPage', () => {
     expect(await screen.findByText(/No readable content yet|Sin contenido legible/i)).toBeInTheDocument();
   });
 
+  it('uses generic compare-versions copy instead of fabricated semver tags', async () => {
+    mockVersions = [
+      { tag: 'bbbbbbb', date: '2024-06-01', label: 'Newest', kind: 'amend' },
+      { tag: 'aaaaaaa', date: '2024-01-01', label: 'Previous', kind: 'publish' },
+    ];
+
+    renderPage('/laws/CE-1978');
+    await userEvent.click(screen.getByRole('tab', { name: /versiones/i }));
+    expect(screen.getByRole('button', { name: /comparar versiones|compare versions/i })).toBeInTheDocument();
+    expect(screen.queryByText(/v1\.0.*v1\.3/i)).toBeNull();
+  });
+
   it('shows law status (not hardcoded vigente) on the newest version row', async () => {
     mockLawData = { ...mockLawData, status: 'derogada' };
     mockVersions = [

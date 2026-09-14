@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/domain/Skeleton';
 import { useDashboard } from '@/lib/queries';
 import { BigChart } from '@/pages/dashboard/BigChart';
 import { DashCard } from '@/pages/dashboard/DashCard';
+import { formatSeriesRange } from '@/pages/dashboard/format-series-range';
 
 type DashboardPreset = 'compliance' | 'analytics';
 const VALID_PRESETS: DashboardPreset[] = ['compliance', 'analytics'];
@@ -29,6 +30,7 @@ export function DashboardPage() {
     navigate(`/dashboards/${next}`);
   };
   const { data, isLoading } = useDashboard(preset);
+  const chartRange = data ? formatSeriesRange(data.series.labels) : null;
 
   return (
     <div className="h-full max-w-content overflow-auto px-5 md:px-8 py-6 scrollbar-thin">
@@ -56,7 +58,9 @@ export function DashboardPage() {
           <Card className="p-5">
             <div className="mb-1 flex items-baseline gap-2">
               <h3 className="font-display text-base font-semibold">{t('dashboards.chartTitle')}</h3>
-              <span className="text-[12px] text-muted">{t('dashboards.chartSubtitle')}</span>
+              {chartRange && (
+                <span className="text-[12px] text-muted">{t('dashboards.chartSubtitleRange', { range: chartRange })}</span>
+              )}
             </div>
             <BigChart values={data.series.values} labels={data.series.labels} recentFrom={data.series.recentFrom} />
           </Card>
