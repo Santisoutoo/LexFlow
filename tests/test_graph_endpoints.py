@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 
 from lexflow.api.app import app
 from lexflow.api.dependencies import get_graph
+from lexflow.core.enums import EdgeResolution
 from lexflow.core.registry import LawRegistry
 from lexflow.graph.builder import build_graph
 from lexflow.graph.model import LegalGraph
@@ -91,6 +92,23 @@ class TestSubgraph:
         ranks = [n["pagerank"] for n in body["nodes"] if n["pagerank"] is not None]
         if ranks:
             assert abs(sum(ranks) - 1.0) < 0.05  # rounding tolerance
+
+    def test_edges_include_resolution(self, client: TestClient, graph_from_fixture: LegalGraph) -> None:
+        ids = list(graph_from_fixture.graph.nodes)
+        assert len(ids) >= 2
+        source, target = ids[0], ids[1]
+        graph_from_fixture.add_reference(source, target, resolution=EdgeResolution.INFERRED)
+        # If the pair already had a BOE-id edge, stamp inferred so the JSON
+        # contract is observable even after merge prefers boe-id.
+        graph_from_fixture.graph[source][target]["resolution"] = EdgeResolution.INFERRED.value
+        body = client.get(f"/api/v1/graph/subgraph/{source}", params={"depth": 1}).json()
+        matching = [e for e in body["edges"] if e["source"] == source and e["target"] == target]
+        assert matching
+        assert matching[0]["resolution"] == "inferred"
+        for edge in body["edges"]:
+            assert "resolution" in edge
+            if edge["resolution"] is not None:
+                assert edge["resolution"] in {"boe-id", "inferred"}
 
 
 class TestPath:

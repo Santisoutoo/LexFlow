@@ -7,7 +7,8 @@
  *
  * WHERE TO CHANGE IF X CHANGES: if `GraphNode` or `GraphEdge` gain new
  * fields that affect neighbour resolution (e.g. weight, directionality
- * flags), update `NeighbourEdge` and `resolveNeighbourNodes` here.
+ * flags, `resolution`), update `NeighbourEdge` and `resolveNeighbourNodes`
+ * here. Edge provenance lives on `GraphEdge.resolution` (#64).
  */
 import type { GraphData, GraphNode, GraphEdge } from '@/lib/types';
 import type { GraphEdgeKind } from '@/lib/graph-colors';
@@ -134,8 +135,7 @@ export function resolveNeighbourhood(
 export interface RelatedLawNeighbour {
   node: GraphNode;
   edgeKind: GraphEdgeKind;
-  /** True when the edge kind is a weak/heuristic signal. Provenance of
-   *  unresolved citations is not on `GraphEdge` yet (#775/#782). */
+  /** True when any merged edge to this neighbour was citation-inferred. */
   inferred: boolean;
 }
 
@@ -178,12 +178,14 @@ export function resolveRelatedLawNeighbours(
     if (!otherNode || otherNode.kind !== 'law') continue;
 
     const edgeKind = edgeKindOf(edge);
+    const inferred = edge.resolution === 'inferred';
     const existing = merged.get(otherId);
     if (!existing) {
-      merged.set(otherId, { node: otherNode, edgeKind, inferred: false });
+      merged.set(otherId, { node: otherNode, edgeKind, inferred });
       continue;
     }
     existing.edgeKind = strongerEdgeKind(existing.edgeKind, edgeKind);
+    existing.inferred = existing.inferred || inferred;
   }
 
   return [...merged.values()]

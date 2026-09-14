@@ -107,6 +107,41 @@ def stronger_reference_kind(a: ReferenceKind, b: ReferenceKind) -> ReferenceKind
     return a if order[a] <= order[b] else b
 
 
+class EdgeResolution(StrEnum):
+    """How a graph edge's target was resolved at build time (#64).
+
+    ``BOE_ID`` means the parser already knew the target's BOE identifier
+    (even if that law was absent from the corpus and the edge went dangling).
+    ``INFERRED`` means the builder matched citation text via the title
+    citation index — heuristic, may contain errors. The honesty layer in
+    the SPA dashes inferred edges; matching logic itself is unchanged.
+    """
+
+    BOE_ID = "boe-id"
+    INFERRED = "inferred"
+
+
+def stronger_edge_resolution(a: EdgeResolution, b: EdgeResolution) -> EdgeResolution:
+    """Prefer BOE-id over inferred when merging parallel edges on the same pair."""
+    if a is EdgeResolution.BOE_ID or b is EdgeResolution.BOE_ID:
+        return EdgeResolution.BOE_ID
+    return EdgeResolution.INFERRED
+
+
+def parse_edge_resolution(raw: object) -> EdgeResolution:
+    """Coerce a stored edge attr to ``EdgeResolution``; missing/unknown → boe-id.
+
+    Pre-migration caches omit ``resolution``; treating those as BOE-id avoids
+    over-marking historical edges as inferred.
+    """
+    if not isinstance(raw, str) or not raw:
+        return EdgeResolution.BOE_ID
+    try:
+        return EdgeResolution(raw)
+    except ValueError:
+        return EdgeResolution.BOE_ID
+
+
 class DisposicionKind(StrEnum):
     """Category of a closing disposition (#106).
 

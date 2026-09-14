@@ -264,6 +264,8 @@ export interface GraphEdge {
   target: string;
   /** Edge kind (cites, modifies, repeals, …). */
   kind?: 'cites' | 'modifies' | 'repeals' | 'develops';
+  /** How the target was identified. Missing → treat as `'boe-id'`. */
+  resolution?: 'boe-id' | 'inferred';
 }
 
 export interface GraphData {

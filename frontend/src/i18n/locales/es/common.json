@@ -302,7 +302,7 @@
       },
       "graph": {
         "title": "Grafo de referencias",
-        "description": "Cada nodo es una ley; las aristas son citas, modificaciones o derogaciones entre normas. Arrastra para mover, rueda para zoom; el panel derecho fija la profundidad de exploración."
+        "description": "Cada nodo es una ley; las aristas son referencias detectadas automáticamente. Arrastra para mover, rueda para zoom; el panel derecho fija la profundidad de exploración."
       },
       "chat": {
         "title": "Chat legal",
@@ -863,7 +863,8 @@
     "legend": {
       "clusters": "Grupos",
       "cluster": "Grupo {{id}}",
-      "nodeKinds": "Tipos de nodo"
+      "nodeKinds": "Tipos de nodo",
+      "inferredEdge": "Referencia inferida"
     },
     "filters": {
       "subgraphHint": "Filtros locales sobre el subgrafo actual. Ámbito y jurisdicción requieren la vista global.",
@@ -876,6 +877,15 @@
       "status": "Estado",
       "pagerank": "PageRank",
       "genericNode": "Nodo del subgrafo local."
+    },
+    "edge": {
+      "inferredTooltip": "referencia inferida automáticamente — puede contener errores"
+    },
+    "relatedLaws": {
+      "title": "Leyes relacionadas",
+      "empty": "Sin leyes relacionadas todavía.",
+      "inferred": "inferida",
+      "subtitle": "según referencias detectadas automáticamente"
     }
   },
   "dashboards": {

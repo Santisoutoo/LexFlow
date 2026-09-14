@@ -1317,6 +1317,10 @@ export interface components {
          *     ``kind`` carries the relationship type (cites / modifies / repeals /
          *     develops, #144). Older cached graphs that pre-date the typing
          *     surface ``None`` here — the frontend treats it as ``cites``.
+         *
+         *     ``resolution`` is how the target was identified (``boe-id`` vs
+         *     ``inferred``, #64). Older caches may omit it — the frontend treats
+         *     missing as ``boe-id``.
          */
         GraphEdgeData: {
             /** Source */
@@ -1327,6 +1331,8 @@ export interface components {
             source_article?: string | null;
             /** Kind */
             kind?: string | null;
+            /** Resolution */
+            resolution?: ("boe-id" | "inferred") | null;
         };
         /**
          * GraphGlobalResponse

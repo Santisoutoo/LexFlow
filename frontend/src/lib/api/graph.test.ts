@@ -27,12 +27,23 @@ describe('projectEdge', () => {
       source: 'A',
       target: 'B',
       kind: 'modifies',
+      resolution: 'boe-id',
     });
   });
 
   it('falls back to cites when kind is missing', () => {
     const raw: BackendGraphEdge = { source: 'A', target: 'B' };
     expect(projectEdge(raw, 2).kind).toBe('cites');
+  });
+
+  it('maps inferred resolution onto the SPA edge', () => {
+    const raw: BackendGraphEdge = { source: 'A', target: 'B', resolution: 'inferred' };
+    expect(projectEdge(raw, 0).resolution).toBe('inferred');
+  });
+
+  it('defaults missing resolution to boe-id', () => {
+    const raw: BackendGraphEdge = { source: 'A', target: 'B' };
+    expect(projectEdge(raw, 1).resolution).toBe('boe-id');
   });
 });
 
