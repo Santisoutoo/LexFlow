@@ -27,7 +27,7 @@ import type { InstalledModel } from '@/lib/types';
 import { cloudProviderStatus } from '@/lib/model-status';
 import { Skeleton } from '@/components/domain/Skeleton';
 import { useUi } from '@/lib/store';
-import { cn, formatDate, timeAgo } from '@/lib/utils';
+import { cn, formatDate, formatDuration, timeAgo } from '@/lib/utils';
 import { USER_NAME_STORAGE_KEY, notifyUserNameChanged, readStoredUserName } from '@/lib/greeting';
 import { toast } from '@/lib/toast';
 import { SUPPORTED_LANGS } from '@/i18n';
@@ -1064,7 +1064,7 @@ function DiagnosticsSection() {
         <div className="flex-1">
           <div className="font-mono text-[13px]">v{health.version}</div>
           <div className="text-[12px] text-muted">
-            {t('settings.diagnostics.uptime', { seconds: Math.round(health.uptimeSeconds) })}
+            {t('settings.diagnostics.uptime', { duration: formatDuration(health.uptimeSeconds) })}
           </div>
         </div>
       </Card>
@@ -1133,7 +1133,7 @@ function DataSection() {
         <div className="flex items-center gap-3">
           <div className="flex-1">
             <div className="font-mono text-[13px]">{sync?.upstream ?? 'legalize-es@main'}</div>
-            <div className="text-[12px] text-muted">{t('settings.data.lastSync', { ago: timeAgo(sync?.lastSyncAt), behind: sync?.behind ?? 0 })}</div>
+            <div className="text-[12px] text-muted">{t('settings.data.lastSync', { ago: timeAgo(sync?.lastSyncAt), count: sync?.behind ?? 0 })}</div>
           </div>
           <Button size="sm" loading={run.isPending} onClick={() => run.mutate()}>{t('settings.data.syncNow')}</Button>
         </div>

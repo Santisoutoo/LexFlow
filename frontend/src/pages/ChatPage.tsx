@@ -411,8 +411,8 @@ export function ChatPage() {
           <div className="min-w-0">
             <div className="truncate font-display text-[15px] font-semibold">{activeId ? (threadsById.get(activeId)?.title ?? t('chat.threadFallback')) : t('chat.threadFallback')}</div>
             <div className="truncate text-[12px] text-muted">
-              {t('chat.turns', { n: visible.length })}
-              {showSourcesCited && <> · {t('chat.sourcesCited', { n: sourcesCited })}</>}
+              {t('chat.turns', { count: visible.length })}
+              {showSourcesCited && <> · {t('chat.sourcesCited', { count: sourcesCited })}</>}
             </div>
           </div>
           <span className="ml-auto shrink-0"><ModelChip /></span>

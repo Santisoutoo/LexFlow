@@ -85,7 +85,8 @@
       "noResults": "No results for \"{{query}}\".",
       "navigate": "navigate",
       "insert": "insert citation",
-      "resultCount": "{{count}} results"
+      "resultCount_one": "{{count}} result",
+      "resultCount_other": "{{count}} results"
     },
     "templates": {
       "dialogAria": "Document templates",
@@ -246,7 +247,8 @@
     "viewOnBoe": "View on BOE",
     "versionTimeline": {
       "title": "History",
-      "count": "{{n}} versions"
+      "count_one": "{{count}} version",
+      "count_other": "{{count}} versions"
     },
     "stats": {
       "articles": "Articles",
@@ -530,8 +532,10 @@
       "week": "This week"
     },
     "threadFallback": "Conversation",
-    "turns": "{{n}} turns",
-    "sourcesCited": "{{n}} cited sources",
+    "turns_one": "{{count}} turn",
+    "turns_other": "{{count}} turns",
+    "sourcesCited_one": "{{count}} cited source",
+    "sourcesCited_other": "{{count}} cited sources",
     "startTitle": "Start by asking the corpus",
     "startHint": "Type your question below. The assistant will query the corpus automatically.",
     "placeholder": "Ask the corpus something…",
@@ -626,7 +630,8 @@
     "refsUngrouped": "No source article",
     "selectCitation": "Select a citation in the text (superscripts) to see the cited law and its context.",
     "relatedRefs": "Related references",
-    "refsHeading": "{{n}} outgoing references",
+    "refsHeading_one": "{{count}} outgoing reference",
+    "refsHeading_other": "{{count}} outgoing references",
     "refsEmpty": "This law has no outgoing references recorded.",
     "disposiciones": "Disposiciones",
     "reading": {
@@ -664,7 +669,8 @@
     "placeholder": "Search laws, articles, conversations…",
     "indexing": "Indexing the corpus for the first time. Results will appear shortly…",
     "searching": "Searching…",
-    "resultsFor": "{{n}} results for \"{{q}}\"",
+    "resultsFor_one": "{{count}} result for \"{{q}}\"",
+    "resultsFor_other": "{{count}} results for \"{{q}}\"",
     "interpretation": {
       "alias": "Showing results for \"{{expansion}}\" ({{token}})"
     },
@@ -684,11 +690,13 @@
     "modeFullText": "Text",
     "modeSemantic": "Semantic",
     "modeHybrid": "Hybrid",
-    "hybridHeading": "{{n}} results combining text and meaning",
+    "hybridHeading_one": "{{count}} result combining text and meaning",
+    "hybridHeading_other": "{{count}} results combining text and meaning",
     "sourceFullText": "Text",
     "sourceSemantic": "Meaning",
     "semanticEmptyQuery": "Type a natural-language question to find articles related by meaning.",
-    "semanticHeading": "{{n}} articles related by meaning",
+    "semanticHeading_one": "{{count}} article related by meaning",
+    "semanticHeading_other": "{{count}} articles related by meaning",
     "semanticEmpty": {
       "title": "No similar articles found",
       "description": "Try a more specific question or switch to text search."
@@ -725,7 +733,7 @@
     "diagnostics": {
       "subtitle": "Live process state: memory, disk, corpus, chat DB. Auto-refreshes every 30 s.",
       "error": "Couldn't load process state.",
-      "uptime": "Up for {{seconds}} s",
+      "uptime": "Up for {{duration}}",
       "status": {
         "ok": "Healthy",
         "degraded": "Attention"
@@ -752,7 +760,7 @@
       "title": "Privacy",
       "subtitle": "LexFlow can log anonymous usage (page views, palette commands, errors) to a local file — never sent to a remote server. Off by default: there are two gates and both must be ON for anything to be recorded.",
       "toggleLabel": "Usage telemetry",
-      "toggleHint": "Your consent lives in this browser. If the backend operator hasn't enabled persistence, this toggle is informational only — events won't be written even when ON.",
+      "toggleHint": "Your consent lives in this browser. If whoever administers this installation hasn't enabled persistence, this toggle is informational only — events won't be written even when ON.",
       "enable": "Enable",
       "disable": "Disable",
       "userGate": "You",
@@ -764,7 +772,7 @@
       "whatWeCollectBody": "Pages you visit inside the app, commands you fire from the palette, and unhandled errors. Never the content of your searches, laws, or chat conversations. The log is a daily JSONL file on your local disk; inspect or delete it any time.",
       "toast": {
         "optedInTitle": "Telemetry enabled",
-        "optedInBody": "Anonymous usage will be recorded from now on (when the operator allows it too).",
+        "optedInBody": "Anonymous usage will be recorded from now on (when whoever administers this installation allows it too).",
         "optedOutTitle": "Telemetry disabled",
         "optedOutBody": "We'll stop recording usage from this browser."
       }
@@ -879,7 +887,8 @@
       "title": "Data",
       "subtitlePre": "The corpus syncs from the repository",
       "subtitlePost": ". It keeps the original Markdown files.",
-      "lastSync": "Last sync {{ago}} · {{behind}} commits pending",
+      "lastSync_one": "Last sync {{ago}} · {{count}} pending change",
+      "lastSync_other": "Last sync {{ago}} · {{count}} pending changes",
       "syncNow": "Sync now"
     },
     "help": {
@@ -930,7 +939,7 @@
     "cols": {
       "law": "Law",
       "status": "Status",
-      "rango": "Type",
+      "rango": "Legal rank",
       "published": "Published",
       "articles": "Arts.",
       "refs": "Refs."
@@ -953,7 +962,11 @@
     },
     "tagsHintPre": "Click to toggle · type",
     "tagsHintToken": "#tag",
-    "tagsHintPost": "in the search box"
+    "tagsHintPost": "in the search box",
+    "year": {
+      "fromAria": "Year — from",
+      "toAria": "Year — to"
+    }
   },
   "home": {
     "searchPlaceholder": "Ask or search any law…",
@@ -961,7 +974,8 @@
     "syncPrefix": "The corpus is up to date. Last sync with",
     "sync": {
       "upToDate": "The corpus is up to date. Last sync with",
-      "behind": "{{behind}} pending commits with {{upstream}} · last sync {{ago}}",
+      "behind_one": "{{count}} pending change with {{upstream}} · last sync {{ago}}",
+      "behind_other": "{{count}} pending changes with {{upstream}} · last sync {{ago}}",
       "unknown": "Sync status unknown"
     },
     "whatChanged": "What changed",
@@ -1005,6 +1019,7 @@
     "notFoundDescription": "Check the URL or go back home.",
     "home": "Home",
     "somethingWrong": "Something went wrong",
+    "showDetails": "Show technical details",
     "retry": "Retry",
     "reportBug": "Report bug",
     "chunkLoadTitle": "New version available",
@@ -1080,6 +1095,8 @@
     "relatedLaws": {
       "title": "Related laws",
       "empty": "No related laws yet.",
+      "emptyHint": "Open the global graph to discover connections between laws.",
+      "openGraph": "Open global graph",
       "inferred": "inferred",
       "subtitle": "from automatically detected references"
     }
@@ -1103,7 +1120,8 @@
     "noResults": "No results for \"{{query}}\".",
     "footerNavigate": "navigate",
     "footerOpen": "open",
-    "resultCount": "{{count}} results",
+    "resultCount_one": "{{count}} result",
+    "resultCount_other": "{{count}} results",
     "viewAllResults": "View all results",
     "groups": {
       "tags": "Tags",

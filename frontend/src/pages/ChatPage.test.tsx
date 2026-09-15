@@ -190,7 +190,7 @@ describe('ChatPage sources cited header', () => {
       ],
     });
     renderChatAt('/chat/t1');
-    expect(screen.getByText(/1 fuentes citadas|1 cited sources/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 fuente citada|1 cited source/i)).toBeInTheDocument();
   });
 
   it('hides the sources cited count while streaming sources before persistence', () => {

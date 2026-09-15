@@ -87,7 +87,7 @@ export function HomePage() {
                 t('home.sync.unknown')
               ) : sync.behind > 0 ? (
                 t('home.sync.behind', {
-                  behind: sync.behind,
+                  count: sync.behind,
                   upstream: sync.upstream,
                   ago: timeAgo(sync.lastSyncAt),
                 })

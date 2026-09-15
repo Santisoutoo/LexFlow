@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from 'vitest';
 import i18n from '@/i18n';
-import { cn, formatDate, formatNumber, groupBy, statusLabel } from './utils';
+import { cn, formatDate, formatDuration, formatNumber, groupBy, statusLabel } from './utils';
 
 describe('cn (Tailwind class merger)', () => {
   it('concatenates string + array + object inputs', () => {
@@ -61,6 +61,24 @@ describe('formatNumber', () => {
 
   it('returns zero verbatim', () => {
     expect(formatNumber(0)).toBe('0');
+  });
+});
+
+describe('formatDuration', () => {
+  it('formats seconds into minute buckets in es-ES', async () => {
+    await i18n.changeLanguage('es');
+    expect(formatDuration(90)).toMatch(/minuto/i);
+  });
+
+  it('formats long uptime into day buckets in es-ES', async () => {
+    await i18n.changeLanguage('es');
+    expect(formatDuration(172_800)).toMatch(/d[ií]a/i);
+  });
+
+  it('formats hour buckets in en-GB when language is en', async () => {
+    await i18n.changeLanguage('en');
+    expect(formatDuration(7200)).toMatch(/hour/i);
+    await i18n.changeLanguage('es');
   });
 });
 

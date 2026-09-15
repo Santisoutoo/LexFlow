@@ -50,7 +50,7 @@ class ErrorBoundaryInner extends Component<Props, State> {
     if (error) {
       const { t } = this.props;
       const chunkError = isChunkLoadError(error);
-      const title = chunkError ? t('errors.chunkLoadTitle') : t('errors.renderErrorTitle');
+      const title = chunkError ? t('errors.chunkLoadTitle') : t('errors.somethingWrong');
       const description = chunkError
         ? t('errors.chunkLoadDescription')
         : t('errors.renderErrorDescription');
@@ -63,10 +63,13 @@ class ErrorBoundaryInner extends Component<Props, State> {
               <span className="text-base font-semibold">{title}</span>
             </div>
             <p className="mt-3 text-[13.5px] leading-relaxed text-muted">{description}</p>
-            {!chunkError && (
-              <pre className="mt-3 max-h-40 overflow-auto rounded-md border border-border bg-bg p-2 font-mono text-[11.5px] text-fg">
-                {error.message}
-              </pre>
+            {!chunkError && error.message && (
+              <details className="mt-3 text-left">
+                <summary className="cursor-pointer text-[12px] text-muted">{t('errors.showDetails')}</summary>
+                <pre className="mt-1 max-h-40 overflow-auto rounded-md border border-border bg-bg p-2 font-mono text-[11.5px] text-fg">
+                  {error.message}
+                </pre>
+              </details>
             )}
             <div className="mt-4 flex gap-2">
               {!chunkError && (

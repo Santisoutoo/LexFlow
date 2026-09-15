@@ -23,7 +23,8 @@
  */
 import { Network } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Badge, Chip } from '@/components/ui';
+import { useNavigate } from 'react-router-dom';
+import { Badge, Button, Chip } from '@/components/ui';
 import type { GraphData } from '@/lib/types';
 import { EDGE_KIND_LABELS } from '@/lib/graph-colors';
 import { resolveRelatedLawNeighbours } from './graph/neighbour-utils';
@@ -46,6 +47,7 @@ interface RelatedLawsProps {
  */
 export function RelatedLaws({ graph, currentLawId, onNavigate }: RelatedLawsProps) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   if (!graph) return null;
 
   const related = resolveRelatedLawNeighbours(graph, currentLawId);
@@ -59,6 +61,15 @@ export function RelatedLaws({ graph, currentLawId, onNavigate }: RelatedLawsProp
           {t('graph.relatedLaws.title')}
         </div>
         <p className="text-[12.5px] text-muted">{t('graph.relatedLaws.empty')}</p>
+        <p className="mt-1 text-[11.5px] text-muted">{t('graph.relatedLaws.emptyHint')}</p>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="mt-2"
+          onClick={() => navigate('/graph')}
+        >
+          {t('graph.relatedLaws.openGraph')}
+        </Button>
       </div>
     );
   }

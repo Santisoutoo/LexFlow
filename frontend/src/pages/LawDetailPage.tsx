@@ -16,7 +16,6 @@ import { RightRail } from '@/components/shell/RightRail';
 import { useAddUserTag, useGraph, useLaw, useRemoveUserTag, useUserTags, useVersions } from '@/lib/queries';
 import { useUi } from '@/lib/store';
 import { formatDate, cn, groupBy } from '@/lib/utils';
-import { errorMessage } from '@/lib/errors';
 import {
   buildReadingItems,
   flattenToc,
@@ -127,7 +126,7 @@ export function LawDetailPage() {
     return out;
   }, [articles, disposiciones]);
 
-  if (error) return <div className="p-10"><ErrorState description={errorMessage(error, t)} onRetry={() => refetch()} /></div>;
+  if (error) return <div className="p-10"><ErrorState error={error} onRetry={() => refetch()} /></div>;
   if (!law || isLoading) return <LoadingSkeleton />;
 
   return (
@@ -262,7 +261,7 @@ function LawDetailRefsTab({ refs, onRefClick }: { refs: ArticleRef[]; onRefClick
   const grouped = groupBy(refs, (ref) => ref.sourceArticle ?? '—');
   return (
     <div className="flex-1 overflow-auto p-6 md:p-8 scrollbar-thin">
-      <div className="mb-3 label-caps">{t('lawDetail.refsHeading', { n: refs.length })}</div>
+      <div className="mb-3 label-caps">{t('lawDetail.refsHeading', { count: refs.length })}</div>
       <div className="flex flex-col gap-5">
         {Object.entries(grouped).map(([source, group]) => (
           <section key={source}>
@@ -320,7 +319,7 @@ function LawDetailGraphTab({
   if (error) {
     return (
       <div className="flex-1 overflow-auto p-12 text-center text-muted">
-        <ErrorState description={errorMessage(error, t)} />
+        <ErrorState error={error} />
       </div>
     );
   }

@@ -16,7 +16,7 @@ export function VersionTimeline({ versions, current, onSelect, className }: Vers
     <div className={cn('rounded-lg border border-border bg-surface px-6 py-5', className)}>
       <div className="mb-3 flex items-center justify-between">
         <span className="label-caps">{t('lawHeader.versionTimeline.title')}</span>
-        <span className="font-mono text-[11px] text-muted">{t('lawHeader.versionTimeline.count', { n: versions.length })}</span>
+        <span className="font-mono text-[11px] text-muted">{t('lawHeader.versionTimeline.count', { count: versions.length })}</span>
       </div>
       <div className="relative pb-7 pt-5">
         <div className="absolute inset-x-0 top-[36px] h-px bg-border-strong" />
