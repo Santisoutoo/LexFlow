@@ -245,7 +245,6 @@
     "addUserTagPlaceholder": "new tag",
     "removeUserTag": "Remove \"{{label}}\"",
     "viewOnBoe": "View on BOE",
-    "version": "Version",
     "versionTimeline": {
       "title": "History",
       "count": "{{n}} versions"
@@ -616,7 +615,8 @@
     "changesByVersion": "Changes by version",
     "compareVersions": "Compare versions",
     "viewChanges": "View changes →",
-    "tabPending": "{{tab}} tab — available in the backend.",
+    "versionCurrent": "Current",
+    "tabPending": "{{tab}} — coming soon",
     "openGlobalGraph": "Open global graph",
     "citationSelected": "Selected citation",
     "lawInfo": "Law information",
@@ -1153,7 +1153,7 @@
     "backendDown": "Could not reach the server. Retrying…",
     "timeoutHelp": "Startup is taking longer than usual. Check that the backend is running or restart the app.",
     "stages": {
-      "metadata": "Indexing laws…",
+      "metadata": "Indexing the corpus…",
       "search": "Building search index…",
       "graph": "Loading reference graph…",
       "graphOptional": "Optional — the app can open without the graph"

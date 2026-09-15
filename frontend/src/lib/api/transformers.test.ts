@@ -14,8 +14,10 @@
 
 import { describe, expect, it } from 'vitest';
 import type { BackendLawDiff, BackendLawDetail, BackendLawSummary, BackendLawVersion, BackendReference } from '../../api';
+import { statusLabel } from '../utils';
 import {
   listLawsQuery,
+  mapLawStatus,
   transformArticle,
   transformDiff,
   transformLaw,
@@ -106,6 +108,9 @@ describe('transformLaw', () => {
     expect(rangoFor('real_decreto_ley')).toBe('Real Decreto-ley');
     expect(rangoFor('real_decreto')).toBe('Real Decreto');
     expect(rangoFor('real_decreto_ley')).not.toBe(rangoFor('real_decreto'));
+    expect(rangoFor('decreto_legislativo')).toBe('RD Legislativo');
+    expect(rangoFor('real_decreto_legislativo')).toBe('RD Legislativo');
+    expect(rangoFor('decreto_legislativo')).not.toBe(rangoFor('real_decreto'));
     expect(rangoFor('ley_foral')).toBe('Ley Foral');
     expect(rangoFor('constitucion')).toBe('Norma constitucional');
   });
@@ -131,6 +136,18 @@ describe('transformLaw', () => {
     expect(law.short).toBe('BOE-A-2000-323');
   });
 
+  it('maps partially_repealed to modificada and labels it as partial repeal', () => {
+    const law = transformLaw({ ...lawSummary, status: 'partially_repealed' });
+    expect(law.status).toBe('modificada');
+    expect(statusLabel(law.status)).toBe('Derogada parcialmente');
+  });
+
+  it('maps pending to pendiente, not desconocido', () => {
+    const law = transformLaw({ ...lawSummary, status: 'pending' });
+    expect(law.status).toBe('pendiente');
+    expect(statusLabel(law.status)).toBe('Pendiente');
+  });
+
   it('passes through unknown enum values via the fallback', () => {
     // The wire type only declares the known enum members, but the runtime
     // transformer is defensive — assert that an out-of-band value coming
@@ -140,7 +157,9 @@ describe('transformLaw', () => {
       status: 'galaxy_brain' as BackendLawSummary['status'],
       rank: 'unknown' as BackendLawSummary['rank'],
     });
-    expect(law.status).toBe('pendiente');
+    expect(law.status).toBe('desconocido');
+    expect(mapLawStatus('galaxy_brain')).toBe('desconocido');
+    expect(statusLabel(law.status)).toBe('Desconocido');
     expect(law.rango).toBe('Otro');
   });
 

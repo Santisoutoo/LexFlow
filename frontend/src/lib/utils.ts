@@ -68,8 +68,9 @@ export const modKey = isMac ? '⌘' : 'Ctrl';
 export function statusLabel(status: string): string {
   return ({
     vigente: 'Vigente',
-    modificada: 'Modificada',
+    modificada: 'Derogada parcialmente',
     derogada: 'Derogada',
     pendiente: 'Pendiente',
+    desconocido: 'Desconocido',
   } as Record<string, string>)[status] || status;
 }

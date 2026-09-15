@@ -14,7 +14,7 @@
 import type { BackendSearchResponse, BackendSemanticSearchResponse } from '../../api';
 import type { ApiClient, HybridSearchResults, SearchFacets, SearchResults, SemanticSearchResults } from '../types';
 import { http, qs } from './http';
-import { RANK_MAP, STATUS_MAP } from './transformers';
+import { RANK_MAP, mapLawStatus } from './transformers';
 
 /**
  * Wire shape of ``GET /api/v1/laws/search/hybrid`` (#43). Kept local —
@@ -52,7 +52,7 @@ export const liveSearchApi: ApiClient['search'] = {
       title: h.law_title,
       snippet: h.snippet,
       articleNumber: h.article_number ?? undefined,
-      status: h.status ? STATUS_MAP[h.status] : undefined,
+      status: h.status ? mapLawStatus(h.status) : undefined,
       rango: h.rank ? RANK_MAP[h.rank] : undefined,
       publicada: h.publication_date ?? undefined,
       articleTitle: h.article_title ?? undefined,

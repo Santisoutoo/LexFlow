@@ -89,6 +89,45 @@ describe('SearchResultsPage', () => {
     expect(screen.getByTestId('law-detail')).toBeInTheDocument();
   });
 
+  it('labels full-text law hits with Spanish kind, not the raw enum', () => {
+    useSearchMock.mockReturnValue(idleQuery<SearchResults>({
+      hits: [{
+        kind: 'law',
+        id: 'BOE-A-1',
+        title: 'Norma de prueba',
+        status: 'vigente',
+        rango: 'Ley Orgánica',
+        publicada: '2020-01-01',
+        snippet: 'texto',
+        payload: { lawId: 'BOE-A-1' },
+      }],
+      total: 1,
+    }));
+    renderSearch('/search?q=prueba&mode=fulltext');
+    expect(screen.queryByText(/^law$/)).toBeNull();
+    expect(screen.queryByText(/^article$/)).toBeNull();
+    expect(screen.getByLabelText('Ley')).toBeInTheDocument();
+  });
+
+  it('labels full-text article hits with Artículo, not the raw enum', () => {
+    useSearchMock.mockReturnValue(idleQuery<SearchResults>({
+      hits: [{
+        kind: 'article',
+        id: 'BOE-A-1::14',
+        title: 'Norma de prueba',
+        articleTitle: 'Igualdad',
+        articleNumber: '14',
+        status: 'vigente',
+        snippet: 'texto',
+        payload: { lawId: 'BOE-A-1', articleNum: '14' },
+      }],
+      total: 1,
+    }));
+    renderSearch('/search?q=prueba&mode=fulltext');
+    expect(screen.queryByText(/^article$/)).toBeNull();
+    expect(screen.getByLabelText('Artículo')).toBeInTheDocument();
+  });
+
   it('shows a settings callout when semantic mode is inactive', () => {
     useSemanticStatusMock.mockReturnValue({
       data: { active: false, installed: false, backend: 'hash', model: 'x' } satisfies SemanticStatus,

@@ -46,4 +46,13 @@ describe('i18n locale parity', () => {
   it('has identical key sets across locales', () => {
     expect(enKeys).toEqual(esKeys);
   });
+
+  it('uses honest pending / splash / dashboard wording', () => {
+    expect(es.lawDetail.tabPending).toBe('{{tab}} — próximamente');
+    expect(en.lawDetail.tabPending).toBe('{{tab}} — coming soon');
+    expect(es.splash.stages.metadata).toBe('Indexando el corpus…');
+    expect(es.dashboards.tabs.compliance).toBe('Cumplimiento');
+    expect(es.lawDetail.versionCurrent).toBe('Actual');
+    expect(en.lawDetail.versionCurrent).toBe('Current');
+  });
 });

@@ -81,6 +81,19 @@ export const STATUS_MAP: Record<string, LawStatus> = {
   pending: 'pendiente',
 };
 
+/**
+ * Map a backend LawStatus wire value to the SPA slug.
+ *
+ * Known keys (including `pending` → `pendiente`) go through `STATUS_MAP`.
+ * Anything else is `desconocido` — never a silent `pendiente` fallback,
+ * which would claim a law is awaiting entry into force.
+ */
+export function mapLawStatus(raw: string): LawStatus {
+  const mapped = STATUS_MAP[raw];
+  if (mapped !== undefined) return mapped;
+  return 'desconocido';
+}
+
 export const SCOPE_MAP: Record<string, Ambito> = {
   Estatal: 'Estatal',
   Autonómico: 'Autonómica',
@@ -145,7 +158,7 @@ export function transformLaw(raw: BackendLawSummary): Law {
     boe: raw.identifier,
     title: raw.title,
     short: buildShortName(raw),
-    status: STATUS_MAP[raw.status] ?? 'pendiente',
+    status: mapLawStatus(raw.status),
     rango: RANK_MAP[raw.rank] ?? 'Otro',
     publicada: raw.publication_date ?? '',
     ambito: SCOPE_MAP[raw.scope] ?? 'Estatal',
@@ -172,7 +185,7 @@ export function transformLawDetail(raw: BackendLawDetail): LawDetail {
     boe: m.identifier,
     title: m.title,
     short: buildShortName(m),
-    status: STATUS_MAP[m.status] ?? 'pendiente',
+    status: mapLawStatus(m.status),
     rango: RANK_MAP[m.rank] ?? 'Otro',
     publicada: m.publication_date ?? '',
     ambito: SCOPE_MAP[m.scope] ?? 'Estatal',
