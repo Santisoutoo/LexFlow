@@ -101,6 +101,22 @@ LexFlow/
 
 When CI fails on `main`, fix the failure — never bypass with `enforce_admins`.
 
+### 4.1 Backport a upstream (VforVitorio/LexFlow)
+
+Este repo es un **fork** de `VforVitorio/LexFlow` (el "repo principal"). El agent-loop autónomo resuelve issues y genera commits con autoría bot (`lexflow-agent`, trailers `Co-authored-by: Cursor`) directamente en `main` de este fork — esos commits **no deben llegar a upstream tal cual**. La infraestructura de agentes (`.github/agent/**`, `.github/workflows/{agent-loop,external-pr-review,orca-supervisor}.yml`, `docs/agent-loop/**`, y los fragmentos de este `CLAUDE.md`/`README.md`/`scripts/setup-github.sh` específicos del agent-loop) es exclusiva de este fork y **nunca** se backportea.
+
+El resto del código de producto (`src/`, `frontend/`, `tests/`, `docs/` salvo `docs/agent-loop/`) sí es candidato a subir. Proceso:
+
+1. **Detectar candidatos** — correr `scripts/check-upstream-backport.sh` (añade el remote `upstream` si falta, hace `git fetch upstream`, y compara `upstream/main..origin/main`). Solo cuentan como candidatos los commits cuyos archivos tocados **difieren** en su estado actual entre `upstream/main` y `origin/main` — que un commit no sea ancestro de `upstream/main` no basta, la mayoría de los fixes del fork ya viajaron a upstream bajo otro hash/mensaje vía este mismo proceso.
+2. **Rama de staging** desde `upstream/main`: `git fetch upstream && git checkout -b backport/<tema> upstream/main`.
+3. **Cherry-pick** los commits candidatos, en orden topológico (`git rev-list --reverse --topo-order`).
+4. **Reautoría**: `git rebase upstream/main --exec 'git commit --amend --reset-author --no-edit'` para reemplazar el autor bot por la identidad real de Santi, y quitar del cuerpo cualquier trailer `Co-authored-by: Cursor <...>` / `Co-Authored-By: Claude ... / Claude-Session: ...` — misma regla de "sin atribución de IA" que ya rige para todos los commits/PRs de Santi, aplicada también cross-repo.
+5. **Remap de issue refs**: si el fix referencia una issue del fork en comentarios/docstrings (p. ej. `#54`), y hace falta una issue equivalente en upstream, crearla con `gh issue create --repo VforVitorio/LexFlow` y añadir un commit final `chore: remap fork issue references to upstream (#NNN)` que sustituye esas referencias — reemplazo dirigido, nunca un sed global del repo.
+6. **Conflictos**: si `upstream/main` avanzó en el mismo archivo desde la divergencia, resolver a mano; `frontend/src/api/schema.ts` en concreto **nunca se mergea a mano** — se regenera con `pnpm generate:api` contra un backend corriendo (ver §6).
+7. **Verificación completa antes de push** (suite entera, no solo el test nuevo — lección §11 2026-06-09/2026-07-05): `uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy src/lexflow/`; si toca frontend, `npx vitest run` + `pnpm typecheck` + `pnpm build` completos.
+8. **PR a `upstream main`** (no `dev` — el `CONTRIBUTING.md` de upstream menciona `dev` pero esa rama ya no existe allí) con `gh pr create --repo VforVitorio/LexFlow --base main`, revisando el cuerpo completo para que no lleve trailers de atribución IA ni URL de sesión.
+9. Tras el merge, la rama de staging local queda obsoleta y se puede borrar (`git branch -D backport/<tema>`); el `main` de este fork no necesita el remap, solo importa para upstream.
+
 ---
 
 ## 5. Commands
