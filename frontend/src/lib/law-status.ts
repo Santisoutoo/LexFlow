@@ -6,5 +6,6 @@ type BadgeTone = 'neutral' | 'primary' | 'amber' | 'success' | 'danger' | 'info'
 export function lawStatusTone(status: LawStatus): BadgeTone {
   if (status === 'vigente') return 'success';
   if (status === 'derogada') return 'danger';
+  if (status === 'desconocido') return 'neutral';
   return 'amber';
 }

@@ -6,7 +6,7 @@
  */
 import { useTranslation } from 'react-i18next';
 
-import { RANK_MAP, STATUS_MAP } from '@/lib/api/transformers';
+import { RANK_MAP, mapLawStatus } from '@/lib/api/transformers';
 import { useLaw } from '@/lib/queries';
 import type { GraphNode } from '@/lib/types';
 import { statusLabel } from '@/lib/utils';
@@ -37,7 +37,7 @@ export function GraphNodeRail({ node, selectedId }: GraphNodeRailProps) {
   }
 
   if (node.kind === 'repealed') {
-    const status = statusLabel(STATUS_MAP[String(node.meta?.status ?? '')] ?? 'pendiente');
+    const status = statusLabel(mapLawStatus(String(node.meta?.status ?? '')));
     return (
       <dl className="mt-1.5 space-y-1 text-[13px]">
         <RailRow label={t('graph.rail.status')} value={status} />
@@ -46,7 +46,7 @@ export function GraphNodeRail({ node, selectedId }: GraphNodeRailProps) {
   }
 
   const rank = law?.rango ?? RANK_MAP[String(node.meta?.rank ?? '')] ?? 'Otro';
-  const status = statusLabel(law?.status ?? STATUS_MAP[String(node.meta?.status ?? '')] ?? 'pendiente');
+  const status = statusLabel(law?.status ?? mapLawStatus(String(node.meta?.status ?? '')));
   const articles = law ? String(law.articulos) : '—';
   const references = law ? String(law.referencias) : '—';
   const pagerank =

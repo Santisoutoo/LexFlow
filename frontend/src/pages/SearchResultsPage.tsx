@@ -30,6 +30,7 @@ import {
 import { parseSearchInput, parseSearchMode, type SearchMode } from '@/lib/search-query';
 import type { HighlightRange } from '@/components/domain/HighlightedSnippet';
 import type { HybridSearchHit, SearchHit, SemanticSearchHit } from '@/lib/types';
+import { NODE_KIND_LABELS } from '@/lib/graph-colors';
 import { formatDate, statusLabel } from '@/lib/utils';
 
 const MIN_QUERY_LENGTH = 2;
@@ -263,7 +264,7 @@ function FullTextRow({ hit }: { hit: SearchHit }) {
     <HitRow
       href={href}
       onOpen={() => navigate(href)}
-      icon={articleNum ? 'article' : 'law'}
+      icon={hit.kind === 'article' ? 'article' : 'law'}
       heading={heading}
       lawTitle={hit.articleTitle != null ? hit.title : undefined}
       articleNum={articleNum}
@@ -361,8 +362,11 @@ function HitRow({
       onKeyDown={(e) => e.key === 'Enter' && onOpen()}
       className="group flex cursor-pointer items-start gap-3.5 px-8 py-4 transition-colors hover:bg-surface-2/50"
     >
-      <span className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-primary-soft text-indigo-700 dark:text-indigo-200">
-        {icon === 'article' ? <FileText className="size-3.5" /> : <BookOpenText className="size-3.5" />}
+      <span
+        className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-primary-soft text-indigo-700 dark:text-indigo-200"
+        aria-label={NODE_KIND_LABELS[icon]}
+      >
+        {icon === 'article' ? <FileText className="size-3.5" aria-hidden /> : <BookOpenText className="size-3.5" aria-hidden />}
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">

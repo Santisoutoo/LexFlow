@@ -245,7 +245,6 @@
     "addUserTagPlaceholder": "nueva etiqueta",
     "removeUserTag": "Quitar \"{{label}}\"",
     "viewOnBoe": "Ver en BOE",
-    "version": "Versión",
     "versionTimeline": {
       "title": "Historial",
       "count": "{{n}} versiones"
@@ -616,7 +615,8 @@
     "changesByVersion": "Cambios por versión",
     "compareVersions": "Comparar versiones",
     "viewChanges": "Ver cambios →",
-    "tabPending": "Pestaña {{tab}} — disponible en el backend.",
+    "versionCurrent": "Actual",
+    "tabPending": "{{tab}} — próximamente",
     "openGlobalGraph": "Abrir grafo global",
     "citationSelected": "Cita seleccionada",
     "lawInfo": "Información de la norma",
@@ -1090,7 +1090,7 @@
     "chartSubtitleRange": "{{range}} · acumulado",
     "exportCsv": "CSV",
     "tabs": {
-      "compliance": "Compliance",
+      "compliance": "Cumplimiento",
       "analytics": "Analítica"
     }
   },
@@ -1153,7 +1153,7 @@
     "backendDown": "No se pudo conectar con el servidor. Seguimos reintentando…",
     "timeoutHelp": "La preparación está tardando más de lo habitual. Comprueba que el backend esté en marcha o reinicia la aplicación.",
     "stages": {
-      "metadata": "Indexando leyes…",
+      "metadata": "Indexando el corpus…",
       "search": "Construyendo índice de búsqueda…",
       "graph": "Cargando grafo de referencias…",
       "graphOptional": "Opcional — la app puede abrirse sin el grafo"

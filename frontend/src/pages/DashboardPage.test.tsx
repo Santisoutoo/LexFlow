@@ -68,6 +68,7 @@ describe('DashboardPage chart subtitle', () => {
   it('keeps preset tabs working', async () => {
     useDashboardMock.mockReturnValue({ data: makeDashboard(['2020']), isLoading: false });
     renderDashboard();
+    expect(screen.getByRole('button', { name: /cumplimiento|compliance/i })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /analítica|analytics/i }));
     expect(useDashboardMock).toHaveBeenCalledWith('analytics');
   });

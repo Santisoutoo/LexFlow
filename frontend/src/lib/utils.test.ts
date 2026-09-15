@@ -84,11 +84,12 @@ describe('groupBy', () => {
 });
 
 describe('statusLabel', () => {
-  it('localises the four known states', () => {
+  it('localises the known states', () => {
     expect(statusLabel('vigente')).toBe('Vigente');
-    expect(statusLabel('modificada')).toBe('Modificada');
+    expect(statusLabel('modificada')).toBe('Derogada parcialmente');
     expect(statusLabel('derogada')).toBe('Derogada');
     expect(statusLabel('pendiente')).toBe('Pendiente');
+    expect(statusLabel('desconocido')).toBe('Desconocido');
   });
 
   it('passes unknown values through unchanged', () => {

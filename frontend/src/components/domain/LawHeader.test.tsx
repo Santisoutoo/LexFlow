@@ -62,4 +62,10 @@ describe('LawHeader', () => {
     renderHeader(baseLaw);
     expect(screen.getByText('Última modificación').nextElementSibling?.textContent).toBe('—');
   });
+
+  it('shows a single status badge and does not label it as Versión', () => {
+    renderHeader({ ...baseLaw, status: 'derogada' });
+    expect(screen.getAllByText('Derogada')).toHaveLength(1);
+    expect(screen.queryByText('Versión')).toBeNull();
+  });
 });

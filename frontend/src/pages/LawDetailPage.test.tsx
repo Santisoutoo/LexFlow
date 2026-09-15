@@ -2,7 +2,7 @@
  * Tests for LawDetailPage texto tab — deep links and empty state (#32).
  */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useNavigate, useSearchParams } from 'react-router-dom';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
@@ -219,7 +219,7 @@ describe('LawDetailPage', () => {
     expect(screen.queryByText(/v1\.0.*v1\.3/i)).toBeNull();
   });
 
-  it('shows law status (not hardcoded vigente) on the newest version row', async () => {
+  it('shows Actual (not law status) on the newest version row', async () => {
     mockLawData = { ...mockLawData, status: 'derogada' };
     mockVersions = [
       { tag: 'bbbbbbb', date: '2024-06-01', label: 'Newest', kind: 'amend' },
@@ -228,6 +228,10 @@ describe('LawDetailPage', () => {
 
     renderPage('/laws/CE-1978');
     await userEvent.click(screen.getByRole('tab', { name: /versiones/i }));
+    const newestRow = screen.getByText('bbbbbbb').closest('div.rounded-xl');
+    expect(newestRow).not.toBeNull();
+    expect(within(newestRow as HTMLElement).getByText(/Actual|Current/)).toBeInTheDocument();
+    expect(within(newestRow as HTMLElement).queryByText('Derogada')).toBeNull();
     expect(screen.queryByText(/^vigente$/i)).toBeNull();
     expect(screen.getAllByText('Derogada').length).toBeGreaterThanOrEqual(1);
   });

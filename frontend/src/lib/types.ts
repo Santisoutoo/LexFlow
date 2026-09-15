@@ -8,7 +8,7 @@
 
 // ─── Laws ────────────────────────────────────────────────────────────────
 
-export type LawStatus = 'vigente' | 'modificada' | 'derogada' | 'pendiente';
+export type LawStatus = 'vigente' | 'modificada' | 'derogada' | 'pendiente' | 'desconocido';
 
 export type RangoNormativo =
   | 'Norma constitucional'

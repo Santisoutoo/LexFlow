@@ -68,17 +68,6 @@ export function LawHeader({
         <Stat label={t('lawHeader.stats.versions')} value={String(versionsCount ?? law.versiones)} />
         <Stat label={t('lawHeader.stats.references')} value={String(law.referencias)} />
         <Stat label={t('lawHeader.stats.lastModified')} value={law.ultimaModificacion ? formatDate(law.ultimaModificacion) : '—'} />
-        <span className="ml-auto inline-flex items-center gap-2">
-          <span className="label-caps">{t('lawHeader.version')}</span>
-          {/* Audit #409 — the button used to read "v1.3 (vigente)" for
-              every law. We don't have a version-picker dropdown wired yet
-              (would need ``useVersions(lawId)`` + a real popover).
-              Deslop sprint #798: dropped the chevron + `<Button>` shell
-              too — a chevron on an inert element still reads as a picker
-              affordance that doesn't exist. A plain badge just states
-              the real status. */}
-          <LawStatusBadge status={law.status} />
-        </span>
       </div>
 
       {law.tags && law.tags.length > 0 && (
