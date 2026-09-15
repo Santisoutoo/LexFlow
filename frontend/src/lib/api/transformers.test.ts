@@ -239,14 +239,14 @@ describe('parseUnifiedDiffLines (via transformDiff)', () => {
     expect(result.to.tag).toBe('bbbbbbb');
   });
 
-  it('falls back to a single Diff completo article when no headings are present', () => {
+  it('falls back to a single Comparación completa article when no headings are present', () => {
     const result = transformDiff({
       ...baseDiff,
       diff_text: [' kept line', '-removed', '+added'].join('\n'),
     });
     expect(result.articles).toHaveLength(1);
     expect(result.articles[0].num).toBe('todo');
-    expect(result.articles[0].titulo).toBe('Diff completo');
+    expect(result.articles[0].titulo).toBe('Comparación completa');
   });
 
   it('segments a multi-article unified diff and keeps per-article totals', () => {

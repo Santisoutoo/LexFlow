@@ -20,7 +20,7 @@ describe('ModelChip', () => {
     render(<ModelChip />);
     await userEvent.click(screen.getByRole('button', { name: /qwen/i }));
     expect(screen.getByText(/cambia modelos en/i)).toBeInTheDocument();
-    expect(screen.getByText('Ajustes › Modelos')).toBeInTheDocument();
-    expect(screen.queryByText('Ajustes › Modelos')?.closest('kbd')).toBeNull();
+    expect(screen.getByText('Ajustes → Modelos')).toBeInTheDocument();
+    expect(screen.queryByText('Ajustes → Modelos')?.closest('kbd')).toBeNull();
   });
 });

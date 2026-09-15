@@ -4,7 +4,7 @@
     "explorer": "Explorador",
     "graph": "Grafo",
     "chat": "Chat",
-    "dashboards": "Cuadros",
+    "dashboards": "Cuadros de mando",
     "settings": "Ajustes",
     "editor": "Editor",
     "communities": "Comunidades autónomas",
@@ -19,17 +19,17 @@
   "communities": {
     "title": "Comunidades autónomas",
     "subtitle": "Explora la legislación por ámbito territorial: normativa estatal o de cada comunidad autónoma.",
-    "openFor": "Ver leyes de {{name}} en el Explorador",
+    "openFor": "Ver normas de {{name}} en el Explorador",
     "mapView": "Mapa",
     "listView": "Lista",
     "national": "Normativa estatal (todo el Estado)"
   },
   "shell": {
-    "searchPlaceholder": "Buscar leyes, artículos…",
+    "searchPlaceholder": "Buscar normas, artículos…",
     "toggleTheme": "Cambiar tema",
     "toggleRightPanel": "Alternar panel derecho",
     "breadcrumb": "Migas",
-    "diff": "Diff",
+    "diff": "Comparación",
     "skipToContent": "Saltar al contenido principal",
     "openCommandPalette": "Buscar (paleta de comandos)",
     "mockDataRibbon": "Datos de demostración",
@@ -77,12 +77,12 @@
     },
     "citationPicker": {
       "dialogAria": "Insertar cita legal",
-      "searchAria": "Buscar una ley o artículo para citar",
-      "searchPlaceholder": "Buscar una ley o artículo para citar…",
+      "searchAria": "Buscar una norma o artículo para citar",
+      "searchPlaceholder": "Buscar una norma o artículo para citar…",
       "resultsAria": "Resultados",
       "minChars": "Escribe al menos 2 caracteres para buscar en el corpus.",
       "searching": "Buscando…",
-      "noResults": "Sin resultados para \"{{query}}\".",
+      "noResults": "Sin resultados para «{{query}}».",
       "navigate": "navegar",
       "insert": "insertar cita",
       "resultCount": "{{count}} resultados"
@@ -109,13 +109,13 @@
       "backAria": "Volver a la lista",
       "back": "Volver",
       "subtitle": "Rellena las variables para generar el borrador",
-      "lawSection": "Datos de la ley",
-      "removeLawAria": "Quitar ley",
+      "lawSection": "Datos de la norma",
+      "removeLawAria": "Quitar norma",
       "removeLaw": "Quitar",
-      "lawSearchAria": "Buscar la ley con la que rellenar",
-      "lawSearchPlaceholder": "Buscar la ley con la que rellenar…",
+      "lawSearchAria": "Buscar la norma con la que rellenar",
+      "lawSearchPlaceholder": "Buscar la norma con la que rellenar…",
       "lawMinChars": "Escribe al menos 2 caracteres.",
-      "lawNoResults": "Sin leyes para esta búsqueda.",
+      "lawNoResults": "Sin normas para esta búsqueda.",
       "variablesSection": "Variables",
       "valueForAria": "Valor para {{name}}",
       "valueForPlaceholder": "Valor para {{name}}",
@@ -143,7 +143,7 @@
       "title": "Asistente de redacción",
       "closeAria": "Cerrar asistente",
       "close": "Cerrar",
-      "noModel": "Configura un modelo en Ajustes › Modelos para usar el asistente.",
+      "noModel": "Configura un modelo en Ajustes → Modelos para usar el asistente.",
       "selectionSection": "Acciones sobre la selección",
       "charsSelected": "{{count}} caracteres seleccionados",
       "selectTextHint": "Selecciona texto en el documento para mejorar, resumir o explicar.",
@@ -212,7 +212,6 @@
       "free-corpus-ready": "Tu corpus está al día",
       "free-ready-to-review": "Listo para revisar",
       "free-pick-a-thread": "Elige por dónde tirar del hilo",
-      "playful-welcome-back": "Bienvenido de vuelta, {{name}}",
       "playful-hello-again": "Hola de nuevo, {{name}}",
       "playful-good-to-see": "Qué bien verte, {{name}}",
       "playful-greeting-question": "{{name}}, ¿qué leemos hoy?",
@@ -231,7 +230,7 @@
     "cloud": "nube",
     "notConfigured": "sin configurar",
     "changeModelsPre": "Cambia modelos en",
-    "changeModelsPath": "Ajustes › Modelos"
+    "changeModelsPath": "Ajustes → Modelos"
   },
   "law": {
     "statusTooltip": "Estado según legalize-es · sync {{date}} · verificar en BOE"
@@ -241,9 +240,9 @@
     "disclaimerBody": "LexFlow es una herramienta de consulta; no constituye asesoramiento jurídico. Fuente: legalize-es (última sync {{syncAgo}}). Verifica siempre en <0>boe.es</0>"
   },
   "lawHeader": {
-    "addUserTag": "tag",
+    "addUserTag": "etiqueta",
     "addUserTagPlaceholder": "nueva etiqueta",
-    "removeUserTag": "Quitar \"{{label}}\"",
+    "removeUserTag": "Quitar «{{label}}»",
     "viewOnBoe": "Ver en BOE",
     "versionTimeline": {
       "title": "Historial",
@@ -260,8 +259,8 @@
     "title": "Novedades en el corpus",
     "added": "Añadidas",
     "modified": "Modificadas",
-    "removed_one": "{{count}} ley eliminada",
-    "removed_other": "{{count}} leyes eliminadas",
+    "removed_one": "{{count}} norma eliminada",
+    "removed_other": "{{count}} normas eliminadas",
     "andMore": "y {{n}} más…"
   },
   "welcome": {
@@ -269,7 +268,8 @@
     "nameSubtitle": "No hace falta cuenta — solo para tratarte por tu nombre en los saludos. Puedes saltarlo.",
     "namePlaceholder": "Tu nombre",
     "skip": "Saltar",
-    "continue": "Continuar"
+    "continue": "Continuar",
+    "ariaLabel": "Te damos la bienvenida"
   },
   "tutorial": {
     "nav": {
@@ -279,12 +279,12 @@
     },
     "steps": {
       "welcome": {
-        "title": "¡Bienvenido a LexFlow!",
-        "body": "Un recorrido de un minuto. Verás dónde están las piezas — explorador de leyes, búsqueda, grafo y chat. Pulsa Siguiente para empezar, o Esc en cualquier momento para salir."
+        "title": "Te damos la bienvenida a LexFlow",
+        "body": "Un recorrido de un minuto. Verás dónde están las piezas — explorador de normas, búsqueda, grafo y chat. Pulsa Siguiente para empezar, o Esc en cualquier momento para salir."
       },
       "nav": {
         "title": "Navegación principal",
-        "body": "Cada sección del producto vive aquí: Inicio, Explorador, Grafo, Chat, Cuadros. Cada una tiene un atajo de dos teclas (g + inicial). Por ejemplo: g c lleva al Chat."
+        "body": "Cada sección del producto vive aquí: Inicio, Explorador, Grafo, Chat, Cuadros de mando. Cada una tiene un atajo de dos teclas (g + inicial). Por ejemplo: g c lleva al Chat."
       },
       "secondary": {
         "title": "Editor, Comunidades autónomas y Ajustes",
@@ -292,15 +292,15 @@
       },
       "palette": {
         "title": "Paleta de comandos",
-        "body": "Ctrl K (⌘ K en Mac) abre la paleta universal: busca leyes, salta a una página, ejecuta acciones. Es el atajo más útil del producto."
+        "body": "Ctrl K (⌘ K en Mac) abre la paleta universal: busca normas, salta a una página, ejecuta acciones. Es el atajo más útil del producto."
       },
       "search": {
-        "title": "Buscar leyes y artículos",
+        "title": "Buscar normas y artículos",
         "body": "Escribe en la paleta y la búsqueda corre sobre toda la legislación indexada — títulos, artículos, BOE. Los resultados se abren directamente en el explorador."
       },
       "graph": {
         "title": "Grafo de referencias",
-        "body": "El Grafo conecta cada ley con las que la citan o modifica. Útil para entender el contexto de una norma: qué la cita, qué deroga, dónde se inserta. Atajo: g g."
+        "body": "El Grafo conecta cada norma con las que la citan o modifica. Útil para entender el contexto de una norma: qué la cita, qué deroga, dónde se inserta. Atajo: g g."
       },
       "chat": {
         "title": "Chat legal con tu modelo",
@@ -357,7 +357,7 @@
     "bundleWrongExt": "El archivo debe terminar en .mcpb",
     "notConnectedHint": "Añadido pero no conectado — activa para dar tu consentimiento y conectar.",
     "consentTitle": "¿Conectar este servidor MCP?",
-    "consentMessage": "Al activar \"{{name}}\" se ejecutará este comando como subproceso: {{command}}. Hazlo solo si confías en su origen.",
+    "consentMessage": "Al activar «{{name}}» se ejecutará este comando como subproceso: {{command}}. Hazlo solo si confías en su origen.",
     "consentConfirm": "Activar y conectar"
   },
   "wizard": {
@@ -434,7 +434,7 @@
     "telemetryShare": "Compartir métricas anónimas",
     "telemetryOptIn": "opt-in · desactivado por defecto",
     "telemetryNotSentTitle": "Qué no se envía",
-    "telemetryNotSentBody": "Nunca enviamos el texto de tus búsquedas ni el contenido de tus chats. Sólo: cuáles pantallas usas, cuántos artículos abres por sesión, y errores.",
+    "telemetryNotSentBody": "Nunca enviamos el texto de tus búsquedas ni el contenido de tus chats. Solo: qué pantallas usas, cuántos artículos abres por sesión, y errores.",
     "startUsing": "Empezar a usar LexFlow",
     "detectError": "No se pudo detectar tu equipo. Comprueba que el backend esté en marcha e inténtalo de nuevo.",
     "retryDetect": "Reintentar"
@@ -453,9 +453,9 @@
       "openPalette": "Abrir la paleta de comandos",
       "toggleSidebar": "Plegar / desplegar la barra lateral",
       "toggleTheme": "Cambiar tema claro / oscuro",
-      "explorerSearch": "Buscar por título, BOE o #tag",
+      "explorerSearch": "Buscar por título, BOE o #etiqueta",
       "focusSearch": "Foco en el input de búsqueda",
-      "lawGraph": "Saltar al grafo de esta ley",
+      "lawGraph": "Saltar al grafo de esta norma",
       "backToExplorer": "Volver al explorador",
       "zoomIn": "Acercar",
       "zoomOut": "Alejar",
@@ -467,27 +467,27 @@
     "pages": {
       "home": {
         "title": "Inicio",
-        "description": "Tu punto de partida. Resume las últimas leyes publicadas, los temas con más actividad y los grafos sugeridos. Usa la paleta (Ctrl K) para saltar a cualquier ley desde aquí."
+        "description": "Tu punto de partida. Resume las últimas normas publicadas, los temas con más actividad y los grafos sugeridos. Usa la paleta (Ctrl K) para saltar a cualquier norma desde aquí."
       },
       "explorer": {
         "title": "Explorador",
-        "description": "Lista completa de leyes con filtros por rango, estado, jurisdicción y etiquetas. Cada fila se abre en la vista de detalle; los filtros se combinan con AND."
+        "description": "Lista completa de normas con filtros por rango, estado, jurisdicción y etiquetas. Cada fila se abre en la vista de detalle; los filtros se combinan con AND."
       },
       "law": {
-        "title": "Detalle de la ley",
+        "title": "Detalle de la norma",
         "description": "Texto consolidado de la norma con anclas por artículo, jerarquía a la izquierda y referencias salientes a la derecha. Cambia el tamaño de lectura en Ajustes → Apariencia."
       },
       "graph": {
         "title": "Grafo de referencias",
-        "description": "Cada nodo es una ley; las aristas son referencias detectadas automáticamente. Arrastra para mover, rueda para zoom; el panel derecho fija la profundidad de exploración."
+        "description": "Cada nodo es una norma; las aristas son referencias detectadas automáticamente. Arrastra para mover, rueda para zoom; el panel derecho fija la profundidad de exploración."
       },
       "chat": {
         "title": "Chat legal",
-        "description": "Conversa con un modelo (local o en nube) con acceso al corpus de leyes. Las respuestas pueden incluir citas al corpus; cuando aparecen, son clickables y abren la ley en el panel lateral."
+        "description": "Conversa con un modelo (local o en nube) con acceso al corpus de normas. Las respuestas pueden incluir citas al corpus; cuando aparecen, son clickables y abren la norma en el panel lateral."
       },
       "dashboards": {
-        "title": "Cuadros",
-        "description": "Dashboards agregados sobre el corpus: distribución por rango, ritmo de reformas, jurisdicciones. Útiles para tener una panorámica antes de bucear en una ley concreta."
+        "title": "Cuadros de mando",
+        "description": "Cuadros de mando agregados sobre el corpus: distribución por rango, ritmo de reformas, jurisdicciones. Útiles para tener una panorámica antes de bucear en una norma concreta."
       },
       "settings": {
         "title": "Ajustes",
@@ -554,7 +554,7 @@
     "renameAria": "Renombrar {{title}}",
     "deleteAria": "Eliminar {{title}}",
     "renamePrompt": "Nuevo nombre de la conversación",
-    "deleteConfirm": "¿Eliminar la conversación \"{{title}}\"?",
+    "deleteConfirm": "¿Eliminar la conversación «{{title}}»?",
     "createFailed": "No se pudo crear la conversación",
     "renameFailed": "No se pudo renombrar",
     "deleteFailed": "No se pudo eliminar",
@@ -649,7 +649,7 @@
     }
   },
   "diff": {
-    "loading": "Cargando diff…",
+    "loading": "Cargando comparación…",
     "noChanges": "No hay artículos modificados en este rango de versiones.",
     "backTo": "Volver a {{law}}",
     "theLaw": "la norma",
@@ -657,13 +657,14 @@
     "inline": "En línea",
     "added": "añadidos",
     "removed": "eliminados",
-    "changedArticles": "Artículos modificados"
+    "changedArticles": "Artículos modificados",
+    "pageTitle": "Comparación · {{title}}"
   },
   "search": {
-    "placeholder": "Buscar leyes, artículos, conversaciones…",
+    "placeholder": "Buscar normas, artículos, conversaciones…",
     "indexing": "Indexando el corpus por primera vez. Los resultados aparecerán en breve…",
     "searching": "Buscando…",
-    "resultsFor": "{{n}} resultados para \"{{q}}\"",
+    "resultsFor": "{{n}} resultados para «{{q}}»",
     "interpretation": {
       "alias": "Mostrando resultados para «{{expansion}}» ({{token}})"
     },
@@ -672,13 +673,13 @@
       "description": "Prueba con menos palabras, revisa la ortografía o usa términos más generales. Los acentos son opcionales."
     },
     "groups": {
-      "law": "Leyes",
+      "law": "Normas",
       "article": "Artículos"
     },
     "seeAll": "Ver todo →",
     "title": "Búsqueda",
     "semanticUnavailable": "La búsqueda semántica no está activa. Actívala en Ajustes → Modelos.",
-    "basicModeNotice": "Modo básico — resultados aproximados; instala la búsqueda semántica en Ajustes › Modelos",
+    "basicModeNotice": "Modo básico — resultados aproximados; instala la búsqueda semántica en Ajustes → Modelos",
     "openSettings": "Abrir Ajustes",
     "modeFullText": "Texto",
     "modeSemantic": "Semántico",
@@ -738,8 +739,8 @@
       },
       "corpus": {
         "label": "Corpus",
-        "lawsIndexed_one": "{{count}} ley indexada",
-        "lawsIndexed_other": "{{count}} leyes indexadas"
+        "lawsIndexed_one": "{{count}} norma indexada",
+        "lawsIndexed_other": "{{count}} normas indexadas"
       },
       "chatDb": {
         "label": "Base de chats",
@@ -749,7 +750,7 @@
     },
     "privacy": {
       "title": "Privacidad",
-      "subtitle": "LexFlow puede registrar uso anónimo (páginas vistas, comandos del palette, errores) en un archivo local — nunca se envía a un servidor remoto. Apagado por defecto: hay dos interruptores y ambos tienen que estar en ON para que se registre algo.",
+      "subtitle": "LexFlow puede registrar uso anónimo (páginas vistas, comandos del palette, errores) en un archivo local — nunca se envía a un servidor remoto. Apagado por defecto: hay dos interruptores y ambos tienen que estar activados para que se registre algo.",
       "toggleLabel": "Telemetría de uso",
       "toggleHint": "Tu consentimiento se guarda en este navegador. Si el operador del backend no ha activado la persistencia, este interruptor queda informativo — los eventos no se guardarán igualmente.",
       "enable": "Activar",
@@ -757,10 +758,10 @@
       "userGate": "Tú",
       "backendGate": "Operador",
       "effective": "Efectivo",
-      "on": "ON",
-      "off": "OFF",
+      "on": "Activado",
+      "off": "Desactivado",
       "whatWeCollectTitle": "Qué se registra",
-      "whatWeCollectBody": "Páginas que visitas dentro de la app, comandos que usas en la paleta, y errores no controlados. Nunca el contenido de tus búsquedas, leyes, ni conversaciones del chat. El log es un fichero JSONL diario en tu disco local; lo puedes inspeccionar o borrar cuando quieras.",
+      "whatWeCollectBody": "Páginas que visitas dentro de la app, comandos que usas en la paleta, y errores no controlados. Nunca el contenido de tus búsquedas, normas, ni conversaciones del chat. El log es un fichero JSONL diario en tu disco local; lo puedes inspeccionar o borrar cuando quieras.",
       "toast": {
         "optedInTitle": "Telemetría activada",
         "optedInBody": "A partir de ahora se registrará el uso anónimo (si el operador también lo permite).",
@@ -784,13 +785,13 @@
         "nameClearedTitle": "Nombre borrado",
         "nameClearedBody": "Los saludos volverán a mostrarse sin tu nombre.",
         "nameFailedTitle": "No se pudo guardar",
-        "nameFailedBody": "localStorage no está disponible (modo privado?)."
+        "nameFailedBody": "localStorage no está disponible (¿modo privado?)."
       }
     },
     "models": {
       "title": "Modelos",
       "subtitle": "Configura los modelos disponibles para el chat. Los locales se ejecutan en tu máquina; los de nube hacen peticiones salientes.",
-      "relaunchWizard": "Volver a lanzar wizard",
+      "relaunchWizard": "Volver a lanzar el asistente",
       "defaultModel": "Modelo por defecto",
       "useAsDefault": "Usar por defecto",
       "useAsDefaultAria": "Usar {{provider}} por defecto",
@@ -850,7 +851,7 @@
       "semanticCancel": "Cancelar",
       "semanticGoAhead": "Adelante, instálalo",
       "installedTitle": "Modelos instalados",
-      "installedEmpty": "No hay modelos locales instalados. Usa «Volver a lanzar wizard» para instalar uno.",
+      "installedEmpty": "No hay modelos locales instalados. Usa «Volver a lanzar el asistente» para instalar uno.",
       "installedInMemory": "En memoria",
       "installedLoad": "Cargar",
       "installedEject": "Liberar",
@@ -890,14 +891,14 @@
       "replayTutorial": "Repetir tutorial",
       "keyShortcuts": "Atajos clave",
       "shortcutPalette": "paleta universal de búsqueda y navegación",
-      "shortcutGoTo": "saltar a Inicio / Explorador / Grafo / Chat / Cuadros / Ajustes",
+      "shortcutGoTo": "saltar a Inicio / Explorador / Grafo / Chat / Cuadros de mando / Ajustes",
       "shortcutCollapse": "plegar el panel izquierdo",
       "shortcutTheme": "cambiar tema claro / oscuro"
     }
   },
   "explorer": {
     "title": "Explorador",
-    "searchPlaceholder": "Buscar por título, BOE, #tag…",
+    "searchPlaceholder": "Buscar por título, BOE, #etiqueta…",
     "filters": "Filtros",
     "closeFilters": "Cerrar filtros",
     "export": "Exportar",
@@ -912,7 +913,7 @@
     "densityComfortableHint": "Cómodo: equilibrio entre densidad y detalle",
     "densityCozyHint": "Amplio: más espacio y detalle por norma",
     "clearFilters": "Limpiar filtros",
-    "removeUserTagFilter": "quitar filtro de tag",
+    "removeUserTagFilter": "quitar filtro de etiqueta",
     "howToSearch": "Cómo buscar",
     "tagSuggestions": "Sugerencias de etiquetas",
     "searchHelp": {
@@ -947,15 +948,16 @@
       "comunidad": "Comunidad",
       "department": "Ministerio",
       "year": "Año",
-      "tags": "Tags",
-      "userTags": "Mis tags"
+      "tags": "Etiquetas",
+      "userTags": "Mis etiquetas"
     },
     "tagsHintPre": "Click para alternar · escribe",
+    "tagsHintToken": "#etiqueta",
     "tagsHintPost": "en el buscador"
   },
   "home": {
     "searchPlaceholder": "Pregunta o busca cualquier norma…",
-    "popularTags": "Tags populares",
+    "popularTags": "Etiquetas populares",
     "syncPrefix": "El corpus está al día. Última sincronización con",
     "sync": {
       "upToDate": "El corpus está al día. Última sincronización con",
@@ -995,7 +997,7 @@
       "refs": "refs."
     },
     "chips": {
-      "diff": "Diff entre versiones de una norma"
+      "diff": "Comparación entre versiones de una norma"
     }
   },
   "errors": {
@@ -1076,8 +1078,8 @@
       "inferredTooltip": "referencia inferida automáticamente — puede contener errores"
     },
     "relatedLaws": {
-      "title": "Leyes relacionadas",
-      "empty": "Sin leyes relacionadas todavía.",
+      "title": "Normas relacionadas",
+      "empty": "Sin normas relacionadas todavía.",
       "inferred": "inferida",
       "subtitle": "según referencias detectadas automáticamente"
     }
@@ -1096,22 +1098,22 @@
   },
   "commandPalette": {
     "ariaLabel": "Paleta de comandos",
-    "placeholder": "Buscar leyes, artículos, #tag, comandos…",
+    "placeholder": "Buscar normas, artículos, #etiqueta, comandos…",
     "resultsAria": "Resultados",
-    "noResults": "Sin resultados para \"{{query}}\".",
+    "noResults": "Sin resultados para «{{query}}».",
     "footerNavigate": "navegar",
     "footerOpen": "abrir",
     "resultCount": "{{count}} resultados",
     "viewAllResults": "Ver todos los resultados",
     "groups": {
-      "tags": "Tags",
-      "userTags": "Mis tags",
-      "laws": "Leyes",
+      "tags": "Etiquetas",
+      "userTags": "Mis etiquetas",
+      "laws": "Normas",
       "articles": "Artículos",
       "commands": "Comandos"
     },
-    "tagSubtitle_one": "{{count}} norma con este tag",
-    "tagSubtitle_other": "{{count}} normas con este tag",
+    "tagSubtitle_one": "{{count}} norma con esta etiqueta",
+    "tagSubtitle_other": "{{count}} normas con esta etiqueta",
     "commands": {
       "theme": "Cambiar tema",
       "goHome": "Ir al inicio",
@@ -1160,7 +1162,7 @@
     },
     "errors": {
       "generic": "No se pudo preparar la aplicación.",
-      "warmup_data_path_missing": "No se encontró el corpus de leyes configurado.",
+      "warmup_data_path_missing": "No se encontró el corpus de normas configurado.",
       "warmup_io_error": "Error de lectura del corpus.",
       "warmup_data_invalid": "El corpus contiene datos no válidos.",
       "warmup_failed": "La preparación inicial falló."

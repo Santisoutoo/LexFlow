@@ -31,7 +31,7 @@ export function buildExplorerFilterSummary(input: ExplorerFilterSummaryInput): E
     filterLabels.push(`año=${input.yearFrom || '…'}–${input.yearTo || '…'}`);
   }
   if (input.department) filterLabels.push(`departamento=${input.department}`);
-  if (input.userTag) filterLabels.push(`tag=${input.userTag}`);
+  if (input.userTag) filterLabels.push(`etiqueta=${input.userTag}`);
 
   const hasFilters = filterLabels.length > 0;
   const suggestion = filterLabels[0] ?? 'los filtros activos';

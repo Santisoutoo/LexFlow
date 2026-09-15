@@ -67,10 +67,10 @@ describe('TopBar breadcrumbs', () => {
     expect(nav).not.toHaveTextContent('chat/abc-123');
   });
 
-  it('shows Cuadros plus the analytics tab label', () => {
+  it('shows Cuadros de mando plus the analytics tab label', () => {
     renderTopBar('/dashboards/analytics');
     const nav = screen.getByRole('navigation', { name: /migas|breadcrumb/i });
-    expect(nav).toHaveTextContent('Cuadros');
+    expect(nav).toHaveTextContent('Cuadros de mando');
     expect(nav).toHaveTextContent('Analítica');
     expect(nav).not.toHaveTextContent('dashboards/analytics');
   });

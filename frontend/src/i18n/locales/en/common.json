@@ -143,7 +143,7 @@
       "title": "Drafting assistant",
       "closeAria": "Close assistant",
       "close": "Close",
-      "noModel": "Configure a model in Settings › Models to use the assistant.",
+      "noModel": "Configure a model in Settings → Models to use the assistant.",
       "selectionSection": "Actions on selection",
       "charsSelected": "{{count}} characters selected",
       "selectTextHint": "Select text in the document to improve, summarise or explain.",
@@ -212,7 +212,6 @@
       "free-corpus-ready": "Your corpus is up to date",
       "free-ready-to-review": "Ready to review",
       "free-pick-a-thread": "Pick a thread to pull",
-      "playful-welcome-back": "Welcome back, {{name}}",
       "playful-hello-again": "Hello again, {{name}}",
       "playful-good-to-see": "Good to see you, {{name}}",
       "playful-greeting-question": "{{name}}, what shall we read today?",
@@ -231,7 +230,7 @@
     "cloud": "cloud",
     "notConfigured": "not configured",
     "changeModelsPre": "Change models in",
-    "changeModelsPath": "Settings › Models"
+    "changeModelsPath": "Settings → Models"
   },
   "law": {
     "statusTooltip": "Status per legalize-es · sync {{date}} · verify on BOE"
@@ -269,7 +268,8 @@
     "nameSubtitle": "No account needed — just so we can address you by name in greetings. You can skip it.",
     "namePlaceholder": "Your name",
     "skip": "Skip",
-    "continue": "Continue"
+    "continue": "Continue",
+    "ariaLabel": "Welcome"
   },
   "tutorial": {
     "nav": {
@@ -657,7 +657,8 @@
     "inline": "Inline",
     "added": "added",
     "removed": "removed",
-    "changedArticles": "Changed articles"
+    "changedArticles": "Changed articles",
+    "pageTitle": "Diff · {{title}}"
   },
   "search": {
     "placeholder": "Search laws, articles, conversations…",
@@ -678,7 +679,7 @@
     "seeAll": "See all →",
     "title": "Search",
     "semanticUnavailable": "Semantic search is not active. Enable it in Settings → Models.",
-    "basicModeNotice": "Basic mode — approximate results; install semantic search in Settings › Models",
+    "basicModeNotice": "Basic mode — approximate results; install semantic search in Settings → Models",
     "openSettings": "Open Settings",
     "modeFullText": "Text",
     "modeSemantic": "Semantic",
@@ -951,6 +952,7 @@
       "userTags": "My tags"
     },
     "tagsHintPre": "Click to toggle · type",
+    "tagsHintToken": "#tag",
     "tagsHintPost": "in the search box"
   },
   "home": {

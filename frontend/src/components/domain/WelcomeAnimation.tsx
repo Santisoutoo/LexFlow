@@ -17,13 +17,14 @@
  *
  * --- WHERE TO CHANGE IF X CHANGES ---
  * * Draw feel / duration → ``DRAW_MS`` + the GSAP timeline easing.
- * * Phrase                → ``WELCOME_TEXT`` (also update the aria-label).
+ * * Phrase                → ``WELCOME_TEXT`` (also update ``welcome.ariaLabel``).
  * * Font                  → ``@/assets/fonts/caveat.ttf`` (OFL, bundled).
  * * Stroke weight / size  → ``GLYPH_SIZE`` + ``STROKE_WIDTH`` (font units).
  * * Pen smoothness        → ``PEN_SAMPLES`` (higher = smoother but more memory).
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import gsap from 'gsap';
 
 import caveatTtf from '@/assets/fonts/caveat.ttf';
@@ -99,6 +100,7 @@ interface Props {
 }
 
 export default function WelcomeAnimation({ onContinue }: Props) {
+  const { t } = useTranslation();
   const [done, setDone] = useState(false);
   const [showStatic, setShowStatic] = useState(prefersReducedMotion);
   const [geometry, setGeometry] = useState<GlyphGeometry | null>(null);
@@ -191,7 +193,7 @@ export default function WelcomeAnimation({ onContinue }: Props) {
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Bienvenida"
+      aria-label={t('welcome.ariaLabel')}
       className="fixed inset-0 z-confirm flex flex-col items-center justify-center gap-10 bg-bg text-fg"
     >
       <div className="relative w-[min(86vw,720px)]" aria-label={WELCOME_TEXT}>

@@ -57,7 +57,7 @@ describe('HelpDrawer content resolution', () => {
   it('matches the longest prefix — /laws/BOE-... hits the law detail copy', async () => {
     renderAt('/laws/BOE-A-2000-323');
     await userEvent.click(screen.getByRole('button', { name: /abrir ayuda/i }));
-    expect(screen.getByRole('heading', { name: 'Detalle de la ley' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Detalle de la norma' })).toBeInTheDocument();
   });
 
   it('falls back to the generic copy on an unknown route', async () => {

@@ -118,7 +118,7 @@ describe('CommandPalette keyboard order', () => {
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'civil' } });
 
     const viewAll = screen.getByText(/ver todos los resultados|view all results/i).closest('[role="option"]');
-    const lawsHeader = screen.getByText(/leyes|laws/i);
+    const lawsHeader = screen.getByText(/normas|laws/i);
     const articlesHeader = screen.getByText(/artículos|articles/i);
     const lawsSection = lawsHeader.parentElement as HTMLElement;
     const articlesSection = articlesHeader.parentElement as HTMLElement;

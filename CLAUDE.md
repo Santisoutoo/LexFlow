@@ -217,6 +217,10 @@ Every logical step uses exactly five cells, in order: markdown context → helpe
 - Performance order of attack (Vercel's rule): waterfalls → bundle → SSR perf → fetching → re-renders → render → JS perf → advanced. Don't reach for `useMemo` before you've checked the waterfall.
 - TypeScript strict mode on. No `any`. Use `unknown` and narrow.
 
+### UI copy (Spanish)
+
+- User-visible SPA strings follow [`docs/frontend/ui-copy-glossary.md`](docs/frontend/ui-copy-glossary.md): official terminology (`etiqueta`, `Comparación`, `asistente`, `norma`) and register bands (neutral / compact lowercase chips / Title Case status badges / playful greetings). Do not invent a parallel term on a new surface.
+
 ### Conventions summary
 
 | Subject | Rule |
