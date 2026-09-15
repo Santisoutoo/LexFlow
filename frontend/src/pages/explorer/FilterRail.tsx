@@ -356,7 +356,7 @@ function FilterRailBody({
 
       <FilterGroup title={t('explorer.groups.tags')}>
         <p className="-mt-1 mb-1.5 text-[11px] text-muted">
-          {t('explorer.tagsHintPre')} <code className="font-mono">#tag</code> {t('explorer.tagsHintPost')}
+          {t('explorer.tagsHintPre')} <code className="font-mono">{t('explorer.tagsHintToken')}</code> {t('explorer.tagsHintPost')}
         </p>
         <div className="flex flex-wrap gap-1.5">
           {vocab.slice(0, 16).map(({ tag, count }) => {

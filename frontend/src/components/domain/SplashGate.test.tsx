@@ -53,7 +53,7 @@ describe('SplashGate', () => {
       </SplashGate>,
     );
 
-    expect(screen.getByText('No se encontró el corpus de leyes configurado.')).toBeInTheDocument();
+    expect(screen.getByText('No se encontró el corpus de normas configurado.')).toBeInTheDocument();
   });
 
   it('shows retry messaging when backend is down', () => {

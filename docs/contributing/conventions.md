@@ -52,6 +52,16 @@ fixtures from `data/legalize-es/` (or a slimmed-down test corpus). Mocks are
 fine for the *chat provider* and *external HTTP* surfaces, where the
 non-determinism is not about us.
 
+## UI copy (Spanish)
+
+User-visible Spanish strings follow
+[docs/frontend/ui-copy-glossary.md](../frontend/ui-copy-glossary.md):
+**etiqueta**, **Comparación**, **asistente**, **Cuadros de mando**, **norma**
+(generic; **ley** only as rank/title), path separator **→**, emphasis quotes
+**«…»**. Register bands (neutral / compact lowercase chips / Title Case
+status badges / playful greetings) are documented there. Do not invent a
+parallel term on a new surface.
+
 ## Commit messages
 
 - English, imperative mood ("Add law diff endpoint", not "Added" /

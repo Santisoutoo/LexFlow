@@ -120,7 +120,7 @@ flipped by the Zustand store. Editing one of the HSL channel triples in
 | `⌘ /`             | Toggle right rail          |
 | `⌘ \\`            | Toggle left rail           |
 | `⌘ .`             | Toggle theme               |
-| `g h` / `g e` / `g g` / `g c` / `g d` / `g s` | Go to Inicio / Explorador / Grafo / Chat / Cuadros / Ajustes |
+| `g h` / `g e` / `g g` / `g c` / `g d` / `g s` | Go to Inicio / Explorador / Grafo / Chat / Cuadros de mando / Ajustes |
 | `j` / `k`        | Next / previous diff change |
 
 ## Graph canvas

@@ -45,6 +45,7 @@ task-oriented pages.
 | [pages-and-routing.md](frontend/pages-and-routing.md) | All 11 routes and their pages |
 | [state-and-data.md](frontend/state-and-data.md) | TanStack Query hooks + Zustand UI store |
 | [api-client.md](frontend/api-client.md) | `src/lib/api.ts` (planned), expected response shapes, mock fallback |
+| [ui-copy-glossary.md](frontend/ui-copy-glossary.md) | Official ES UI glossary (etiqueta, Comparación, asistente, norma) |
 
 ## Operations
 

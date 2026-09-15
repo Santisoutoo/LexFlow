@@ -84,6 +84,15 @@ describe('pickGreeting — name awareness', () => {
     }
     expect(seen.has('playful')).toBe(true);
   });
+
+  it('never surfaces a masculine Bienvenido greeting when a name is stored', () => {
+    localStorage.setItem(USER_NAME_STORAGE_KEY, 'Victor');
+    for (let i = 0; i < 40; i++) {
+      localStorage.removeItem(LAST_GREETING_STORAGE_KEY);
+      const g = pickGreeting(t, AFTERNOON, () => i / 40);
+      expect(g.text).not.toMatch(/Bienvenido/);
+    }
+  });
 });
 
 describe('pickGreeting — no-repeat-twice guard', () => {

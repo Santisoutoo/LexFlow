@@ -65,7 +65,7 @@ export function DiffPage() {
             </span>
           </div>
           <h1 className="font-display text-2xl font-semibold">
-            Diff · {article.titulo}{' '}
+            {t('diff.pageTitle', { title: article.titulo })}{' '}
             <span className="font-mono text-lg text-amber-700 dark:text-amber-400">(Art. {article.num})</span>
           </h1>
           <div className="mt-2 flex items-center gap-3.5 text-[13px] text-muted">

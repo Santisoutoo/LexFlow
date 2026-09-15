@@ -459,7 +459,7 @@ function parseUnifiedDiffByArticles(diffText: string, changedArticles?: string[]
   }
 
   if (buckets.length === 0) {
-    return [articleDiffFromLines('todo', 'Diff completo', classified)];
+    return [articleDiffFromLines('todo', 'Comparación completa', classified)];
   }
 
   const merged = mergeBucketsByNum(buckets);

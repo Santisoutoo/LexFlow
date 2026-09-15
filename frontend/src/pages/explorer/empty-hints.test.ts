@@ -19,6 +19,7 @@ describe('buildExplorerFilterSummary', () => {
     expect(summary.hasFilters).toBe(true);
     expect(summary.filterLabels).toContain('estado=vigente');
     expect(summary.filterLabels).toContain('#laboral');
+    expect(summary.filterLabels).toContain('etiqueta=compliance');
     expect(summary.filterLabels).toContain('jurisdicción=es-MD');
     expect(summary.suggestion).toBe('estado=vigente');
   });

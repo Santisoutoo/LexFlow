@@ -417,7 +417,7 @@ function formatModelSize(bytes: number | null): string {
 /**
  * #597 — installed Ollama models with per-model actions (load / eject /
  * delete), so a lawyer manages local models without a terminal. Install of
- * new models stays in the wizard ("Volver a lanzar wizard" above), which
+ * new models stays in the wizard ("Volver a lanzar el asistente" above), which
  * already streams `ollama pull`.
  */
 function InstalledModelsCard() {

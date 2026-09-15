@@ -167,11 +167,6 @@ const GREETING_POOL: GreetingEntry[] = [
     render: (_, t) => t('greeting.pool.free-pick-a-thread'),
   },
   {
-    id: 'playful-welcome-back',
-    category: 'playful',
-    render: ({ name }, t) => (name ? t('greeting.pool.playful-welcome-back', { name }) : null),
-  },
-  {
     id: 'playful-hello-again',
     category: 'playful',
     render: ({ name }, t) => (name ? t('greeting.pool.playful-hello-again', { name }) : null),
