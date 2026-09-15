@@ -19,7 +19,6 @@ import { EmptyState } from '@/components/domain/EmptyState';
 import { ErrorState } from '@/components/domain/ErrorState';
 import { HighlightedSnippet } from '@/components/domain/HighlightedSnippet';
 import { Skeleton } from '@/components/domain/Skeleton';
-import { errorMessage } from '@/lib/errors';
 import { lawDetailHref } from '@/lib/law-reading';
 import {
   useHybridSearch,
@@ -112,7 +111,7 @@ function FullTextResults({ q }: { q: string }) {
   if (isError) {
     return (
       <div className="p-8">
-        <ErrorState onRetry={() => refetch()} description={errorMessage(error, t)} />
+        <ErrorState onRetry={() => refetch()} error={error} />
       </div>
     );
   }
@@ -127,7 +126,7 @@ function FullTextResults({ q }: { q: string }) {
   return (
     <ResultList
       loading={isLoading && !data}
-      heading={t('search.resultsFor', { n: data?.total ?? hits.length, q })}
+      heading={t('search.resultsFor', { count: data?.total ?? hits.length, q })}
     >
       {hits.map((hit) => (
         <FullTextRow key={hit.id} hit={hit} />
@@ -142,7 +141,7 @@ function SemanticResults({ q, semanticActive }: { q: string; semanticActive: boo
   if (isError) {
     return (
       <div className="p-8">
-        <ErrorState onRetry={() => refetch()} description={errorMessage(error, t)} />
+        <ErrorState onRetry={() => refetch()} error={error} />
       </div>
     );
   }
@@ -158,7 +157,7 @@ function SemanticResults({ q, semanticActive }: { q: string; semanticActive: boo
   return (
     <ResultList
       loading={isLoading && !data}
-      heading={t('search.semanticHeading', { n: hits.length })}
+      heading={t('search.semanticHeading', { count: hits.length })}
       notice={
         !semanticActive && hits.length > 0 ? (
           <BasicModeNotice />
@@ -195,7 +194,7 @@ function HybridResults({ q, semanticActive }: { q: string; semanticActive: boole
   if (isError) {
     return (
       <div className="p-8">
-        <ErrorState onRetry={() => refetch()} description={errorMessage(error, t)} />
+        <ErrorState onRetry={() => refetch()} error={error} />
       </div>
     );
   }
@@ -210,7 +209,7 @@ function HybridResults({ q, semanticActive }: { q: string; semanticActive: boole
   return (
     <ResultList
       loading={isLoading && !data}
-      heading={t('search.hybridHeading', { n: hits.length })}
+      heading={t('search.hybridHeading', { count: hits.length })}
       notice={
         !semanticActive && hits.length > 0 ? (
           <BasicModeNotice />

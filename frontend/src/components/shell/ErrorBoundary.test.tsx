@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import i18n from '@/i18n';
@@ -31,14 +32,16 @@ describe('ErrorBoundary', () => {
     consoleError.mockRestore();
   });
 
-  it('shows retry and error detail for non-chunk errors', () => {
+  it('shows retry and folded error detail for non-chunk errors', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     render(
       <ErrorBoundary>
         <RenderBoom />
       </ErrorBoundary>,
     );
-    expect(screen.getByText('plain render failure')).toBeInTheDocument();
+    expect(screen.queryByText('plain render failure')).not.toBeVisible();
+    await userEvent.click(screen.getByText(/detalles técnicos/i));
+    expect(screen.getByText('plain render failure')).toBeVisible();
     expect(screen.getByRole('button', { name: /reintentar/i })).toBeInTheDocument();
     consoleError.mockRestore();
   });

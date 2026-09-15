@@ -340,7 +340,7 @@ function FilterRailBody({
             value={yearFrom}
             onChange={(e) => setYearFrom(e.target.value.replace(/\D/g, '').slice(0, 4))}
             className="h-8 w-20"
-            aria-label={t('explorer.groups.year') + ' — desde'}
+            aria-label={t('explorer.year.fromAria')}
           />
           <span className="text-[12px] text-muted">—</span>
           <Input
@@ -349,7 +349,7 @@ function FilterRailBody({
             value={yearTo}
             onChange={(e) => setYearTo(e.target.value.replace(/\D/g, '').slice(0, 4))}
             className="h-8 w-20"
-            aria-label={t('explorer.groups.year') + ' — hasta'}
+            aria-label={t('explorer.year.toAria')}
           />
         </div>
       </FilterGroup>

@@ -85,7 +85,8 @@
       "noResults": "Sin resultados para «{{query}}».",
       "navigate": "navegar",
       "insert": "insertar cita",
-      "resultCount": "{{count}} resultados"
+      "resultCount_one": "{{count}} resultado",
+      "resultCount_other": "{{count}} resultados"
     },
     "templates": {
       "dialogAria": "Plantillas de documento",
@@ -246,7 +247,8 @@
     "viewOnBoe": "Ver en BOE",
     "versionTimeline": {
       "title": "Historial",
-      "count": "{{n}} versiones"
+      "count_one": "{{count}} versión",
+      "count_other": "{{count}} versiones"
     },
     "stats": {
       "articles": "Artículos",
@@ -530,8 +532,10 @@
       "week": "Esta semana"
     },
     "threadFallback": "Conversación",
-    "turns": "{{n}} turnos",
-    "sourcesCited": "{{n}} fuentes citadas",
+    "turns_one": "{{count}} turno",
+    "turns_other": "{{count}} turnos",
+    "sourcesCited_one": "{{count}} fuente citada",
+    "sourcesCited_other": "{{count}} fuentes citadas",
     "startTitle": "Empieza preguntando al corpus",
     "startHint": "Escribe tu pregunta abajo. El asistente consultará el corpus automáticamente.",
     "placeholder": "Pregunta algo al corpus…",
@@ -626,7 +630,8 @@
     "refsUngrouped": "Sin artículo de origen",
     "selectCitation": "Selecciona una cita en el texto (superíndices) para ver la norma citada y su contexto.",
     "relatedRefs": "Referencias relacionadas",
-    "refsHeading": "{{n}} referencias salientes",
+    "refsHeading_one": "{{count}} referencia saliente",
+    "refsHeading_other": "{{count}} referencias salientes",
     "refsEmpty": "Esta norma no tiene referencias salientes registradas.",
     "disposiciones": "Disposiciones",
     "reading": {
@@ -664,7 +669,8 @@
     "placeholder": "Buscar normas, artículos, conversaciones…",
     "indexing": "Indexando el corpus por primera vez. Los resultados aparecerán en breve…",
     "searching": "Buscando…",
-    "resultsFor": "{{n}} resultados para «{{q}}»",
+    "resultsFor_one": "{{count}} resultado para «{{q}}»",
+    "resultsFor_other": "{{count}} resultados para «{{q}}»",
     "interpretation": {
       "alias": "Mostrando resultados para «{{expansion}}» ({{token}})"
     },
@@ -684,11 +690,13 @@
     "modeFullText": "Texto",
     "modeSemantic": "Semántico",
     "modeHybrid": "Híbrido",
-    "hybridHeading": "{{n}} resultados combinando texto y significado",
+    "hybridHeading_one": "{{count}} resultado combinando texto y significado",
+    "hybridHeading_other": "{{count}} resultados combinando texto y significado",
     "sourceFullText": "Texto",
     "sourceSemantic": "Significado",
     "semanticEmptyQuery": "Escribe una pregunta en lenguaje natural para encontrar artículos relacionados por significado.",
-    "semanticHeading": "{{n}} artículos relacionados por significado",
+    "semanticHeading_one": "{{count}} artículo relacionado por significado",
+    "semanticHeading_other": "{{count}} artículos relacionados por significado",
     "semanticEmpty": {
       "title": "No encontramos artículos parecidos",
       "description": "Prueba con una pregunta más concreta o cambia a búsqueda por texto."
@@ -725,7 +733,7 @@
     "diagnostics": {
       "subtitle": "Estado en vivo del proceso: memoria, disco, corpus y base de chats. Se refresca automáticamente cada 30 s.",
       "error": "No se pudo cargar el estado del proceso.",
-      "uptime": "Activo desde hace {{seconds}} s",
+      "uptime": "Activo desde hace {{duration}}",
       "status": {
         "ok": "Sano",
         "degraded": "Atención"
@@ -752,7 +760,7 @@
       "title": "Privacidad",
       "subtitle": "LexFlow puede registrar uso anónimo (páginas vistas, comandos del palette, errores) en un archivo local — nunca se envía a un servidor remoto. Apagado por defecto: hay dos interruptores y ambos tienen que estar activados para que se registre algo.",
       "toggleLabel": "Telemetría de uso",
-      "toggleHint": "Tu consentimiento se guarda en este navegador. Si el operador del backend no ha activado la persistencia, este interruptor queda informativo — los eventos no se guardarán igualmente.",
+      "toggleHint": "Tu consentimiento se guarda en este navegador. Si quien administra esta instalación no ha activado la persistencia, este interruptor queda informativo — los eventos no se guardarán igualmente.",
       "enable": "Activar",
       "disable": "Desactivar",
       "userGate": "Tú",
@@ -764,7 +772,7 @@
       "whatWeCollectBody": "Páginas que visitas dentro de la app, comandos que usas en la paleta, y errores no controlados. Nunca el contenido de tus búsquedas, normas, ni conversaciones del chat. El log es un fichero JSONL diario en tu disco local; lo puedes inspeccionar o borrar cuando quieras.",
       "toast": {
         "optedInTitle": "Telemetría activada",
-        "optedInBody": "A partir de ahora se registrará el uso anónimo (si el operador también lo permite).",
+        "optedInBody": "A partir de ahora se registrará el uso anónimo (si quien administra esta instalación también lo permite).",
         "optedOutTitle": "Telemetría desactivada",
         "optedOutBody": "Dejaremos de registrar uso desde este navegador."
       }
@@ -879,7 +887,8 @@
       "title": "Datos",
       "subtitlePre": "El corpus se sincroniza desde el repositorio",
       "subtitlePost": ". Conserva los archivos Markdown originales.",
-      "lastSync": "Última sincronización {{ago}} · {{behind}} commits pendientes",
+      "lastSync_one": "Última sincronización {{ago}} · {{count}} cambio pendiente",
+      "lastSync_other": "Última sincronización {{ago}} · {{count}} cambios pendientes",
       "syncNow": "Sincronizar ahora"
     },
     "help": {
@@ -930,7 +939,7 @@
     "cols": {
       "law": "Norma",
       "status": "Estado",
-      "rango": "Rango",
+      "rango": "Rango normativo",
       "published": "Publicada",
       "articles": "Arts.",
       "refs": "Refs."
@@ -953,7 +962,11 @@
     },
     "tagsHintPre": "Click para alternar · escribe",
     "tagsHintToken": "#etiqueta",
-    "tagsHintPost": "en el buscador"
+    "tagsHintPost": "en el buscador",
+    "year": {
+      "fromAria": "Año — desde",
+      "toAria": "Año — hasta"
+    }
   },
   "home": {
     "searchPlaceholder": "Pregunta o busca cualquier norma…",
@@ -961,7 +974,8 @@
     "syncPrefix": "El corpus está al día. Última sincronización con",
     "sync": {
       "upToDate": "El corpus está al día. Última sincronización con",
-      "behind": "{{behind}} commits pendientes con {{upstream}} · última sync {{ago}}",
+      "behind_one": "{{count}} cambio pendiente con {{upstream}} · última sync {{ago}}",
+      "behind_other": "{{count}} cambios pendientes con {{upstream}} · última sync {{ago}}",
       "unknown": "Estado de sincronización desconocido"
     },
     "whatChanged": "Qué ha cambiado",
@@ -1005,6 +1019,7 @@
     "notFoundDescription": "Comprueba la URL o vuelve al inicio.",
     "home": "Inicio",
     "somethingWrong": "Algo ha ido mal",
+    "showDetails": "Ver detalles técnicos",
     "retry": "Reintentar",
     "reportBug": "Reportar bug",
     "chunkLoadTitle": "Nueva versión disponible",
@@ -1080,6 +1095,8 @@
     "relatedLaws": {
       "title": "Normas relacionadas",
       "empty": "Sin normas relacionadas todavía.",
+      "emptyHint": "Explora el grafo global para descubrir conexiones entre normas.",
+      "openGraph": "Abrir grafo global",
       "inferred": "inferida",
       "subtitle": "según referencias detectadas automáticamente"
     }
@@ -1103,7 +1120,8 @@
     "noResults": "Sin resultados para «{{query}}».",
     "footerNavigate": "navegar",
     "footerOpen": "abrir",
-    "resultCount": "{{count}} resultados",
+    "resultCount_one": "{{count}} resultado",
+    "resultCount_other": "{{count}} resultados",
     "viewAllResults": "Ver todos los resultados",
     "groups": {
       "tags": "Etiquetas",

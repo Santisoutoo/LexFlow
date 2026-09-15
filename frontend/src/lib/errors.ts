@@ -84,6 +84,43 @@ export function errorMessage(err: unknown, t?: TFunction): string {
   return translateKey('network', t);
 }
 
+function serializeApiBody(body: unknown): string | null {
+  if (body == null) return null;
+  if (typeof body === 'string') return body;
+  try {
+    return JSON.stringify(body, null, 2);
+  } catch {
+    return String(body);
+  }
+}
+
+/** Split an error into a human message and optional technical detail for disclosure UI. */
+export function errorDisplay(err: unknown, t?: TFunction): { message: string; detail?: string } {
+  const message = errorMessage(err, t);
+  if (err instanceof ApiError) {
+    const parts: string[] = [`HTTP ${err.status}`];
+    const parsed = parseApiErrorBody(err.body);
+    const wireDetail = err.detail || parsed.detail;
+    if (wireDetail && wireDetail !== message && !looksLikeHttpPath(wireDetail)) {
+      parts.push(wireDetail);
+    }
+    const serialized = serializeApiBody(err.body);
+    if (serialized && serialized !== wireDetail && !looksLikeHttpPath(serialized) && !parts.includes(serialized)) {
+      parts.push(serialized);
+    }
+    const detail = parts.join('\n');
+    if (detail === message) return { message };
+    return { message, detail };
+  }
+
+  if (err instanceof Error && err.message && err.message !== message && !looksLikeHttpPath(err.message)) {
+    if (NETWORK_ERROR.test(err.message)) return { message };
+    return { message, detail: err.message };
+  }
+
+  return { message };
+}
+
 /** Resolve a persisted or in-stream chat error to a localized message. */
 export function chatErrorMessage(error: { detail: string; code?: string }, t: TFunction): string {
   if (error.code) {

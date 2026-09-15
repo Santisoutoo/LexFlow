@@ -28,6 +28,7 @@ function renderTopBar(path = '/home') {
           <Route path="/settings" element={<TopBar />} />
           <Route path="/settings/:section" element={<TopBar />} />
           <Route path="/editor" element={<TopBar />} />
+          <Route path="/editor/draft" element={<TopBar />} />
           <Route path="/communities" element={<TopBar />} />
           <Route path="/search" element={<TopBar />} />
         </Routes>
@@ -73,6 +74,18 @@ describe('TopBar breadcrumbs', () => {
     expect(nav).toHaveTextContent('Cuadros de mando');
     expect(nav).toHaveTextContent('Analítica');
     expect(nav).not.toHaveTextContent('dashboards/analytics');
+  });
+
+  it('shows Editor for editor routes instead of the raw path segment', () => {
+    const { unmount } = renderTopBar('/editor');
+    let nav = screen.getByRole('navigation', { name: /migas|breadcrumb/i });
+    expect(nav).toHaveTextContent('Editor');
+    unmount();
+
+    renderTopBar('/editor/draft');
+    nav = screen.getByRole('navigation', { name: /migas|breadcrumb/i });
+    expect(nav).toHaveTextContent('Editor');
+    expect(nav).not.toHaveTextContent('editor/draft');
   });
 });
 

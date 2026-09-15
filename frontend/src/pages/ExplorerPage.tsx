@@ -29,7 +29,6 @@ import {
   useUserTagLaws,
   useWarmup,
 } from '@/lib/queries';
-import { errorMessage } from '@/lib/errors';
 import { parseSearchInput, parseSearchMode, searchResultsHref } from '@/lib/search-query';
 import { useUi } from '@/lib/store';
 import { cn, formatDate, statusLabel } from '@/lib/utils';
@@ -550,7 +549,7 @@ export function ExplorerPage() {
         <div className="flex-1 overflow-auto scrollbar-thin">
           {isError ? (
             <div className="p-8">
-              <ErrorState onRetry={() => refetchResults()} description={errorMessage(queryError, t)} />
+              <ErrorState onRetry={() => refetchResults()} error={queryError} />
             </div>
           ) : isSearchMode ? (
             /* ── Search mode ────────────────────────────────────────── */

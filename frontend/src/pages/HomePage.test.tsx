@@ -99,7 +99,7 @@ describe('HomePage sync banner', () => {
       isLoading: false,
     });
     renderHome();
-    expect(screen.getByText(/3 commits pendientes/i)).toBeInTheDocument();
+    expect(screen.getByText(/3 cambios pendientes/i)).toBeInTheDocument();
     expect(screen.queryByText(/El corpus está al día\. Última sincronización/i)).toBeNull();
   });
 

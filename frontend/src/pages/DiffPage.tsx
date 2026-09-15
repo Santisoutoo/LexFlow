@@ -8,8 +8,6 @@ import { ErrorState } from '@/components/domain/ErrorState';
 import { RightRail } from '@/components/shell/RightRail';
 import { useDiff, useLaw, useVersions } from '@/lib/queries';
 import { formatDate } from '@/lib/utils';
-import { errorMessage } from '@/lib/errors';
-
 export function DiffPage() {
   const { lawId } = useParams<{ lawId: string }>();
   const [searchParams] = useSearchParams();
@@ -36,7 +34,7 @@ export function DiffPage() {
   if (!fromTag || !toTag) {
     return <div className="p-10 text-muted">{t('diff.loading')}</div>;
   }
-  if (error) return <div className="p-10"><ErrorState description={errorMessage(error, t)} onRetry={() => refetch()} /></div>;
+  if (error) return <div className="p-10"><ErrorState error={error} onRetry={() => refetch()} /></div>;
   if (!diff || isLoading) return <div className="p-10 text-muted">{t('diff.loading')}</div>;
 
   const article = diff.articles[active];

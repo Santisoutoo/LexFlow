@@ -1,10 +1,21 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { GraphData } from '@/lib/types';
 
 import { RelatedLaws } from './RelatedLaws';
+
+const navigateMock = vi.fn();
+
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return {
+    ...actual,
+    useNavigate: () => navigateMock,
+  };
+});
 
 const graph: GraphData = {
   nodes: [
@@ -24,6 +35,10 @@ const graph: GraphData = {
 };
 
 describe('RelatedLaws', () => {
+  beforeEach(() => {
+    navigateMock.mockReset();
+  });
+
   it('lists only 1-hop law neighbours, not arbitrary subgraph members', () => {
     render(
       <RelatedLaws graph={graph} currentLawId="centre" onNavigate={() => undefined} />,
@@ -79,5 +94,21 @@ describe('RelatedLaws', () => {
 
     expect(screen.queryByText('inferida')).not.toBeInTheDocument();
     expect(screen.queryByText(/según referencias detectadas automáticamente/i)).not.toBeInTheDocument();
+  });
+
+  it('offers a graph CTA in the empty state', async () => {
+    const emptyGraph: GraphData = {
+      nodes: [{ id: 'centre', kind: 'law', label: 'Centre' }],
+      edges: [],
+    };
+
+    render(
+      <MemoryRouter>
+        <RelatedLaws graph={emptyGraph} currentLawId="centre" onNavigate={() => undefined} />
+      </MemoryRouter>,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: /grafo global/i }));
+    expect(navigateMock).toHaveBeenCalledWith('/graph');
   });
 });

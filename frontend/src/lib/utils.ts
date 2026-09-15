@@ -51,6 +51,28 @@ export function timeAgo(iso?: string | null): string {
   return formatDate(iso);
 }
 
+function stripRelativeTimePrefix(parts: Intl.RelativeTimeFormatPart[]): string {
+  return parts
+    .filter((part) => {
+      if (part.type !== 'literal') return true;
+      const trimmed = part.value.trim().toLowerCase();
+      return trimmed !== 'hace' && trimmed !== 'ago' && trimmed !== 'in' && trimmed !== 'within';
+    })
+    .map((part) => part.value)
+    .join('')
+    .trim();
+}
+
+/** Human-readable duration without a relative prefix ("14 minutos", not "hace 14 minutos"). */
+export function formatDuration(seconds: number, locale?: string): string {
+  const abs = Math.max(0, Math.round(seconds));
+  const rtf = new Intl.RelativeTimeFormat(locale ?? getIntlLocale(), { numeric: 'always' });
+  if (abs < 60) return stripRelativeTimePrefix(rtf.formatToParts(-abs, 'second'));
+  if (abs < 3600) return stripRelativeTimePrefix(rtf.formatToParts(-Math.round(abs / 60), 'minute'));
+  if (abs < 86400) return stripRelativeTimePrefix(rtf.formatToParts(-Math.round(abs / 3600), 'hour'));
+  return stripRelativeTimePrefix(rtf.formatToParts(-Math.round(abs / 86400), 'day'));
+}
+
 /** Group an array by a key function. */
 export function groupBy<T, K extends string>(arr: T[], key: (item: T) => K): Record<K, T[]> {
   return arr.reduce((acc, item) => {
