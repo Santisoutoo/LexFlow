@@ -12,10 +12,11 @@
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Editor } from '@tiptap/react';
-import { MessageSquare, X, MapPin, Check, RotateCcw, Trash2 } from 'lucide-react';
+import { MessageSquare, X, MapPin, Check, RotateCcw, Trash2, Link2 } from 'lucide-react';
 import { Button } from '@/components/ui';
+import { toast } from '@/lib/toast';
 import { useCommentStore, type DocComment } from '@/lib/comment-store';
-import { filterDocComments } from './comment-utils';
+import { filterDocComments, findCommentRangeInDoc } from './comment-utils';
 
 interface CommentsPanelProps {
   editor: Editor;
@@ -27,22 +28,12 @@ interface CommentsPanelProps {
 
 /** Find the document range covered by a comment mark, or null if gone. */
 function findCommentRange(editor: Editor, commentId: string): { from: number; to: number } | null {
-  let from: number | null = null;
-  let to: number | null = null;
-  editor.state.doc.descendants((node, pos) => {
-    if (!node.isText) return;
-    const hasMark = node.marks.some((m) => m.type.name === 'comment' && m.attrs.commentId === commentId);
-    if (hasMark) {
-      if (from === null) from = pos;
-      to = pos + node.nodeSize;
-    }
-  });
-  return from !== null && to !== null ? { from, to } : null;
+  return findCommentRangeInDoc(editor.state.doc, commentId);
 }
 
 export function CommentsPanel({ editor, docId, focusCommentId, onClose }: CommentsPanelProps) {
   const { t } = useTranslation();
-  const { comments, updateNote, toggleResolved, deleteComment } = useCommentStore();
+  const { comments, updateNote, updateQuote, toggleResolved, deleteComment } = useCommentStore();
   const all = filterDocComments(comments, docId, true);
   const active = all.filter((c) => !c.resolved);
   const resolved = all.filter((c) => c.resolved);
@@ -65,13 +56,48 @@ export function CommentsPanel({ editor, docId, focusCommentId, onClose }: Commen
 
   const locate = (id: string) => {
     const range = findCommentRange(editor, id);
-    if (range) editor.chain().setTextSelection(range).scrollIntoView().focus().run();
+    if (range) {
+      editor.chain().setTextSelection(range).scrollIntoView().focus().run();
+      return;
+    }
+    toast({
+      tone: 'warning',
+      title: t('editor.comments.orphanLocateTitle'),
+      message: t('editor.comments.orphanLocateBlocked'),
+    });
   };
 
   const resolve = (c: DocComment) => {
     const range = findCommentRange(editor, c.id);
-    if (range) editor.chain().setTextSelection(range).setComment({ commentId: c.id, resolved: !c.resolved }).run();
+    if (range) {
+      editor.chain().setTextSelection(range).setComment({ commentId: c.id, resolved: !c.resolved }).run();
+    }
     toggleResolved(c.id);
+  };
+
+  const reattach = (c: DocComment) => {
+    const { from, to, empty } = editor.state.selection;
+    if (empty) {
+      toast({
+        tone: 'warning',
+        title: t('editor.comments.reattachSelectTitle'),
+        message: t('editor.comments.reattachSelectHint'),
+      });
+      return;
+    }
+    const wasReadOnly = !editor.isEditable;
+    if (wasReadOnly) editor.setEditable(true);
+    const ok = editor.chain().focus().setComment({ commentId: c.id, resolved: c.resolved }).run();
+    if (wasReadOnly) editor.setEditable(false);
+    if (!ok) {
+      toast({
+        tone: 'warning',
+        title: t('editor.comments.overlapBlockedTitle'),
+        message: t('editor.comments.overlapBlocked'),
+      });
+      return;
+    }
+    updateQuote(c.id, editor.state.doc.textBetween(from, to, ' '));
   };
 
   const remove = (id: string) => {
@@ -80,8 +106,15 @@ export function CommentsPanel({ editor, docId, focusCommentId, onClose }: Commen
     deleteComment(id);
   };
 
-  const renderCard = (c: DocComment) => (
+  const renderCard = (c: DocComment) => {
+    const anchored = findCommentRange(editor, c.id) !== null;
+    return (
     <div key={c.id} className="space-y-2 rounded-lg border border-border bg-bg p-3">
+      {!anchored && (
+        <p className="rounded bg-muted/40 px-2 py-1 text-[11.5px] font-medium text-muted">
+          {t('editor.comments.orphanBanner')}
+        </p>
+      )}
       <button
         type="button"
         onClick={() => locate(c.id)}
@@ -99,10 +132,15 @@ export function CommentsPanel({ editor, docId, focusCommentId, onClose }: Commen
         rows={2}
         className="w-full resize-none rounded border border-border bg-surface px-2 py-1.5 text-[13px] outline-none focus:ring-2 focus:ring-indigo-400 placeholder:text-muted"
       />
-      <div className="flex items-center gap-1">
+      <div className="flex flex-wrap items-center gap-1">
         <Button variant="ghost" size="sm" icon={<MapPin className="size-3.5" />} onClick={() => locate(c.id)}>
           {t('editor.comments.locate')}
         </Button>
+        {!anchored && (
+          <Button variant="ghost" size="sm" icon={<Link2 className="size-3.5" />} onClick={() => reattach(c)}>
+            {t('editor.comments.reattach')}
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="sm"
@@ -123,7 +161,8 @@ export function CommentsPanel({ editor, docId, focusCommentId, onClose }: Commen
         </Button>
       </div>
     </div>
-  );
+    );
+  };
 
   return (
     <aside

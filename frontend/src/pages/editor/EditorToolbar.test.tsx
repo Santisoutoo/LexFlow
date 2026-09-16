@@ -22,20 +22,22 @@ const editorMock = {
   state: { selection: { empty: true } },
 };
 
+const editorStateMock = vi.hoisted(() => ({
+  canUndo: true,
+  canRedo: true,
+  isH1: false,
+  isH2: false,
+  isH3: false,
+  isBold: false,
+  isItalic: false,
+  isBulletList: false,
+  isOrderedList: false,
+  isBlockquote: false,
+  isEmptySelection: true,
+}));
+
 vi.mock('@tiptap/react', () => ({
-  useEditorState: () => ({
-    canUndo: true,
-    canRedo: true,
-    isH1: false,
-    isH2: false,
-    isH3: false,
-    isBold: false,
-    isItalic: false,
-    isBulletList: false,
-    isOrderedList: false,
-    isBlockquote: false,
-    isEmptySelection: true,
-  }),
+  useEditorState: () => editorStateMock,
 }));
 
 describe('EditorToolbar i18n', () => {
@@ -63,5 +65,59 @@ describe('EditorToolbar i18n', () => {
     );
     expect(screen.getByLabelText('Heading 1')).toBeInTheDocument();
     expect(screen.getByLabelText('Undo')).toBeInTheDocument();
+  });
+
+  it('shows a badge when commentBadgeCount is greater than zero', () => {
+    render(
+      <EditorToolbar
+        editor={editorMock as never}
+        isReadOnly={false}
+        onToggleReadOnly={vi.fn()}
+        onInsertCitation={vi.fn()}
+        onOpenTemplates={vi.fn()}
+        onOpenAiPanel={vi.fn()}
+        onAddComment={vi.fn()}
+        onOpenComments={vi.fn()}
+        commentBadgeCount={3}
+      />,
+    );
+    expect(screen.getByLabelText('3 open comments')).toHaveTextContent('3');
+  });
+
+  it('hides the badge when commentBadgeCount is zero', () => {
+    render(
+      <EditorToolbar
+        editor={editorMock as never}
+        isReadOnly={false}
+        onToggleReadOnly={vi.fn()}
+        onInsertCitation={vi.fn()}
+        onOpenTemplates={vi.fn()}
+        onOpenAiPanel={vi.fn()}
+        onAddComment={vi.fn()}
+        onOpenComments={vi.fn()}
+        commentBadgeCount={0}
+      />,
+    );
+    expect(screen.queryByLabelText(/open comments/)).not.toBeInTheDocument();
+  });
+
+  it('keeps comment buttons enabled in read-only mode', () => {
+    editorStateMock.isEmptySelection = false;
+    render(
+      <EditorToolbar
+        editor={editorMock as never}
+        isReadOnly={true}
+        onToggleReadOnly={vi.fn()}
+        onInsertCitation={vi.fn()}
+        onOpenTemplates={vi.fn()}
+        onOpenAiPanel={vi.fn()}
+        onAddComment={vi.fn()}
+        onOpenComments={vi.fn()}
+      />,
+    );
+    expect(screen.getByLabelText('Comment selection')).not.toBeDisabled();
+    expect(screen.getByLabelText('View comments')).not.toBeDisabled();
+    expect(screen.getByLabelText('Bold')).toBeDisabled();
+    editorStateMock.isEmptySelection = true;
   });
 });

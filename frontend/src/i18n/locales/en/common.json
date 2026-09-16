@@ -72,6 +72,7 @@
       "aiDraft": "AI drafting assistant",
       "commentSelection": "Comment selection",
       "viewComments": "View comments",
+      "commentBadgeAria": "{{count}} open comments",
       "undo": "Undo",
       "redo": "Redo",
       "switchToEdit": "Switch to edit mode",
@@ -141,7 +142,15 @@
       "deleteAria": "Delete comment",
       "delete": "Delete",
       "empty": "No comments. Select text in the document and press Comment.",
-      "resolvedSection": "Resolved"
+      "resolvedSection": "Resolved",
+      "overlapBlockedTitle": "Cannot comment",
+      "overlapBlocked": "The selection overlaps another comment. Choose a different span.",
+      "orphanBanner": "Anchor lost",
+      "orphanLocateTitle": "Anchor lost",
+      "orphanLocateBlocked": "The annotated text is no longer in the document. Reattach or delete the comment.",
+      "reattach": "Reattach",
+      "reattachSelectTitle": "Select text",
+      "reattachSelectHint": "Select the span in the document you want to reattach this comment to."
     },
     "aiDraft": {
       "panelAria": "Drafting assistant",

@@ -22,6 +22,7 @@ import type { JSONContent } from '@tiptap/react';
 import { LayoutTemplate, FilePlus2, Upload, Trash2, FileText } from 'lucide-react';
 import { Button, Kbd } from '@/components/ui';
 import { useTemplateStore } from '@/lib/template-store';
+import { stripCommentMarks } from './comment-utils';
 import { extractVariables, fillTemplate } from './template-utils';
 import { importFile, SUPPORTED_IMPORT } from './import-utils';
 import { TemplateFillForm } from './TemplateFillForm';
@@ -56,7 +57,7 @@ export function TemplatesDialog({ editor, onClose }: TemplatesDialogProps) {
   const saveCurrent = () => {
     const trimmed = name.trim();
     if (!trimmed) return;
-    saveTemplate({ id: crypto.randomUUID(), name: trimmed, content: editor.getJSON() });
+    saveTemplate({ id: crypto.randomUUID(), name: trimmed, content: stripCommentMarks(editor.getJSON()) });
     setName('');
   };
 
@@ -79,7 +80,7 @@ export function TemplatesDialog({ editor, onClose }: TemplatesDialogProps) {
   };
 
   const applyTemplate = (content: JSONContent, values: Record<string, string>) => {
-    const filled = fillTemplate(content, values);
+    const filled = stripCommentMarks(fillTemplate(content, values));
     // Insert the filled body at the cursor — never overwrite the whole doc.
     editor.chain().focus().insertContent(filled.content ?? []).run();
     onClose();

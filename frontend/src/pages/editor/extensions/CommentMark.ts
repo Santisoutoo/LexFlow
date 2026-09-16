@@ -14,6 +14,7 @@
  * - Highlight look → the `[data-comment-id]` rules in `EditorPage.tsx`.
  */
 import { Mark, mergeAttributes } from '@tiptap/react';
+import { selectionOverlapsCommentMark } from '../comment-utils';
 
 export interface CommentMarkAttrs {
   commentId: string;
@@ -68,8 +69,12 @@ export const CommentMark = Mark.create({
     return {
       setComment:
         (attrs) =>
-        ({ commands }) =>
-          commands.setMark(this.name, attrs),
+        ({ commands, state }) => {
+          const { from, to, empty } = state.selection;
+          if (empty) return false;
+          if (selectionOverlapsCommentMark(state.doc, from, to, attrs.commentId)) return false;
+          return commands.setMark(this.name, attrs);
+        },
       unsetComment:
         () =>
         ({ commands }) =>
