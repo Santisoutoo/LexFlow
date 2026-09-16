@@ -72,7 +72,7 @@ export const CommentMark = Mark.create({
         ({ commands, state }) => {
           const { from, to, empty } = state.selection;
           if (empty) return false;
-          if (selectionOverlapsCommentMark(state.doc, from, to)) return false;
+          if (selectionOverlapsCommentMark(state.doc, from, to, attrs.commentId)) return false;
           return commands.setMark(this.name, attrs);
         },
       unsetComment:

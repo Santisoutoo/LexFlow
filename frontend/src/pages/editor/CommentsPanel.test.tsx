@@ -5,6 +5,7 @@ import i18n from '@/i18n';
 import en from '@/i18n/locales/en/common.json';
 import { useCommentStore } from '@/lib/comment-store';
 import { CommentsPanel } from './CommentsPanel';
+import * as commentUtils from './comment-utils';
 
 const toast = vi.fn();
 
@@ -42,7 +43,9 @@ describe('CommentsPanel orphan state', () => {
   beforeEach(async () => {
     toast.mockReset();
     setCommentMock.mockClear();
+    chainMock.setTextSelection.mockClear();
     chainMock.run.mockReturnValue(true);
+    vi.spyOn(commentUtils, 'findCommentRangeInDoc').mockReturnValue(null);
     useCommentStore.setState({ comments: {} });
     i18n.addResourceBundle('en', 'common', en, true, true);
     await i18n.changeLanguage('en');
@@ -129,5 +132,64 @@ describe('CommentsPanel orphan state', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reattach' }));
     expect(setCommentMock).toHaveBeenCalledWith({ commentId: 'c1', resolved: false });
     expect(useCommentStore.getState().comments.c1?.quote).toBe('new quote');
+  });
+});
+
+describe('CommentsPanel anchored resolve/reopen', () => {
+  const anchoredRange = { from: 1, to: 5 };
+
+  beforeEach(async () => {
+    toast.mockReset();
+    setCommentMock.mockClear();
+    chainMock.setTextSelection.mockClear();
+    chainMock.run.mockReturnValue(true);
+    vi.spyOn(commentUtils, 'findCommentRangeInDoc').mockReturnValue(anchoredRange);
+    useCommentStore.setState({ comments: {} });
+    i18n.addResourceBundle('en', 'common', en, true, true);
+    await i18n.changeLanguage('en');
+  });
+
+  it('updates the mark when resolving an anchored comment', () => {
+    useCommentStore.setState({
+      comments: {
+        c1: {
+          id: 'c1',
+          docId: 'draft',
+          quote: 'anchored text',
+          note: '',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          resolved: false,
+        },
+      },
+    });
+
+    render(<CommentsPanel editor={editor} docId="draft" onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Resolve' }));
+
+    expect(chainMock.setTextSelection).toHaveBeenCalledWith(anchoredRange);
+    expect(setCommentMock).toHaveBeenCalledWith({ commentId: 'c1', resolved: true });
+    expect(useCommentStore.getState().comments.c1?.resolved).toBe(true);
+  });
+
+  it('updates the mark when reopening an anchored comment', () => {
+    useCommentStore.setState({
+      comments: {
+        c1: {
+          id: 'c1',
+          docId: 'draft',
+          quote: 'anchored text',
+          note: '',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          resolved: true,
+        },
+      },
+    });
+
+    render(<CommentsPanel editor={editor} docId="draft" onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Reopen' }));
+
+    expect(chainMock.setTextSelection).toHaveBeenCalledWith(anchoredRange);
+    expect(setCommentMock).toHaveBeenCalledWith({ commentId: 'c1', resolved: false });
+    expect(useCommentStore.getState().comments.c1?.resolved).toBe(false);
   });
 });

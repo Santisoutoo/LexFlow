@@ -119,6 +119,12 @@ describe('selectionOverlapsCommentMark', () => {
     const doc = schema.nodes.doc.create(null, schema.nodes.paragraph.create(null, schema.text('plain')));
     expect(selectionOverlapsCommentMark(doc, 1, 4)).toBe(false);
   });
+
+  it('ignores the mark for exceptCommentId so resolve/reopen can update the same span', () => {
+    const doc = docWithComment('c1');
+    expect(selectionOverlapsCommentMark(doc, 1, 5, 'c1')).toBe(false);
+    expect(selectionOverlapsCommentMark(doc, 1, 5, 'other')).toBe(true);
+  });
 });
 
 describe('findCommentRangeInDoc', () => {

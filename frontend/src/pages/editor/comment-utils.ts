@@ -42,12 +42,25 @@ export function stripCommentMarks(content: JSONContent): JSONContent {
   return next;
 }
 
-/** True when any text node in `[from, to)` already carries a `comment` mark. */
-export function selectionOverlapsCommentMark(doc: ProseMirrorNode, from: number, to: number): boolean {
+/**
+ * True when any text node in `[from, to)` already carries a `comment` mark.
+ *
+ * `exceptCommentId` skips marks for that id so resolve/reopen can update the
+ * same anchored span without tripping the overlap guard.
+ */
+export function selectionOverlapsCommentMark(
+  doc: ProseMirrorNode,
+  from: number,
+  to: number,
+  exceptCommentId?: string,
+): boolean {
   let overlaps = false;
   doc.nodesBetween(from, to, (node) => {
     if (!node.isText) return;
-    if (node.marks.some((m) => m.type.name === 'comment')) overlaps = true;
+    const hasOtherComment = node.marks.some(
+      (m) => m.type.name === 'comment' && m.attrs.commentId !== exceptCommentId,
+    );
+    if (hasOtherComment) overlaps = true;
   });
   return overlaps;
 }
