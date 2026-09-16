@@ -72,6 +72,7 @@
       "aiDraft": "Asistente de redacción IA",
       "commentSelection": "Comentar la selección",
       "viewComments": "Ver comentarios",
+      "commentBadgeAria": "{{count}} comentarios abiertos",
       "undo": "Deshacer",
       "redo": "Rehacer",
       "switchToEdit": "Cambiar a modo edición",
@@ -141,7 +142,15 @@
       "deleteAria": "Eliminar comentario",
       "delete": "Eliminar",
       "empty": "No hay comentarios. Selecciona texto en el documento y pulsa Comentar.",
-      "resolvedSection": "Resueltos"
+      "resolvedSection": "Resueltos",
+      "overlapBlockedTitle": "No se puede comentar",
+      "overlapBlocked": "La selección se solapa con otro comentario. Elige un fragmento distinto.",
+      "orphanBanner": "Anclaje perdido",
+      "orphanLocateTitle": "Anclaje perdido",
+      "orphanLocateBlocked": "El texto anotado ya no está en el documento. Usa Reanclar o elimina el comentario.",
+      "reattach": "Reanclar",
+      "reattachSelectTitle": "Selecciona texto",
+      "reattachSelectHint": "Selecciona en el documento el fragmento al que quieres reanclar este comentario."
     },
     "aiDraft": {
       "panelAria": "Asistente de redacción",

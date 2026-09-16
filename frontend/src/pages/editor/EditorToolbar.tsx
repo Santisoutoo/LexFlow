@@ -59,6 +59,8 @@ interface EditorToolbarProps {
   onAddComment: () => void;
   /** Open the comments side panel (#602). Owned by EditorPage. */
   onOpenComments: () => void;
+  /** Unresolved comment count for the open document — drives the badge on "View comments". */
+  commentBadgeCount?: number;
 }
 
 /** A thin divider between button groups. */
@@ -111,6 +113,7 @@ export function EditorToolbar({
   onOpenAiPanel,
   onAddComment,
   onOpenComments,
+  commentBadgeCount = 0,
 }: EditorToolbarProps) {
   const { t } = useTranslation();
 
@@ -245,19 +248,6 @@ export function EditorToolbar({
         onPress={onOpenAiPanel}
       />
 
-      {/* Comments / annotations (#602) */}
-      <ToolButton
-        icon={<MessageSquarePlus className="size-3.5" />}
-        label={t('editor.toolbar.commentSelection')}
-        disabled={isEmptySelection}
-        onPress={onAddComment}
-      />
-      <ToolButton
-        icon={<MessageSquare className="size-3.5" />}
-        label={t('editor.toolbar.viewComments')}
-        onPress={onOpenComments}
-      />
-
       <Divider />
 
       {/* Undo / Redo */}
@@ -275,6 +265,29 @@ export function EditorToolbar({
       />
 
       </fieldset>
+
+      {/* Comments (#602) — outside the fieldset so annotating works in read mode. */}
+      <ToolButton
+        icon={<MessageSquarePlus className="size-3.5" />}
+        label={t('editor.toolbar.commentSelection')}
+        disabled={isEmptySelection}
+        onPress={onAddComment}
+      />
+      <div className="relative">
+        <ToolButton
+          icon={<MessageSquare className="size-3.5" />}
+          label={t('editor.toolbar.viewComments')}
+          onPress={onOpenComments}
+        />
+        {commentBadgeCount > 0 && (
+          <span
+            className="pointer-events-none absolute -right-0.5 -top-0.5 flex min-w-[1rem] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-semibold leading-none text-white"
+            aria-label={t('editor.toolbar.commentBadgeAria', { count: commentBadgeCount })}
+          >
+            {commentBadgeCount}
+          </span>
+        )}
+      </div>
 
       {/* Read / Edit toggle — outside the fieldset, so it stays clickable in read-only. */}
       <div className="ml-auto">

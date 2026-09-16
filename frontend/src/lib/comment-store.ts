@@ -37,6 +37,8 @@ interface CommentState {
   addComment(comment: Omit<DocComment, 'createdAt' | 'resolved'>): void;
   /** Update a comment's note text. */
   updateNote(id: string, note: string): void;
+  /** Update the quoted anchor text after reattaching. */
+  updateQuote(id: string, quote: string): void;
   /** Flip the resolved flag. */
   toggleResolved(id: string): void;
   /** Remove a comment entirely. */
@@ -61,6 +63,13 @@ export const useCommentStore = create<CommentState>()(
           const existing = state.comments[id];
           if (!existing) return state;
           return { comments: { ...state.comments, [id]: { ...existing, note } } };
+        }),
+
+      updateQuote: (id, quote) =>
+        set((state) => {
+          const existing = state.comments[id];
+          if (!existing) return state;
+          return { comments: { ...state.comments, [id]: { ...existing, quote } } };
         }),
 
       toggleResolved: (id) =>

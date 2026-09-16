@@ -50,6 +50,7 @@ import { CommentMark } from '@/pages/editor/extensions/CommentMark';
 import { AiGeneratedMark } from '@/pages/editor/extensions/AiGeneratedMark';
 import { PendingInsertHighlight } from '@/pages/editor/extensions/PendingInsertHighlight';
 import { useCommentStore } from '@/lib/comment-store';
+import { openCommentCount } from '@/pages/editor/comment-utils';
 import { cn } from '@/lib/utils';
 import { DocumentList, DocumentPicker } from '@/pages/editor/DocumentList';
 
@@ -156,6 +157,15 @@ function EditorDocumentSurface({ docId }: { docId: string }) {
   const [commentsOpen, setCommentsOpen] = useState<boolean>(false);
   const [focusCommentId, setFocusCommentId] = useState<string | null>(null);
   const addComment = useCommentStore((s) => s.addComment);
+  const commentBadgeCount = useCommentStore((s) => openCommentCount(s.comments, docId));
+
+  const handleCommentClickRef = useRef<(commentId: string) => void>(() => {});
+  useEffect(() => {
+    handleCommentClickRef.current = (commentId: string) => {
+      setFocusCommentId(commentId);
+      setCommentsOpen(true);
+    };
+  });
 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
 
@@ -193,6 +203,16 @@ function EditorDocumentSurface({ docId }: { docId: string }) {
     content: initialDoc.content,
     editable: !isReadOnly,
     immediatelyRender: true,
+    editorProps: {
+      handleClickOn: (_view, _pos, _node, _nodePos, event) => {
+        const el = (event.target as HTMLElement).closest('[data-comment-id]');
+        if (!el) return false;
+        const commentId = el.getAttribute('data-comment-id');
+        if (!commentId) return false;
+        handleCommentClickRef.current(commentId);
+        return true;
+      },
+    },
     onUpdate: ({ editor: ed }) => {
       if (autosaveTimer.current !== null) {
         clearTimeout(autosaveTimer.current);
@@ -296,11 +316,22 @@ function EditorDocumentSurface({ docId }: { docId: string }) {
     if (empty) return;
     const quote = editor.state.doc.textBetween(from, to, ' ');
     const commentId = crypto.randomUUID();
-    editor.chain().focus().setComment({ commentId, resolved: false }).run();
+    const wasReadOnly = isReadOnly;
+    if (wasReadOnly) editor.setEditable(true);
+    const ok = editor.chain().focus().setComment({ commentId, resolved: false }).run();
+    if (wasReadOnly) editor.setEditable(false);
+    if (!ok) {
+      toast({
+        tone: 'warning',
+        title: t('editor.comments.overlapBlockedTitle'),
+        message: t('editor.comments.overlapBlocked'),
+      });
+      return;
+    }
     addComment({ id: commentId, docId, quote, note: '' });
     setFocusCommentId(commentId);
     setCommentsOpen(true);
-  }, [editor, docId, addComment]);
+  }, [editor, docId, addComment, isReadOnly, t]);
 
   const handleEmergencyExport = useCallback(() => {
     if (!editor) return;
@@ -381,6 +412,7 @@ function EditorDocumentSurface({ docId }: { docId: string }) {
             setFocusCommentId(null);
             setCommentsOpen(true);
           }}
+          commentBadgeCount={commentBadgeCount}
         />
       )}
 
@@ -460,9 +492,9 @@ function EditorDocumentSurface({ docId }: { docId: string }) {
           '[&_.ProseMirror_p.is-editor-empty:first-child::before]:pointer-events-none',
           '[&_.ProseMirror_p.is-editor-empty:first-child::before]:h-0',
           // Inline comment highlight (#602): amber span; resolved → dotted underline only.
-          '[&_.ProseMirror_.lex-comment]:rounded-sm [&_.ProseMirror_.lex-comment]:bg-[hsl(var(--amber-500)/0.28)]',
+          '[&_.ProseMirror_.lex-comment]:cursor-pointer [&_.ProseMirror_.lex-comment]:rounded-sm [&_.ProseMirror_.lex-comment]:bg-[hsl(var(--amber-500)/0.28)]',
           '[&_.ProseMirror_.lex-comment]:box-decoration-clone [&_.ProseMirror_.lex-comment]:px-0.5',
-          '[&_.ProseMirror_.lex-comment--resolved]:bg-transparent [&_.ProseMirror_.lex-comment--resolved]:px-0',
+          '[&_.ProseMirror_.lex-comment--resolved]:cursor-pointer [&_.ProseMirror_.lex-comment--resolved]:bg-transparent [&_.ProseMirror_.lex-comment--resolved]:px-0',
           '[&_.ProseMirror_.lex-comment--resolved]:underline [&_.ProseMirror_.lex-comment--resolved]:decoration-dotted',
           '[&_.ProseMirror_.lex-comment--resolved]:decoration-amber-400/70',
           '[&_.ProseMirror_.lex-ai-generated]:rounded-sm [&_.ProseMirror_.lex-ai-generated]:bg-[hsl(var(--indigo-500)/0.18)]',
