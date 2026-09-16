@@ -52,6 +52,10 @@
     "documentTitleAria": "Document title",
     "placeholder": "Untitled document",
     "savedAt": "Saved {{time}}",
+    "saveStatusSaving": "Saving…",
+    "saveStatusUnsaved": "Unsaved",
+    "exportErrorTitle": "Could not export",
+    "exportErrorBody": "Try again or export as Markdown.",
     "contentPlaceholder": "Start writing your document…",
     "toolbar": {
       "aria": "Editor toolbar",

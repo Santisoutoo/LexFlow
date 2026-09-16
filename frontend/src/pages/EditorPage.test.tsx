@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { saveDocumentMock, createDocumentMock, getDocumentMock } = vi.hoisted(() => ({
   saveDocumentMock: vi.fn(),
@@ -104,6 +104,22 @@ function renderEditor(initialPath = '/editor/draft') {
   return renderEditorAtDoc(docId);
 }
 
+function storedDoc(overrides?: { id?: string; updatedAt?: string }) {
+  return {
+    id: overrides?.id ?? 'draft',
+    title: 'Untitled',
+    content: { type: 'doc', content: [{ type: 'paragraph' }] },
+    updatedAt: overrides?.updatedAt ?? '2026-09-12T12:00:00.000Z',
+  };
+}
+
+function typePendingContent(content: ReturnType<(typeof mockEditor)['getJSON']>) {
+  mockEditor.getJSON.mockReturnValue(content);
+  act(() => {
+    onUpdateHandler?.({ editor: mockEditor });
+  });
+}
+
 describe('EditorPage autosave flush', () => {
   beforeEach(() => {
     saveDocumentMock.mockReset();
@@ -116,6 +132,7 @@ describe('EditorPage autosave flush', () => {
       type: 'doc',
       content: [{ type: 'paragraph', content: [{ type: 'text', text: 'saved' }] }],
     });
+    mockEditor.commands.setContent.mockReset();
     onUpdateHandler = undefined;
   });
 
@@ -126,8 +143,7 @@ describe('EditorPage autosave flush', () => {
     };
     const view = renderEditorAtDoc('doc-a');
     expect(onUpdateHandler).toBeDefined();
-    mockEditor.getJSON.mockReturnValue(pendingContent);
-    onUpdateHandler?.({ editor: mockEditor });
+    typePendingContent(pendingContent);
     expect(saveDocumentMock).not.toHaveBeenCalled();
 
     view.rerender(
@@ -150,6 +166,9 @@ describe('EditorPage autosave flush', () => {
     expect(saveDocumentMock).not.toHaveBeenCalledWith(
       expect.objectContaining({ id: 'doc-b', content: pendingContent }),
     );
+    // Incoming doc loads via a remounted useEditor({ content }), not setContent.
+    expect(mockEditor.commands.setContent).not.toHaveBeenCalled();
+    expect(saveDocumentMock).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'doc-b' }));
   });
 
   it('creates a document from the picker and navigates to the new id', async () => {
@@ -174,8 +193,7 @@ describe('EditorPage autosave flush', () => {
     };
     const view = renderEditor();
     expect(onUpdateHandler).toBeDefined();
-    mockEditor.getJSON.mockReturnValue(pendingContent);
-    onUpdateHandler?.({ editor: mockEditor });
+    typePendingContent(pendingContent);
     expect(saveDocumentMock).not.toHaveBeenCalled();
     view.unmount();
     await waitFor(() => {
@@ -187,13 +205,63 @@ describe('EditorPage autosave flush', () => {
     });
   });
 
-  it('uses Spanish i18n for title aria, placeholder and saved line', () => {
-    getDocumentMock.mockReturnValue({
-      id: 'draft',
-      title: 'Untitled',
-      content: { type: 'doc', content: [{ type: 'paragraph' }] },
-      updatedAt: '2026-09-12T12:00:00.000Z',
+  it('flushes pending save when the tab is hidden', () => {
+    const pendingContent = {
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'hidden-tab' }] }],
+    };
+    renderEditor();
+    typePendingContent(pendingContent);
+    expect(saveDocumentMock).not.toHaveBeenCalled();
+
+    const originalVisibility = document.visibilityState;
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'hidden',
     });
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => originalVisibility,
+    });
+
+    expect(saveDocumentMock).toHaveBeenCalledWith({
+      id: 'draft',
+      title: 'Draft',
+      content: pendingContent,
+    });
+  });
+
+  it('registers a beforeunload listener that flushes pending save', () => {
+    const pendingContent = {
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'leaving' }] }],
+    };
+    renderEditor();
+    typePendingContent(pendingContent);
+    expect(saveDocumentMock).not.toHaveBeenCalled();
+
+    act(() => {
+      window.dispatchEvent(new Event('beforeunload'));
+    });
+
+    expect(saveDocumentMock).toHaveBeenCalledWith({
+      id: 'draft',
+      title: 'Draft',
+      content: pendingContent,
+    });
+  });
+
+  it('does not call setContent or save on initial document load', () => {
+    renderEditor();
+    expect(mockEditor.commands.setContent).not.toHaveBeenCalled();
+    expect(saveDocumentMock).not.toHaveBeenCalled();
+  });
+
+  it('uses Spanish i18n for title aria, placeholder and saved line', () => {
+    getDocumentMock.mockReturnValue(storedDoc());
     renderEditor();
     expect(screen.getByLabelText('Título del documento')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Documento sin título')).toBeInTheDocument();
@@ -203,16 +271,56 @@ describe('EditorPage autosave flush', () => {
   it('uses English i18n for title aria and placeholder when locale is en', async () => {
     i18n.addResourceBundle('en', 'common', en, true, true);
     await i18n.changeLanguage('en');
-    getDocumentMock.mockReturnValue({
-      id: 'draft',
-      title: 'Untitled',
-      content: { type: 'doc', content: [{ type: 'paragraph' }] },
-      updatedAt: '2026-09-12T12:00:00.000Z',
-    });
+    getDocumentMock.mockReturnValue(storedDoc());
     renderEditor();
     expect(screen.getByLabelText('Document title')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Untitled document')).toBeInTheDocument();
     expect(screen.getByText(/^Saved /)).toBeInTheDocument();
     await i18n.changeLanguage('es');
+  });
+});
+
+describe('EditorPage save indicator', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    saveDocumentMock.mockReset();
+    getDocumentMock.mockReset();
+    getDocumentMock.mockReturnValue(storedDoc());
+    mockEditor.getJSON.mockReset();
+    mockEditor.getJSON.mockReturnValue({
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'saved' }] }],
+    });
+    onUpdateHandler = undefined;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('shows unsaved while debounce is pending, then saved after flush', () => {
+    renderEditor();
+    expect(screen.getByTestId('editor-save-status')).toHaveTextContent(/^Guardado /);
+
+    typePendingContent({
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'dirty' }] }],
+    });
+    expect(screen.getByTestId('editor-save-status')).toHaveTextContent('Sin guardar');
+
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    expect(saveDocumentMock).toHaveBeenCalled();
+    expect(screen.getByTestId('editor-save-status')).toHaveTextContent(/^Guardado /);
+  });
+
+  it('returns to saved immediately when the title is edited', () => {
+    renderEditor();
+    fireEvent.change(screen.getByLabelText('Título del documento'), {
+      target: { value: 'Nuevo título' },
+    });
+    expect(saveDocumentMock).toHaveBeenCalled();
+    expect(screen.getByTestId('editor-save-status')).toHaveTextContent(/^Guardado /);
   });
 });
