@@ -21,8 +21,9 @@ export function CitationChip({ node }: NodeViewProps) {
 
   const goToSource = () => {
     if (!lawId) return;
-    // ponytail: navigate on click in any mode — the draft is autosaved, so
-    // jumping to the source can't lose work. In-place re-pick deferred (#599).
+    // Autosave is debounced (~600 ms), not instant. Unmount flush plus tab
+    // hide/close handlers persist keystrokes inside that window when this
+    // click navigates away. In-place re-pick deferred (#599).
     navigate(`/laws/${encodeURIComponent(lawId)}`);
   };
 

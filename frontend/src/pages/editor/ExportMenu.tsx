@@ -10,9 +10,11 @@
  * dynamic-imports `docx`, so opening this menu costs nothing until used.
  */
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Download, FileText, FileType2, ChevronDown } from 'lucide-react';
 import type { Editor } from '@tiptap/react';
 import { Button } from '@/components/ui';
+import { toast } from '@/lib/toast';
 import { exportDocx, exportMarkdown } from './export-utils';
 
 interface ExportMenuProps {
@@ -22,6 +24,7 @@ interface ExportMenuProps {
 }
 
 export function ExportMenu({ editor, title }: ExportMenuProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -47,8 +50,12 @@ export function ExportMenu({ editor, title }: ExportMenuProps) {
     try {
       await action();
     } catch (err) {
-      // Export is a user action; a silent failure would look like a no-op.
       console.error('Document export failed', err);
+      toast({
+        tone: 'danger',
+        title: t('editor.exportErrorTitle'),
+        message: t('editor.exportErrorBody'),
+      });
     }
   }
 

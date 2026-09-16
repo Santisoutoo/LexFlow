@@ -13,11 +13,15 @@
  *
  * Invariants:
  * - The editor is always mounted with `immediatelyRender: true` (CSR only).
- * - On unmount the debounce timer is cancelled via the cleanup returned
- *   from `useEffect` so a queued save never fires against an unmounted
- *   component.
+ * - A pending debounce is flushed immediately on unmount, doc switch (the
+ *   keyed surface unmounts), tab hide (`visibilitychange`), and `beforeunload`,
+ *   so the last keystrokes persist instead of being cancelled.
  * - `docId` is required on `/editor/:docId`. Bare `/editor` renders the
  *   document picker so the user can create or switch documents (#57 S1.4).
+ * - The TipTap instance remounts per `docId` (`key={docId}`) so each
+ *   document gets a fresh undo stack and loads via `useEditor({ content })`
+ *   without a follow-up `setContent` (which would be undoable and would
+ *   emit `onUpdate`, scheduling a redundant save).
  *
  * --- WHERE TO CHANGE IF EDITOR FEATURES CHANGE ---
  * - Add a new TipTap extension → install it, add to `extensions` below,
@@ -51,6 +55,8 @@ import { DocumentList, DocumentPicker } from '@/pages/editor/DocumentList';
 /** Debounce window before a content change is written to localStorage (ms). */
 const AUTOSAVE_DELAY_MS = 600;
 
+type SaveStatus = 'saved' | 'saving' | 'unsaved';
+
 /** Cancel any pending debounce and write the latest editor state immediately (#44 R5). */
 function flushPendingAutosave(
   autosaveTimer: MutableRefObject<ReturnType<typeof setTimeout> | null>,
@@ -60,16 +66,23 @@ function flushPendingAutosave(
   saveDocument: (doc: { id: string; title: string; content: ReturnType<Editor['getJSON']> }) => void,
   /** When switching docs, pass the outgoing id — `docIdRef` may already point at the new route. */
   docIdOverride?: string,
-): void {
-  if (autosaveTimer.current === null) return;
+): boolean {
+  if (autosaveTimer.current === null) return false;
   clearTimeout(autosaveTimer.current);
   autosaveTimer.current = null;
-  if (!editor) return;
+  if (!editor) return false;
   saveDocument({
     id: docIdOverride ?? docIdRef.current,
     title: titleRef.current,
     content: editor.getJSON(),
   });
+  return true;
+}
+
+function clearAutosaveTimer(autosaveTimer: MutableRefObject<ReturnType<typeof setTimeout> | null>): void {
+  if (autosaveTimer.current === null) return;
+  clearTimeout(autosaveTimer.current);
+  autosaveTimer.current = null;
 }
 
 /**
@@ -86,7 +99,35 @@ function intlLocale(language: string): string {
   return language.startsWith('en') ? 'en-GB' : 'es-ES';
 }
 
+/**
+ * Shell around a single document: sidebar list stays mounted across
+ * switches; the TipTap surface remounts per `docId` (S1.2).
+ */
 function EditorWorkspace({ docId }: { docId: string }) {
+  return (
+    <div className="flex h-full min-h-0">
+      <aside className="hidden w-56 shrink-0 flex-col overflow-auto border-r border-border p-3 md:flex">
+        <DocumentList activeId={docId} />
+      </aside>
+      <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-auto p-6">
+        <div className="border-b border-border pb-3 md:hidden">
+          <DocumentList activeId={docId} />
+        </div>
+        <EditorDocumentSurface key={docId} docId={docId} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Per-document TipTap instance, autosave lifecycle, toolbar, and panels.
+ *
+ * Mounted with `key={docId}` so switching documents destroys the previous
+ * editor (flushing a pending debounce via unmount cleanup) and creates a
+ * new one with the incoming JSON as initial `content` — no `setContent`,
+ * no undo history bleed, no save-on-load.
+ */
+function EditorDocumentSurface({ docId }: { docId: string }) {
   const { t, i18n } = useTranslation();
 
   const { getDocument, saveDocument, persistError, clearPersistError } = useEditorStore();
@@ -115,7 +156,9 @@ function EditorWorkspace({ docId }: { docId: string }) {
   const [focusCommentId, setFocusCommentId] = useState<string | null>(null);
   const addComment = useCommentStore((s) => s.addComment);
 
-  // Ref to hold the active autosave timeout so it can be cancelled on unmount.
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
+
+  // Ref to hold the active autosave timeout so it can be flushed on unmount.
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // `useEditor`'s `onUpdate` closes over the values at creation time, so the
@@ -149,16 +192,19 @@ function EditorWorkspace({ docId }: { docId: string }) {
     editable: !isReadOnly,
     immediatelyRender: true,
     onUpdate: ({ editor: ed }) => {
-      // Debounce: cancel the previous timer and start a fresh one.
       if (autosaveTimer.current !== null) {
         clearTimeout(autosaveTimer.current);
       }
+      setSaveStatus('unsaved');
       autosaveTimer.current = setTimeout(() => {
+        autosaveTimer.current = null;
+        setSaveStatus('saving');
         saveDocument({
           id: docIdRef.current,
           title: titleRef.current,
           content: ed.getJSON(),
         });
+        setSaveStatus('saved');
       }, AUTOSAVE_DELAY_MS);
     },
   });
@@ -167,6 +213,26 @@ function EditorWorkspace({ docId }: { docId: string }) {
   useEffect(() => {
     return () => {
       flushPendingAutosave(autosaveTimer, editor, docIdRef, titleRef, saveDocument);
+    };
+  }, [editor, saveDocument]);
+
+  // Tab close / background: same flush as unmount, without cancelling the timer.
+  useEffect(() => {
+    const flushIfPending = () =>
+      flushPendingAutosave(autosaveTimer, editor, docIdRef, titleRef, saveDocument);
+
+    const onBeforeUnload = () => {
+      flushIfPending();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'hidden') return;
+      if (flushIfPending()) setSaveStatus('saved');
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.removeEventListener('beforeunload', onBeforeUnload);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [editor, saveDocument]);
 
@@ -180,23 +246,6 @@ function EditorWorkspace({ docId }: { docId: string }) {
       ttlMs: 0,
     });
   }, [persistError, t]);
-
-  // When `docId` changes (the user navigates to a different doc), load the
-  // correct content and reset the title.
-  useEffect(() => {
-    const outgoingDocId = docIdRef.current;
-    if (!editor) {
-      docIdRef.current = docId;
-      return;
-    }
-    // Save the outgoing doc before syncing `docIdRef` to the new route param.
-    flushPendingAutosave(autosaveTimer, editor, docIdRef, titleRef, saveDocument, outgoingDocId);
-    docIdRef.current = docId;
-    const doc = getDocument(docId) ?? makeDefaultDocument(docId);
-    setTitle(doc.title);
-    // `setContent` resets the editor state to the new JSON document.
-    editor.commands.setContent(doc.content);
-  }, [docId, editor, getDocument, saveDocument]);
 
   // Sync the `editable` flag whenever the toggle changes.
   useEffect(() => {
@@ -219,11 +268,13 @@ function EditorWorkspace({ docId }: { docId: string }) {
       const newTitle = e.target.value;
       setTitle(newTitle);
       if (!editor) return;
+      clearAutosaveTimer(autosaveTimer);
       saveDocument({
         id: docId,
         title: newTitle,
         content: editor.getJSON(),
       });
+      setSaveStatus('saved');
     },
     [docId, editor, saveDocument]
   );
@@ -255,14 +306,7 @@ function EditorWorkspace({ docId }: { docId: string }) {
   }, [editor, title]);
 
   return (
-    <div className="flex h-full min-h-0">
-      <aside className="hidden w-56 shrink-0 flex-col overflow-auto border-r border-border p-3 md:flex">
-        <DocumentList activeId={docId} />
-      </aside>
-      <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-auto p-6">
-        <div className="border-b border-border pb-3 md:hidden">
-          <DocumentList activeId={docId} />
-        </div>
+    <>
       {persistError && (
         <div
           className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-[12.5px] text-amber-900 dark:text-amber-100"
@@ -288,7 +332,7 @@ function EditorWorkspace({ docId }: { docId: string }) {
           </div>
         </div>
       )}
-      {/* Page header: editable title + doc id breadcrumb, export on the right */}
+      {/* Page header: editable title + save status, export on the right */}
       <header className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <input
@@ -305,17 +349,17 @@ function EditorWorkspace({ docId }: { docId: string }) {
               isReadOnly && 'cursor-default select-text',
             )}
           />
-          <span className="text-xs text-muted">
-            {stored?.updatedAt && (
-              <>
-                {t('editor.savedAt', {
-                  time: new Date(stored.updatedAt).toLocaleTimeString(intlLocale(i18n.language), {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  }),
-                })}
-              </>
-            )}
+          <span className="text-xs text-muted" data-testid="editor-save-status" aria-live="polite">
+            {saveStatus === 'saving' && t('editor.saveStatusSaving')}
+            {saveStatus === 'unsaved' && t('editor.saveStatusUnsaved')}
+            {saveStatus === 'saved' &&
+              stored?.updatedAt &&
+              t('editor.savedAt', {
+                time: new Date(stored.updatedAt).toLocaleTimeString(intlLocale(i18n.language), {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }),
+              })}
           </span>
         </div>
         {editor && <ExportMenu editor={editor} title={title} />}
@@ -421,7 +465,6 @@ function EditorWorkspace({ docId }: { docId: string }) {
       >
         <EditorContent editor={editor} />
       </div>
-      </div>
-    </div>
+    </>
   );
 }
