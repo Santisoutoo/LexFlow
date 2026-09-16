@@ -48,6 +48,7 @@ import { ExportMenu } from '@/pages/editor/ExportMenu';
 import { LegalCitation } from '@/pages/editor/extensions/LegalCitation';
 import { CommentMark } from '@/pages/editor/extensions/CommentMark';
 import { AiGeneratedMark } from '@/pages/editor/extensions/AiGeneratedMark';
+import { PendingInsertHighlight } from '@/pages/editor/extensions/PendingInsertHighlight';
 import { useCommentStore } from '@/lib/comment-store';
 import { cn } from '@/lib/utils';
 import { DocumentList, DocumentPicker } from '@/pages/editor/DocumentList';
@@ -187,6 +188,7 @@ function EditorDocumentSurface({ docId }: { docId: string }) {
       // Inline comment anchors (#602). The note text lives in comment-store.
       CommentMark,
       AiGeneratedMark,
+      PendingInsertHighlight,
     ],
     content: initialDoc.content,
     editable: !isReadOnly,
@@ -403,7 +405,12 @@ function EditorDocumentSurface({ docId }: { docId: string }) {
       {editor &&
         aiPanelOpen &&
         createPortal(
-          <AiDraftPanel editor={editor} onClose={() => setAiPanelOpen(false)} />,
+          <AiDraftPanel
+            editor={editor}
+            docId={docId}
+            docTitle={title}
+            onClose={() => setAiPanelOpen(false)}
+          />,
           document.body,
         )}
 
@@ -460,6 +467,9 @@ function EditorDocumentSurface({ docId }: { docId: string }) {
           '[&_.ProseMirror_.lex-comment--resolved]:decoration-amber-400/70',
           '[&_.ProseMirror_.lex-ai-generated]:rounded-sm [&_.ProseMirror_.lex-ai-generated]:bg-[hsl(var(--indigo-500)/0.18)]',
           '[&_.ProseMirror_.lex-ai-generated]:box-decoration-clone [&_.ProseMirror_.lex-ai-generated]:px-0.5',
+          '[&_.ProseMirror_.lex-pending-insert]:rounded-sm [&_.ProseMirror_.lex-pending-insert]:box-decoration-clone',
+          '[&_.ProseMirror_.lex-pending-insert]:outline [&_.ProseMirror_.lex-pending-insert]:outline-dashed',
+          '[&_.ProseMirror_.lex-pending-insert]:outline-1 [&_.ProseMirror_.lex-pending-insert]:outline-indigo-400/80',
           isReadOnly && 'cursor-default',
         )}
       >

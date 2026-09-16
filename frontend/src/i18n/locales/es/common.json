@@ -167,7 +167,12 @@
       "insertWithCitationsEmpty": "Insertar con citas",
       "insertTextOnly": "Insertar solo texto",
       "generateError": "No se pudo generar el texto.",
-      "threadTitle": "Asistente de redacción"
+      "threadTitle": "Asistente de redacción",
+      "stop": "Detener",
+      "stopAria": "Detener generación",
+      "targetStale": "La selección original ya no está en el documento. Vuelve a seleccionar el texto.",
+      "pendingTargetHint": "Insertará en la selección marcada",
+      "submitHint": "Ctrl+Enter para generar"
     },
     "aiDraftDisclaimer": "Texto generado por IA — revísalo antes de usarlo.",
     "aiDraftAttribution": "— Generado por IA. Revisa antes de usar."

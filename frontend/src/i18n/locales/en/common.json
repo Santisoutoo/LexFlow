@@ -167,7 +167,12 @@
       "insertWithCitationsEmpty": "Insert with citations",
       "insertTextOnly": "Insert text only",
       "generateError": "Could not generate text.",
-      "threadTitle": "Drafting assistant"
+      "threadTitle": "Drafting assistant",
+      "stop": "Stop",
+      "stopAria": "Stop generation",
+      "targetStale": "The original selection is no longer in the document. Reselect the text.",
+      "pendingTargetHint": "Will insert at the highlighted selection",
+      "submitHint": "Ctrl+Enter to generate"
     },
     "aiDraftDisclaimer": "AI-generated text — review before using.",
     "aiDraftAttribution": "— AI-generated. Review before using."
