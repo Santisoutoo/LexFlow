@@ -8,8 +8,8 @@
  *   `TemplateFillForm` to map them (free text + corpus law metadata).
  *
  * Applying inserts the filled draft at the cursor (non-destructive — it never
- * silently wipes the current document). Portaled to `<body>` by EditorPage so
- * the fixed overlay isn't clipped by the editor's scroll container.
+ * silently wipes the current document). "Aplicar en documento nuevo" mints a
+ * fresh document via `createDocument` (#832 / S4.6).
  *
  * --- WHERE TO CHANGE IF TEMPLATE STORAGE CHANGES ---
  * - Persistence → `@/lib/template-store`.
@@ -17,15 +17,21 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import type { Editor } from '@tiptap/react';
 import type { JSONContent } from '@tiptap/react';
 import { LayoutTemplate, FilePlus2, Upload, Trash2, FileText } from 'lucide-react';
 import { Button, Kbd } from '@/components/ui';
+import { useConfirm } from '@/lib/confirm';
+import { useEditorStore } from '@/lib/editor-store';
+import { useFocusTrap } from '@/lib/useFocusTrap';
 import { useTemplateStore } from '@/lib/template-store';
 import { stripCommentMarks } from './comment-utils';
 import { extractVariables, fillTemplate } from './template-utils';
 import { importFile, SUPPORTED_IMPORT } from './import-utils';
 import { TemplateFillForm } from './TemplateFillForm';
+
+type ApplyMode = 'insert' | 'newDocument';
 
 interface TemplatesDialogProps {
   editor: Editor;
@@ -34,25 +40,41 @@ interface TemplatesDialogProps {
 
 export function TemplatesDialog({ editor, onClose }: TemplatesDialogProps) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const confirm = useConfirm();
+  const panelRef = useRef<HTMLDivElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const { templates, saveTemplate, deleteTemplate } = useTemplateStore();
+  const { createDocument, saveDocument } = useEditorStore();
   const [name, setName] = useState('');
   const [fillId, setFillId] = useState<string | null>(null);
+  const [applyMode, setApplyMode] = useState<ApplyMode>('insert');
   const [importError, setImportError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const list = Object.values(templates).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const filling = fillId ? templates[fillId] : null;
 
+  useFocusTrap(panelRef, true);
+
+  useEffect(() => {
+    if (filling) return;
+    requestAnimationFrame(() => nameInputRef.current?.focus());
+  }, [filling]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      if (fillId) {
+        setFillId(null);
+        return;
       }
+      onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [fillId, onClose]);
 
   const saveCurrent = () => {
     const trimmed = name.trim();
@@ -79,21 +101,53 @@ export function TemplatesDialog({ editor, onClose }: TemplatesDialogProps) {
     }
   };
 
-  const applyTemplate = (content: JSONContent, values: Record<string, string>) => {
+  const finishApply = (
+    templateName: string,
+    content: JSONContent,
+    values: Record<string, string>,
+    mode: ApplyMode,
+  ) => {
     const filled = stripCommentMarks(fillTemplate(content, values));
-    // Insert the filled body at the cursor — never overwrite the whole doc.
+    if (mode === 'newDocument') {
+      const newId = createDocument(templateName);
+      saveDocument({ id: newId, title: templateName, content: filled });
+      onClose();
+      navigate(`/editor/${newId}`);
+      return;
+    }
     editor.chain().focus().insertContent(filled.content ?? []).run();
     onClose();
   };
 
-  const startApply = (id: string) => {
+  const applyTemplate = (
+    templateName: string,
+    content: JSONContent,
+    values: Record<string, string>,
+    mode: ApplyMode,
+  ) => {
+    finishApply(templateName, content, values, mode);
+  };
+
+  const startApply = (id: string, mode: ApplyMode = 'insert') => {
     const template = templates[id];
     if (!template) return;
+    setApplyMode(mode);
     if (extractVariables(template.content).length === 0) {
-      applyTemplate(template.content, {});
+      applyTemplate(template.name, template.content, {}, mode);
       return;
     }
     setFillId(id);
+  };
+
+  const handleDelete = async (templateId: string, templateName: string) => {
+    const ok = await confirm({
+      title: t('editor.templates.deleteConfirmTitle'),
+      message: t('editor.templates.deleteConfirmMessage', { name: templateName }),
+      confirmLabel: t('common.delete'),
+      tone: 'danger',
+    });
+    if (!ok) return;
+    deleteTemplate(templateId);
   };
 
   return (
@@ -104,12 +158,16 @@ export function TemplatesDialog({ editor, onClose }: TemplatesDialogProps) {
       className="fixed inset-0 z-overlay flex items-start justify-center pt-[12vh] bg-black/35 backdrop-blur-[2px] animate-in"
       onClick={onClose}
     >
-      <div onClick={(e) => e.stopPropagation()} className="air-glass-strong w-[580px] max-w-[92vw] overflow-hidden">
+      <div
+        ref={panelRef}
+        onClick={(e) => e.stopPropagation()}
+        className="air-glass-strong w-[580px] max-w-[92vw] overflow-hidden"
+      >
         {filling ? (
           <TemplateFillForm
             template={filling}
             onBack={() => setFillId(null)}
-            onApply={(values) => applyTemplate(filling.content, values)}
+            onApply={(values) => applyTemplate(filling.name, filling.content, values, applyMode)}
           />
         ) : (
           <>
@@ -123,6 +181,7 @@ export function TemplatesDialog({ editor, onClose }: TemplatesDialogProps) {
             <div className="flex flex-col gap-2 border-b border-border px-4 py-3">
               <div className="flex items-center gap-2">
                 <input
+                  ref={nameInputRef}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   onKeyDown={(e) => {
@@ -198,12 +257,15 @@ export function TemplatesDialog({ editor, onClose }: TemplatesDialogProps) {
                       <Button variant="ghost" size="sm" onClick={() => startApply(template.id)}>
                         {t('editor.templates.apply')}
                       </Button>
+                      <Button variant="ghost" size="sm" onClick={() => startApply(template.id, 'newDocument')}>
+                        {t('editor.templates.applyNewDocument')}
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon-sm"
                         aria-label={t('editor.templates.deleteAria', { name: template.name })}
                         title={t('editor.templates.delete')}
-                        onClick={() => deleteTemplate(template.id)}
+                        onClick={() => void handleDelete(template.id, template.name)}
                       >
                         <Trash2 className="size-3.5" />
                       </Button>

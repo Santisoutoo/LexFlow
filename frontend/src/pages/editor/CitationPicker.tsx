@@ -21,6 +21,8 @@ import type { Editor } from '@tiptap/react';
 import { BookOpenText, FileText, Scale } from 'lucide-react';
 import { Kbd } from '@/components/ui';
 import { useSearch } from '@/lib/queries';
+import { useDebouncedValue } from '@/lib/use-debounced-value';
+import { useFocusTrap } from '@/lib/useFocusTrap';
 import { cn } from '@/lib/utils';
 import { HighlightedSnippet } from '@/components/domain/HighlightedSnippet';
 import { citationFromHit } from './citation-utils';
@@ -32,12 +34,16 @@ interface CitationPickerProps {
 
 export function CitationPicker({ editor, onClose }: CitationPickerProps) {
   const { t } = useTranslation();
+  const panelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [q, setQ] = useState('');
   const [active, setActive] = useState(0);
+  const debouncedQ = useDebouncedValue(q, 200);
 
   const { data, isFetching } = useSearch(q);
-  const searchPending = isFetching && !data;
+  const searchPending = isFetching && (data?.hits ?? []).length === 0;
+
+  useFocusTrap(panelRef, true);
 
   // Keep only hits that resolve to a citation, paired with their attributes —
   // `citationFromHit` is the single source of truth for "can this be cited?".
@@ -55,11 +61,10 @@ export function CitationPicker({ editor, onClose }: CitationPickerProps) {
     requestAnimationFrame(() => inputRef.current?.focus());
   }, []);
 
-  // Clamp the active row whenever the (async) result set changes so Enter can
-  // never target an invalid index — including the empty-list case.
+  // Clamp the active row when debounced results change — not on every keystroke.
   useEffect(() => {
     setActive((a) => (resolvable.length === 0 ? 0 : Math.min(a, resolvable.length - 1)));
-  }, [q, resolvable.length]);
+  }, [debouncedQ, resolvable.length]);
 
   const insert = (index: number) => {
     const entry = resolvable[index];
@@ -99,7 +104,11 @@ export function CitationPicker({ editor, onClose }: CitationPickerProps) {
       className="fixed inset-0 z-overlay flex items-start justify-center pt-[12vh] bg-black/35 backdrop-blur-[2px] animate-in"
       onClick={onClose}
     >
-      <div onClick={(e) => e.stopPropagation()} className="air-glass-strong w-[580px] max-w-[92vw] overflow-hidden">
+      <div
+        ref={panelRef}
+        onClick={(e) => e.stopPropagation()}
+        className="air-glass-strong w-[580px] max-w-[92vw] overflow-hidden"
+      >
         <div className="flex items-center gap-2.5 border-b border-border px-4 py-3">
           <Scale className="size-4 text-muted" />
           <input
