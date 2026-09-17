@@ -9,16 +9,19 @@ dangling index so a later incremental add can resolve them.
 from __future__ import annotations
 
 import logging
+import os
 import unicodedata
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
 from lexflow.core.delta_sync import CorpusDiff
 from lexflow.core.enums import EdgeResolution, ReferenceKind, parse_edge_resolution
 from lexflow.core.exceptions import LexFlowError
-from lexflow.core.models import Law
+from lexflow.core.models import Reference
 
 # Reuse the parser's citation pattern so a reference's text and a law title's
 # leading citation are matched by the exact same rule (no drift, #569).
-from lexflow.core.parser import _LAW_REF_RE
+from lexflow.core.parser import _LAW_REF_RE, extract_law_references_from_path
 from lexflow.core.registry import LawRegistry
 from lexflow.graph.algorithms import enrich_graph_analytics
 from lexflow.graph.model import LegalGraph
@@ -60,6 +63,50 @@ def _build_citation_index(registry: LawRegistry) -> dict[str, str]:
     return index
 
 
+def _default_graph_workers() -> int:
+    """Worker count for parallel reference extraction during cold graph builds."""
+    return min(32, (os.cpu_count() or 1) + 4)
+
+
+def _extract_references_for_path(law_id: str, path: Path) -> tuple[str, list[Reference]] | None:
+    """Parse references from one law file without touching the registry cache."""
+    try:
+        return law_id, extract_law_references_from_path(path)
+    except (OSError, ValueError, LexFlowError):
+        logger.warning("Could not extract references for %s", law_id, exc_info=True)
+        return None
+
+
+def _collect_law_references(registry: LawRegistry) -> dict[str, list[Reference]]:
+    """Extract cross-references for every indexed law in a worker pool (#78 S2.1)."""
+    paths: list[tuple[str, Path]] = []
+    fallback_ids: list[str] = []
+    path_lookup = getattr(registry, "law_file_path", None)
+    for law_id in registry.law_ids:
+        path = path_lookup(law_id) if path_lookup is not None else None
+        if path is not None:
+            paths.append((law_id, path))
+        else:
+            fallback_ids.append(law_id)
+
+    references_by_law: dict[str, list[Reference]] = {}
+    workers = _default_graph_workers()
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = {executor.submit(_extract_references_for_path, law_id, path): law_id for law_id, path in paths}
+        for future in as_completed(futures):
+            result = future.result()
+            if result is not None:
+                references_by_law[result[0]] = result[1]
+
+    for law_id in fallback_ids:
+        try:
+            references_by_law[law_id] = registry.get_law(law_id).references
+        except (OSError, ValueError, LexFlowError):
+            logger.warning("Could not process references for %s", law_id, exc_info=True)
+
+    return references_by_law
+
+
 def build_graph(registry: LawRegistry) -> LegalGraph:
     graph = LegalGraph()
     # Pass 1: add all law nodes
@@ -77,12 +124,12 @@ def build_graph(registry: LawRegistry) -> LegalGraph:
     # them; only resolved edges are counted for the log.
     added_edges = 0
     citation_index = _build_citation_index(registry)
+    references_by_law = _collect_law_references(registry)
     for law_id in registry.law_ids:
-        try:
-            law = registry.get_law(law_id)
-            added_edges += _add_law_edges(graph, law_id, law, citation_index)
-        except (OSError, ValueError, LexFlowError):
-            logger.warning("Could not process references for %s", law_id, exc_info=True)
+        references = references_by_law.get(law_id)
+        if references is None:
+            continue
+        added_edges += _add_law_edges(graph, law_id, references, citation_index)
     enrich_graph_analytics(graph)
     logger.info("Graph built: %d nodes, %d edges", graph.node_count(), added_edges)
     return graph
@@ -109,7 +156,12 @@ def apply_diff_to_graph(graph: LegalGraph, registry: LawRegistry, diff: CorpusDi
     enrich_graph_analytics(graph)
 
 
-def _add_law_edges(graph: LegalGraph, law_id: str, law: Law, citation_index: dict[str, str]) -> int:
+def _add_law_edges(
+    graph: LegalGraph,
+    law_id: str,
+    references: list[Reference],
+    citation_index: dict[str, str],
+) -> int:
     """Add one law's outgoing edges; park unresolved targets as dangling.
 
     Returns the number of edges actually inserted (target was a known node).
@@ -122,7 +174,7 @@ def _add_law_edges(graph: LegalGraph, law_id: str, law: Law, citation_index: dic
     ``inferred`` when the target came from ``citation_index`` (#64).
     """
     added = 0
-    for ref in law.references:
+    for ref in references:
         if ref.target_id:
             target_id = ref.target_id
             resolution = EdgeResolution.BOE_ID
@@ -184,7 +236,8 @@ def _upsert_law(graph: LegalGraph, registry: LawRegistry, law_id: str, citation_
     graph.add_law(registry.get_metadata(law_id))
     graph.drop_source_from_dangling(law_id)
     graph.clear_outgoing(law_id)
-    _add_law_edges(graph, law_id, registry.get_law(law_id), citation_index)
+    law = registry.get_law(law_id)
+    _add_law_edges(graph, law_id, law.references, citation_index)
 
 
 def _resolve_incoming(graph: LegalGraph, law_id: str) -> None:

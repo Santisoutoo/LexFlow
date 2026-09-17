@@ -156,7 +156,7 @@ def test_upsert_merges_duplicate_target_kinds() -> None:
     graph.clear_outgoing("A")
     from lexflow.graph.builder import _add_law_edges
 
-    _add_law_edges(graph, "A", law, {})
+    _add_law_edges(graph, "A", law.references, {})
     assert graph.graph["A"]["B"]["kind"] == ReferenceKind.REPEALS.value
 
 

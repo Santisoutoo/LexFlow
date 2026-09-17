@@ -7,8 +7,10 @@ lazily parses them on first access, and caches results permanently.
 from __future__ import annotations
 
 import logging
+import os
 from collections import Counter
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
 from pathlib import Path
 from threading import Lock
@@ -391,12 +393,44 @@ class LawRegistry:
         """Parse frontmatter for all laws in the index.
 
         Called as a background task at startup to make subsequent list/filter
-        operations fast.
+        operations fast. Uses a worker pool and CSafeLoader-backed YAML
+        parsing for cold-start throughput (#78 S2.2).
         """
+        pending = [law_id for law_id in self._snapshot_law_ids() if law_id not in self._metadata_cache]
+        if not pending:
+            logger.info("Metadata preload complete: 0 laws loaded")
+            return
+
+        workers = min(32, (os.cpu_count() or 1) + 4)
         loaded = 0
-        for law_id in self._snapshot_law_ids():
-            if law_id not in self._metadata_cache and self._safe_metadata(law_id) is not None:
-                loaded += 1
+        skipped: set[str] = set()
+
+        def _parse_one(law_id: str) -> tuple[str, LawMetadata | None]:
+            path = self._index.get(law_id)
+            if path is None:
+                return law_id, None
+            try:
+                return law_id, parse_metadata_only(path)
+            except (OSError, ValueError, LexFlowError):
+                logger.warning("Skipping malformed law %s during metadata preload", law_id, exc_info=True)
+                return law_id, None
+
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = {executor.submit(_parse_one, law_id): law_id for law_id in pending}
+            for future in as_completed(futures):
+                law_id, metadata = future.result()
+                if metadata is None:
+                    skipped.add(law_id)
+                    continue
+                with self._lock:
+                    if law_id not in self._metadata_cache:
+                        self._metadata_cache[law_id] = metadata
+                        loaded += 1
+
+        if skipped:
+            with self._lock:
+                self._skipped_law_ids.update(skipped)
+
         logger.info("Metadata preload complete: %d laws loaded", loaded)
 
     # ------------------------------------------------------------------
