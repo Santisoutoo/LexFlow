@@ -81,7 +81,8 @@ class TestComputeDriftReport:
 
         priming_registry = LawRegistry(data_path)
         graph = graph_cache.load_or_build(priming_registry, data_path)
-        assert priming_registry.is_parsed("BOE-A-2099-2")  # cold build parsed it
+        # Cold graph build extracts references without populating ``_cache`` (#78 S2.1).
+        assert priming_registry.is_parsed("BOE-A-2099-2") is False
 
         registry = LawRegistry(data_path)
         cached_graph = graph_cache.load_or_build(registry, data_path)

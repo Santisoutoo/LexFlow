@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 import re
 import unicodedata
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -51,6 +52,23 @@ def split_frontmatter(content: str) -> tuple[str, str]:
     return yaml_text, body
 
 
+def _load_yaml_dict(yaml_text: str) -> dict[str, Any]:
+    """Parse YAML frontmatter using CSafeLoader when available (#78 S2.2)."""
+    stripped = yaml_text.strip()
+    if not stripped:
+        return {}
+    loader = getattr(yaml, "CSafeLoader", None)
+    if loader is not None:
+        try:
+            data = yaml.load(stripped, Loader=loader)
+            if isinstance(data, dict):
+                return data
+        except yaml.YAMLError:
+            pass
+    data = yaml.safe_load(stripped)
+    return data if isinstance(data, dict) else {}
+
+
 def parse_frontmatter(yaml_text: str) -> dict[str, Any]:
     """Parse a YAML frontmatter string into a raw dictionary.
 
@@ -60,10 +78,9 @@ def parse_frontmatter(yaml_text: str) -> dict[str, Any]:
     if not yaml_text.strip():
         return {}
     try:
-        data = yaml.safe_load(yaml_text)
+        return _load_yaml_dict(yaml_text)
     except yaml.YAMLError as exc:
         raise ParserError("<unknown>", f"Invalid YAML frontmatter: {exc}") from exc
-    return data if isinstance(data, dict) else {}
 
 
 def _safe_enum(enum_cls: type, value: Any, default: Any) -> Any:
@@ -177,22 +194,33 @@ def frontmatter_to_metadata(raw: dict[str, Any]) -> LawMetadata:
 _HEADING_RE = re.compile(r"^(#{1,5})\s+(.+)$", re.MULTILINE)
 
 
-def extract_heading_tree(body: str) -> list[Section]:
+@dataclass
+class _BodyScan:
+    """Precomputed heading and article match positions for a law body (#78 S2.3)."""
+
+    heading_matches: list[tuple[int, str, int]]
+    article_matches: list[re.Match[str]]
+
+
+def _scan_body(body: str) -> _BodyScan:
+    """Scan *body* once for heading and article heading positions."""
+    return _BodyScan(
+        heading_matches=[(len(m.group(1)), m.group(2).strip(), m.start()) for m in _HEADING_RE.finditer(body)],
+        article_matches=list(_ARTICLE_RE.finditer(body)),
+    )
+
+
+def extract_heading_tree(body: str, *, scan: _BodyScan | None = None) -> list[Section]:
     """Parse Markdown headings into a nested :class:`Section` tree.
 
     Walks the body line-by-line, using heading depth to establish
     parent/child relationships.
     """
-    matches: list[tuple[int, str, int]] = []  # (level, heading, start_pos)
-    for m in _HEADING_RE.finditer(body):
-        level = len(m.group(1))
-        heading = m.group(2).strip()
-        matches.append((level, heading, m.start()))
-
-    if not matches:
+    body_scan = scan or _scan_body(body)
+    if not body_scan.heading_matches:
         return []
 
-    return _build_section_list(body, matches, target_level=0)
+    return _build_section_list(body, body_scan.heading_matches, target_level=0, scan=body_scan)
 
 
 def _build_section_list(
@@ -202,6 +230,8 @@ def _build_section_list(
     start_idx: int = 0,
     end_idx: int | None = None,
     body_end: int | None = None,
+    *,
+    scan: _BodyScan | None = None,
 ) -> list[Section]:
     """Recursively build sections for headings at *target_level* depth.
 
@@ -256,6 +286,7 @@ def _build_section_list(
             start_idx=i + 1,
             end_idx=i + (j - i),
             body_end=content_end,
+            scan=scan,
         )
 
         # Extract articles from this section's DIRECT content only — the
@@ -267,7 +298,10 @@ def _build_section_list(
         # their own articles via the recursion above.
         first_sub_start = subset[i + 1][2] if (i + 1) < j else content_end
         direct_body = body[content_start:first_sub_start]
-        articles = extract_articles(direct_body)
+        if scan is not None:
+            articles = _articles_in_span(body, scan, content_start, first_sub_start)
+        else:
+            articles = extract_articles(direct_body)
         section_text = _extract_section_text(direct_body)
 
         sections.append(
@@ -353,7 +387,23 @@ _ARTICLE_RANGE_RE = re.compile(
 _ANY_HEADING_LINE_RE = re.compile(r"^#{1,6}[ \t]+\S", re.MULTILINE)
 
 
-def extract_articles(body: str) -> list[Article]:
+def _articles_in_span(body: str, scan: _BodyScan, start: int, end: int) -> list[Article]:
+    """Build articles whose headings fall within ``[start, end)`` using *scan*."""
+    span_matches = [match for match in scan.article_matches if start <= match.start() < end]
+    articles: list[Article] = []
+    for idx, match in enumerate(span_matches):
+        number = (match.group(1) or match.group(3)).strip()
+        raw_title = match.group(2)
+        title = raw_title.strip() if raw_title else None
+        text_start = match.end()
+        text_end = span_matches[idx + 1].start() if idx + 1 < len(span_matches) else end
+        raw_text = _extract_article_text(body[text_start:text_end])
+        references = extract_references(raw_text, source_article=number)
+        articles.append(_build_article(number, title, raw_text, references))
+    return articles
+
+
+def extract_articles(body: str, *, scan: _BodyScan | None = None) -> list[Article]:
     """Extract all articles from a Markdown body.
 
     Finds ``Articulo N.`` patterns, splitting each heading into the article
@@ -361,8 +411,9 @@ def extract_articles(body: str) -> list[Article]:
     number ``"1"``, title ``"Objeto de la Ley"`` — #112), and captures text
     until the next article heading or section heading.
     """
-    matches = list(_ARTICLE_RE.finditer(body))
+    body_scan = scan or _scan_body(body)
     entries: list[tuple[int, Article]] = []
+    matches = body_scan.article_matches
     for idx, match in enumerate(matches):
         number = (match.group(1) or match.group(3)).strip()
         raw_title = match.group(2)
@@ -377,6 +428,16 @@ def extract_articles(body: str) -> list[Article]:
     entries.extend(_extract_range_placeholder_articles(body, existing_numbers))
     entries.sort(key=lambda entry: entry[0])
     return [article for _, article in entries]
+
+
+def extract_law_body_structure(body: str) -> tuple[list[Section], list[Article]]:
+    """Extract the section tree and flat article list with one body scan (#78 S2.3)."""
+    scan = _scan_body(body)
+    sections = extract_heading_tree(body, scan=scan)
+    articles = extract_articles(body, scan=scan)
+    if not articles:
+        articles = extract_ordinal_articles(body)
+    return sections, articles
 
 
 def _extract_range_placeholder_articles(body: str, existing_numbers: set[str]) -> list[tuple[int, Article]]:
@@ -941,6 +1002,25 @@ def _resolve_reference_id(ref_text: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 
+def extract_law_references_from_path(file_path: Path) -> list[Reference]:
+    """Parse only cross-references from a law file without caching a full :class:`Law` (#78 S2.1)."""
+    try:
+        content = file_path.read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise ParserError(str(file_path), "File not found") from exc
+    except OSError as exc:
+        raise ParserError(str(file_path), f"Cannot read file: {exc}") from exc
+    return extract_law_references_from_content(content)
+
+
+def extract_law_references_from_content(content: str) -> list[Reference]:
+    """Collect cross-references from law body text without building a full :class:`Law`."""
+    _, body = split_frontmatter(content)
+    sections, articles = extract_law_body_structure(body)
+    disposiciones = extract_disposiciones(body)
+    return _collect_all_references(articles, disposiciones, sections)
+
+
 def parse_law_file(file_path: Path) -> Law:
     """Parse a complete ``.md`` law file into a :class:`Law` model.
 
@@ -978,12 +1058,7 @@ def parse_law_content(content: str, file_path: str) -> Law:
     except ParserError as exc:
         raise ParserError(file_path, exc.reason) from exc
     metadata = frontmatter_to_metadata(raw_fm)
-    sections = extract_heading_tree(body)
-    articles = extract_articles(body)
-    if not articles:
-        # #54: ~38% of the 1,857 zero-article laws use numbered ordinals
-        # (``Primero.``, ``Único.``, ...) instead of ``Artículo`` headings.
-        articles = extract_ordinal_articles(body)
+    sections, articles = extract_law_body_structure(body)
     disposiciones = extract_disposiciones(body)
     all_references = _collect_all_references(articles, disposiciones, sections)
 
