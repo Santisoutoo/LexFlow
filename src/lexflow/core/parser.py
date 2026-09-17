@@ -390,7 +390,7 @@ _ANY_HEADING_LINE_RE = re.compile(r"^#{1,6}[ \t]+\S", re.MULTILINE)
 def _articles_in_span(body: str, scan: _BodyScan, start: int, end: int) -> list[Article]:
     """Build articles whose headings fall within ``[start, end)`` using *scan*."""
     span_matches = [match for match in scan.article_matches if start <= match.start() < end]
-    articles: list[Article] = []
+    entries: list[tuple[int, Article]] = []
     for idx, match in enumerate(span_matches):
         number = (match.group(1) or match.group(3)).strip()
         raw_title = match.group(2)
@@ -399,8 +399,15 @@ def _articles_in_span(body: str, scan: _BodyScan, start: int, end: int) -> list[
         text_end = span_matches[idx + 1].start() if idx + 1 < len(span_matches) else end
         raw_text = _extract_article_text(body[text_start:text_end])
         references = extract_references(raw_text, source_article=number)
-        articles.append(_build_article(number, title, raw_text, references))
-    return articles
+        entries.append((match.start(), _build_article(number, title, raw_text, references)))
+
+    existing_numbers = {(match.group(1) or match.group(3)).strip() for match in scan.article_matches}
+    for pos, article in _extract_range_placeholder_articles(body, existing_numbers):
+        if start <= pos < end:
+            entries.append((pos, article))
+
+    entries.sort(key=lambda entry: entry[0])
+    return [article for _, article in entries]
 
 
 def extract_articles(body: str, *, scan: _BodyScan | None = None) -> list[Article]:

@@ -13,6 +13,7 @@ from lexflow.core.parser import (
     extract_articles,
     extract_disposiciones,
     extract_heading_tree,
+    extract_law_body_structure,
     extract_ordinal_articles,
     extract_references,
     frontmatter_to_metadata,
@@ -365,6 +366,38 @@ class TestExtractArticles:
             return sum(len(s.articles) + count(s.subsections) for s in sections)
 
         assert count(tree) == len(extract_articles(body)) == 3
+
+    def test_section_tree_includes_range_placeholder_articles(self) -> None:
+        """Regression (#78): range placeholders must count in the section tree.
+
+        ``_articles_in_span`` must materialise ``Artículos N a M`` placeholders
+        inside its slice — same as :func:`extract_articles` — or nested section
+        article totals fall short of the flat list.
+        """
+        body = dedent("""\
+            ## TITULO I
+
+            ###### Artículos 60 a 62.
+
+            **(Derogados)**
+
+            ###### Artículo 63.
+
+            Texto del articulo 63.
+
+            ### CAPITULO I
+
+            ###### Artículo 64.
+
+            En el capitulo.
+        """)
+        sections, flat_articles = extract_law_body_structure(body)
+
+        def count(sections_list: list) -> int:
+            return sum(len(s.articles) + count(s.subsections) for s in sections_list)
+
+        assert count(sections) == len(flat_articles) == 5
+        assert [a.number for a in flat_articles] == ["60", "61", "62", "63", "64"]
 
     def test_non_heading_mention_is_not_a_boundary(self) -> None:
         """Regression (#54): a body line reading "Artículo N" without a
