@@ -54,27 +54,46 @@ vi.mock('@/lib/useFocusTrap', () => ({
   useFocusTrap: vi.fn(),
 }));
 
-vi.mock('./TemplateFillForm', () => ({
-  TemplateFillForm: ({
-    onBack,
-    onApply,
-  }: {
-    onBack: () => void;
-    onApply: (values: Record<string, string>) => void;
-  }) => (
-    <div>
-      <p>Rellena las variables para generar el borrador</p>
-      <label htmlFor="parte-input">Valor para parte</label>
-      <input id="parte-input" aria-label="Valor para parte" />
-      <button type="button" onClick={onBack}>
-        Volver
-      </button>
-      <button type="button" onClick={() => onApply({ parte: 'demandante' })}>
-        Aplicar plantilla
-      </button>
-    </div>
-  ),
-}));
+vi.mock('./TemplateFillForm', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./TemplateFillForm')>();
+  return {
+    ...actual,
+    TemplateFillForm: ({
+      draft,
+      onDraftChange,
+      onBack,
+      onApply,
+    }: {
+      draft: { customValues: Record<string, string>; lawQuery: string; lawId: string | null };
+      onDraftChange: (draft: {
+        customValues: Record<string, string>;
+        lawQuery: string;
+        lawId: string | null;
+      }) => void;
+      onBack: () => void;
+      onApply: (values: Record<string, string>) => void;
+    }) => (
+      <div>
+        <p>Rellena las variables para generar el borrador</p>
+        <label htmlFor="parte-input">Valor para parte</label>
+        <input
+          id="parte-input"
+          aria-label="Valor para parte"
+          value={draft.customValues.parte ?? ''}
+          onChange={(e) =>
+            onDraftChange({ ...draft, customValues: { ...draft.customValues, parte: e.target.value } })
+          }
+        />
+        <button type="button" onClick={onBack}>
+          Volver
+        </button>
+        <button type="button" onClick={() => onApply({ parte: draft.customValues.parte ?? 'demandante' })}>
+          Aplicar plantilla
+        </button>
+      </div>
+    ),
+  };
+});
 
 const navigateMock = vi.fn();
 vi.mock('react-router-dom', async (importOriginal) => {
@@ -135,6 +154,17 @@ describe('TemplatesDialog', () => {
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(screen.getByText('Con variables')).toBeInTheDocument();
     expect(screen.queryByText(/rellena las variables/i)).not.toBeInTheDocument();
+  });
+
+  it('preserves fill draft when escaping back to list and re-opening the template', async () => {
+    renderDialog();
+    await userEvent.click(screen.getAllByRole('button', { name: /^aplicar$/i })[0]);
+    const input = screen.getByRole('textbox', { name: /valor para parte/i });
+    await userEvent.type(input, 'demandante');
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByText(/rellena las variables/i)).not.toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole('button', { name: /^aplicar$/i })[0]);
+    expect(screen.getByRole('textbox', { name: /valor para parte/i })).toHaveValue('demandante');
   });
 
   it('closes dialog on second Escape from list view', async () => {

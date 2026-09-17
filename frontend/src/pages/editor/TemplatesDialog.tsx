@@ -29,7 +29,7 @@ import { useTemplateStore } from '@/lib/template-store';
 import { stripCommentMarks } from './comment-utils';
 import { extractVariables, fillTemplate } from './template-utils';
 import { importFile, SUPPORTED_IMPORT } from './import-utils';
-import { TemplateFillForm } from './TemplateFillForm';
+import { EMPTY_TEMPLATE_FILL_DRAFT, TemplateFillForm, type TemplateFillDraft } from './TemplateFillForm';
 
 type ApplyMode = 'insert' | 'newDocument';
 
@@ -48,6 +48,7 @@ export function TemplatesDialog({ editor, onClose }: TemplatesDialogProps) {
   const { createDocument, saveDocument } = useEditorStore();
   const [name, setName] = useState('');
   const [fillId, setFillId] = useState<string | null>(null);
+  const [fillDrafts, setFillDrafts] = useState<Record<string, TemplateFillDraft>>({});
   const [applyMode, setApplyMode] = useState<ApplyMode>('insert');
   const [importError, setImportError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -163,9 +164,11 @@ export function TemplatesDialog({ editor, onClose }: TemplatesDialogProps) {
         onClick={(e) => e.stopPropagation()}
         className="air-glass-strong w-[580px] max-w-[92vw] overflow-hidden"
       >
-        {filling ? (
+        {filling && fillId ? (
           <TemplateFillForm
             template={filling}
+            draft={fillDrafts[fillId] ?? EMPTY_TEMPLATE_FILL_DRAFT}
+            onDraftChange={(draft) => setFillDrafts((prev) => ({ ...prev, [fillId]: draft }))}
             onBack={() => setFillId(null)}
             onApply={(values) => applyTemplate(filling.name, filling.content, values, applyMode)}
           />

@@ -10,7 +10,7 @@
  * On "Aplicar" it hands the merged values up; the dialog substitutes them and
  * inserts the draft. Unknown/empty vars are intentionally left as placeholders.
  */
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, BookOpenText, Search, X } from 'lucide-react';
 import { Button } from '@/components/ui';
@@ -19,21 +19,33 @@ import { cn } from '@/lib/utils';
 import type { DocumentTemplate } from '@/lib/template-store';
 import { extractVariables, lawVariableValues } from './template-utils';
 
+export interface TemplateFillDraft {
+  customValues: Record<string, string>;
+  lawQuery: string;
+  lawId: string | null;
+}
+
+export const EMPTY_TEMPLATE_FILL_DRAFT: TemplateFillDraft = {
+  customValues: {},
+  lawQuery: '',
+  lawId: null,
+};
+
 interface TemplateFillFormProps {
   template: DocumentTemplate;
+  draft: TemplateFillDraft;
+  onDraftChange: (draft: TemplateFillDraft) => void;
   onApply: (values: Record<string, string>) => void;
   onBack: () => void;
 }
 
-export function TemplateFillForm({ template, onApply, onBack }: TemplateFillFormProps) {
+export function TemplateFillForm({ template, draft, onDraftChange, onApply, onBack }: TemplateFillFormProps) {
   const { t } = useTranslation();
   const variables = useMemo(() => extractVariables(template.content), [template]);
   const lawVars = variables.filter((v) => v.startsWith('law.'));
   const customVars = variables.filter((v) => !v.startsWith('law.'));
 
-  const [customValues, setCustomValues] = useState<Record<string, string>>({});
-  const [lawQuery, setLawQuery] = useState('');
-  const [lawId, setLawId] = useState<string | null>(null);
+  const { customValues, lawQuery, lawId } = draft;
 
   const { data: searchData } = useSearch(lawQuery);
   const lawHits = (searchData?.hits ?? []).filter((h) => h.kind === 'law' && typeof h.payload?.lawId === 'string');
@@ -67,7 +79,13 @@ export function TemplateFillForm({ template, onApply, onBack }: TemplateFillForm
                   <span className="truncate font-medium">{law.short || law.title}</span>
                   <span className="truncate text-muted">{law.id}</span>
                 </span>
-                <Button variant="ghost" size="icon-sm" aria-label={t('editor.templateFill.removeLawAria')} title={t('editor.templateFill.removeLaw')} onClick={() => setLawId(null)}>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={t('editor.templateFill.removeLawAria')}
+                  title={t('editor.templateFill.removeLaw')}
+                  onClick={() => onDraftChange({ ...draft, lawId: null })}
+                >
                   <X className="size-3.5" />
                 </Button>
               </div>
@@ -77,7 +95,7 @@ export function TemplateFillForm({ template, onApply, onBack }: TemplateFillForm
                   <Search className="size-3.5 text-muted" />
                   <input
                     value={lawQuery}
-                    onChange={(e) => setLawQuery(e.target.value)}
+                    onChange={(e) => onDraftChange({ ...draft, lawQuery: e.target.value })}
                     aria-label={t('editor.templateFill.lawSearchAria')}
                     placeholder={t('editor.templateFill.lawSearchPlaceholder')}
                     className="flex-1 bg-transparent text-[13.5px] outline-none placeholder:text-muted"
@@ -93,7 +111,7 @@ export function TemplateFillForm({ template, onApply, onBack }: TemplateFillForm
                       <button
                         key={h.id}
                         type="button"
-                        onClick={() => setLawId(h.payload!.lawId as string)}
+                        onClick={() => onDraftChange({ ...draft, lawId: h.payload!.lawId as string })}
                         className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-[13px] text-fg transition-colors hover:bg-surface-2"
                       >
                         <BookOpenText className="size-3.5 shrink-0 text-indigo-600" />
@@ -129,7 +147,9 @@ export function TemplateFillForm({ template, onApply, onBack }: TemplateFillForm
                 <span className="font-mono text-[12px] text-muted">{`{{${v}}}`}</span>
                 <input
                   value={customValues[v] ?? ''}
-                  onChange={(e) => setCustomValues((prev) => ({ ...prev, [v]: e.target.value }))}
+                  onChange={(e) =>
+                    onDraftChange({ ...draft, customValues: { ...draft.customValues, [v]: e.target.value } })
+                  }
                   aria-label={t('editor.templateFill.valueForAria', { name: v })}
                   placeholder={t('editor.templateFill.valueForPlaceholder', { name: v })}
                   className="w-full rounded-lg border border-border bg-surface px-3 py-1.5 text-[13.5px] outline-none focus:ring-2 focus:ring-indigo-400"
