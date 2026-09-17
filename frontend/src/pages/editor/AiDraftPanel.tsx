@@ -16,7 +16,7 @@
  * - Markdown insertion → `markdownDraftToBlocks` in `./draft-insert-utils`.
  * - Model selection → mirrors ChatPage (`useModels` + `useUi.defaultModel`).
  */
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { Editor } from '@tiptap/react';
 import { useEditorState } from '@tiptap/react';
 import { useNavigate } from 'react-router-dom';
@@ -30,6 +30,7 @@ import { isSentinelDocumentTitle } from '@/lib/editor-store';
 import { EMPTY_DOC_AI_DRAFT, useAiDraftStore, type AiInsertTarget } from '@/lib/ai-draft-store';
 import { useModels } from '@/lib/queries';
 import { useUi } from '@/lib/store';
+import { useFocusTrap } from '@/lib/useFocusTrap';
 import type { ChatSource } from '@/lib/types';
 import { citationFromSource, type CitationAttrs } from './citation-utils';
 import { isInsertTargetValid, markdownDraftToBlocks } from './draft-insert-utils';
@@ -84,6 +85,9 @@ function captureSelectionTarget(editor: Editor): AiInsertTarget | null {
 export function AiDraftPanel({ editor, docId, docTitle, onClose }: AiDraftPanelProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const panelRef = useRef<HTMLElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const promptRef = useRef<HTMLTextAreaElement>(null);
   const { data: models = [] } = useModels();
   const defaultModel = useUi((s) => s.defaultModel);
   const model = useMemo(() => {
@@ -231,8 +235,15 @@ export function AiDraftPanel({ editor, docId, docTitle, onClose }: AiDraftPanelP
 
   const citableCount = sources.filter((s) => s.target?.lawId).length;
 
+  useFocusTrap(panelRef, true);
+
+  useEffect(() => {
+    requestAnimationFrame(() => promptRef.current?.focus());
+  }, []);
+
   return (
     <aside
+      ref={panelRef}
       role="complementary"
       aria-label={t('editor.aiDraft.panelAria')}
       className="fixed inset-y-0 right-0 z-40 flex w-[380px] max-w-[92vw] flex-col border-l border-border bg-surface shadow-xl"
@@ -241,6 +252,7 @@ export function AiDraftPanel({ editor, docId, docTitle, onClose }: AiDraftPanelP
         <Sparkles className="size-4 text-indigo-600" />
         <span className="flex-1 text-[14px] font-semibold">{t('editor.aiDraft.title')}</span>
         <Button
+          ref={closeButtonRef}
           variant="ghost"
           size="icon-sm"
           aria-label={t('editor.aiDraft.closeAria')}
@@ -290,6 +302,7 @@ export function AiDraftPanel({ editor, docId, docTitle, onClose }: AiDraftPanelP
         <section className="space-y-2">
           <div className="label-caps">{t('editor.aiDraft.promptSection')}</div>
           <textarea
+            ref={promptRef}
             value={prompt}
             onChange={(e) => setPrompt(docId, e.target.value)}
             onKeyDown={onPromptKeyDown}

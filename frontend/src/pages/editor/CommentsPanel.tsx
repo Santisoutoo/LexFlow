@@ -15,6 +15,7 @@ import type { Editor } from '@tiptap/react';
 import { MessageSquare, X, MapPin, Check, RotateCcw, Trash2, Link2 } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { toast } from '@/lib/toast';
+import { useFocusTrap } from '@/lib/useFocusTrap';
 import { useCommentStore, type DocComment } from '@/lib/comment-store';
 import { filterDocComments, findCommentRangeInDoc } from './comment-utils';
 
@@ -33,6 +34,8 @@ function findCommentRange(editor: Editor, commentId: string): { from: number; to
 
 export function CommentsPanel({ editor, docId, focusCommentId, onClose }: CommentsPanelProps) {
   const { t } = useTranslation();
+  const panelRef = useRef<HTMLElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const { comments, updateNote, updateQuote, toggleResolved, deleteComment } = useCommentStore();
   const all = filterDocComments(comments, docId, true);
   const active = all.filter((c) => !c.resolved);
@@ -40,8 +43,14 @@ export function CommentsPanel({ editor, docId, focusCommentId, onClose }: Commen
 
   const focusRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
-    if (focusCommentId) requestAnimationFrame(() => focusRef.current?.focus());
+    if (focusCommentId) {
+      requestAnimationFrame(() => focusRef.current?.focus());
+      return;
+    }
+    requestAnimationFrame(() => closeButtonRef.current?.focus());
   }, [focusCommentId]);
+
+  useFocusTrap(panelRef, true);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -166,6 +175,7 @@ export function CommentsPanel({ editor, docId, focusCommentId, onClose }: Commen
 
   return (
     <aside
+      ref={panelRef}
       role="complementary"
       aria-label={t('editor.comments.panelAria')}
       className="fixed inset-y-0 right-0 z-40 flex w-[340px] max-w-[92vw] flex-col border-l border-border bg-surface shadow-xl"
@@ -173,7 +183,14 @@ export function CommentsPanel({ editor, docId, focusCommentId, onClose }: Commen
       <header className="flex items-center gap-2 border-b border-border px-4 py-3">
         <MessageSquare className="size-4 text-amber-600" />
         <span className="flex-1 text-[14px] font-semibold">{t('editor.comments.title')}</span>
-        <Button variant="ghost" size="icon-sm" aria-label={t('editor.comments.closeAria')} title={t('editor.comments.close')} onClick={onClose}>
+        <Button
+          ref={closeButtonRef}
+          variant="ghost"
+          size="icon-sm"
+          aria-label={t('editor.comments.closeAria')}
+          title={t('editor.comments.close')}
+          onClick={onClose}
+        >
           <X className="size-4" />
         </Button>
       </header>

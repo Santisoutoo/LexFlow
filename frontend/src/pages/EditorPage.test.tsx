@@ -63,6 +63,8 @@ vi.mock('@tiptap/react', () => ({
     onUpdateHandler = opts.onUpdate;
     return mockEditor;
   },
+  useEditorState: ({ selector }: { selector: (snap: { editor: { isEmpty: boolean } }) => unknown }) =>
+    selector({ editor: { isEmpty: true } }),
   EditorContent: () => <div data-testid="editor-content" />,
 }));
 
@@ -278,6 +280,17 @@ describe('EditorPage autosave flush', () => {
     expect(screen.getByPlaceholderText('Untitled document')).toBeInTheDocument();
     expect(screen.getByText(/^Saved /)).toBeInTheDocument();
     await i18n.changeLanguage('es');
+  });
+
+  it('uses measure token on the editor writing surface', () => {
+    renderEditor();
+    expect(screen.getByTestId('editor-surface')).toHaveClass('max-w-measure');
+  });
+
+  it('shows empty-state CTA tiles when the editor is empty', () => {
+    renderEditor();
+    expect(screen.getByTestId('editor-empty-state')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /plantilla/i })).toBeInTheDocument();
   });
 });
 

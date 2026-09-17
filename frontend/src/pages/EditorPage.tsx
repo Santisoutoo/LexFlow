@@ -33,7 +33,8 @@ import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 
 import { createPortal } from 'react-dom';
 import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useEditor, EditorContent, type Editor } from '@tiptap/react';
+import { useEditor, EditorContent, useEditorState, type Editor } from '@tiptap/react';
+import { LayoutTemplate, Scale, Sparkles } from 'lucide-react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import { useEditorStore, makeDefaultDocument, isSentinelDocumentTitle } from '@/lib/editor-store';
@@ -156,6 +157,10 @@ function EditorDocumentSurface({ docId }: { docId: string }) {
   // Comments side panel (#602): open state + the comment to autofocus on open.
   const [commentsOpen, setCommentsOpen] = useState<boolean>(false);
   const [focusCommentId, setFocusCommentId] = useState<string | null>(null);
+  const citationTriggerRef = useRef<HTMLButtonElement>(null);
+  const templatesTriggerRef = useRef<HTMLButtonElement>(null);
+  const aiPanelTriggerRef = useRef<HTMLButtonElement>(null);
+  const commentsTriggerRef = useRef<HTMLButtonElement>(null);
   const addComment = useCommentStore((s) => s.addComment);
   const commentBadgeCount = useCommentStore((s) => openCommentCount(s.comments, docId));
 
@@ -338,8 +343,34 @@ function EditorDocumentSurface({ docId }: { docId: string }) {
     exportMarkdown(editor.getJSON(), title);
   }, [editor, title]);
 
+  const closeCitationPicker = useCallback(() => {
+    setCitationPickerOpen(false);
+    citationTriggerRef.current?.focus();
+  }, []);
+
+  const closeTemplatesDialog = useCallback(() => {
+    setTemplatesOpen(false);
+    templatesTriggerRef.current?.focus();
+  }, []);
+
+  const closeAiPanel = useCallback(() => {
+    setAiPanelOpen(false);
+    aiPanelTriggerRef.current?.focus();
+  }, []);
+
+  const closeCommentsPanel = useCallback(() => {
+    setCommentsOpen(false);
+    commentsTriggerRef.current?.focus();
+  }, []);
+
+  const drawerPaddingClass = cn(
+    'transition-[padding] duration-200',
+    aiPanelOpen && 'pr-[380px]',
+    !aiPanelOpen && commentsOpen && 'pr-[340px]',
+  );
+
   return (
-    <>
+    <div className={drawerPaddingClass}>
       {persistError && (
         <div
           className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-[12.5px] text-amber-900 dark:text-amber-100"
@@ -413,6 +444,10 @@ function EditorDocumentSurface({ docId }: { docId: string }) {
             setCommentsOpen(true);
           }}
           commentBadgeCount={commentBadgeCount}
+          citationButtonRef={citationTriggerRef}
+          templatesButtonRef={templatesTriggerRef}
+          aiPanelButtonRef={aiPanelTriggerRef}
+          commentsButtonRef={commentsTriggerRef}
         />
       )}
 
@@ -421,7 +456,7 @@ function EditorDocumentSurface({ docId }: { docId: string }) {
       {editor &&
         citationPickerOpen &&
         createPortal(
-          <CitationPicker editor={editor} onClose={() => setCitationPickerOpen(false)} />,
+          <CitationPicker editor={editor} onClose={closeCitationPicker} />,
           document.body,
         )}
 
@@ -429,7 +464,7 @@ function EditorDocumentSurface({ docId }: { docId: string }) {
       {editor &&
         templatesOpen &&
         createPortal(
-          <TemplatesDialog editor={editor} onClose={() => setTemplatesOpen(false)} />,
+          <TemplatesDialog editor={editor} onClose={closeTemplatesDialog} />,
           document.body,
         )}
 
@@ -441,7 +476,7 @@ function EditorDocumentSurface({ docId }: { docId: string }) {
             editor={editor}
             docId={docId}
             docTitle={title}
-            onClose={() => setAiPanelOpen(false)}
+            onClose={closeAiPanel}
           />,
           document.body,
         )}
@@ -454,16 +489,17 @@ function EditorDocumentSurface({ docId }: { docId: string }) {
             editor={editor}
             docId={docId}
             focusCommentId={focusCommentId}
-            onClose={() => setCommentsOpen(false)}
+            onClose={closeCommentsPanel}
           />,
           document.body,
         )}
 
       {/* TipTap content area */}
       <div
+        data-testid="editor-surface"
         className={cn(
-          'min-h-[60vh] rounded-lg border border-border bg-surface p-6',
-          'prose prose-neutral dark:prose-invert max-w-none',
+          'relative min-h-[60vh] rounded-lg border border-border bg-surface p-6',
+          'prose prose-neutral dark:prose-invert max-w-measure',
           // Headings inherit the app's display font + tight tracking instead
           // of the plugin's default body font — matches every other heading
           // in the app (`font-display ... tracking-tight`). Sizes/weights per
@@ -505,8 +541,73 @@ function EditorDocumentSurface({ docId }: { docId: string }) {
           isReadOnly && 'cursor-default',
         )}
       >
+        {editor && !isReadOnly && (
+          <EditorEmptyStateTiles
+            editor={editor}
+            onOpenTemplates={() => setTemplatesOpen(true)}
+            onOpenAiPanel={() => setAiPanelOpen(true)}
+            onOpenCitationPicker={() => setCitationPickerOpen(true)}
+          />
+        )}
         <EditorContent editor={editor} />
       </div>
-    </>
+    </div>
+  );
+}
+
+interface EditorEmptyStateTilesProps {
+  editor: Editor;
+  onOpenTemplates: () => void;
+  onOpenAiPanel: () => void;
+  onOpenCitationPicker: () => void;
+}
+
+/** CTA tiles shown over an empty editor surface (#75 S4.6). */
+function EditorEmptyStateTiles({
+  editor,
+  onOpenTemplates,
+  onOpenAiPanel,
+  onOpenCitationPicker,
+}: EditorEmptyStateTilesProps) {
+  const { t } = useTranslation();
+  const isEmpty = useEditorState({
+    editor,
+    selector: (snap) => snap.editor.isEmpty,
+  });
+
+  if (!isEmpty) return null;
+
+  return (
+    <div
+      className="pointer-events-none absolute inset-6 z-10 flex items-start pt-12"
+      data-testid="editor-empty-state"
+    >
+      <div className="pointer-events-auto flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={onOpenTemplates}
+          className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-[13px] font-medium shadow-sm transition-colors hover:bg-surface-2"
+        >
+          <LayoutTemplate className="size-4 text-indigo-600" aria-hidden />
+          {t('editor.emptyState.template')}
+        </button>
+        <button
+          type="button"
+          onClick={onOpenAiPanel}
+          className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-[13px] font-medium shadow-sm transition-colors hover:bg-surface-2"
+        >
+          <Sparkles className="size-4 text-indigo-600" aria-hidden />
+          {t('editor.emptyState.ai')}
+        </button>
+        <button
+          type="button"
+          onClick={onOpenCitationPicker}
+          className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-[13px] font-medium shadow-sm transition-colors hover:bg-surface-2"
+        >
+          <Scale className="size-4 text-indigo-600" aria-hidden />
+          {t('editor.emptyState.citation')}
+        </button>
+      </div>
+    </div>
   );
 }

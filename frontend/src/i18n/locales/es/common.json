@@ -93,6 +93,18 @@
       "resultCount_one": "{{count}} resultado",
       "resultCount_other": "{{count}} resultados"
     },
+    "citationChip": {
+      "openTitle": "{{label}} — abrir vista previa",
+      "popoverAria": "Vista previa de la cita {{label}}",
+      "articleLabel": "Artículo {{num}}",
+      "previewError": "No se pudo cargar la vista previa.",
+      "openLaw": "Abrir ley"
+    },
+    "emptyState": {
+      "template": "Plantilla",
+      "ai": "Asistente IA",
+      "citation": "Cita"
+    },
     "templates": {
       "dialogAria": "Plantillas de documento",
       "title": "Plantillas",
@@ -107,6 +119,9 @@
       "apply": "Aplicar",
       "deleteAria": "Eliminar plantilla {{name}}",
       "delete": "Eliminar",
+      "deleteConfirmTitle": "Eliminar plantilla",
+      "deleteConfirmMessage": "¿Eliminar la plantilla «{{name}}»? Esta acción no se puede deshacer.",
+      "applyNewDocument": "Aplicar en documento nuevo",
       "variable": "variable",
       "variables": "variables",
       "noVariables": "Sin variables"

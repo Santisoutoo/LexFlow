@@ -35,6 +35,22 @@ describe('extractVariables', () => {
   it('returns an empty list when there are no placeholders', () => {
     expect(extractVariables({ type: 'doc', content: [{ type: 'paragraph' }] })).toEqual([]);
   });
+
+  it('finds placeholders split across text nodes with different marks', () => {
+    const split: JSONContent = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: '{{par' },
+            { type: 'text', text: 'te}}', marks: [{ type: 'bold' }] },
+          ],
+        },
+      ],
+    };
+    expect(extractVariables(split)).toEqual(['parte']);
+  });
 });
 
 describe('fillTemplate', () => {

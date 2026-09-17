@@ -39,6 +39,7 @@ import {
   Eye,
   Pencil,
 } from 'lucide-react';
+import { forwardRef } from 'react';
 import type { Editor } from '@tiptap/react';
 import { useEditorState } from '@tiptap/react';
 import { useTranslation } from 'react-i18next';
@@ -61,6 +62,10 @@ interface EditorToolbarProps {
   onOpenComments: () => void;
   /** Unresolved comment count for the open document — drives the badge on "View comments". */
   commentBadgeCount?: number;
+  citationButtonRef?: React.Ref<HTMLButtonElement>;
+  templatesButtonRef?: React.Ref<HTMLButtonElement>;
+  aiPanelButtonRef?: React.Ref<HTMLButtonElement>;
+  commentsButtonRef?: React.Ref<HTMLButtonElement>;
 }
 
 /** A thin divider between button groups. */
@@ -74,15 +79,20 @@ interface ToolButtonProps {
   active?: boolean;
   disabled?: boolean;
   onPress: () => void;
+  buttonRef?: React.Ref<HTMLButtonElement>;
 }
 
 /**
  * A single toolbar button. Uses `Button` variant `ghost` with an extra
  * active ring when the mark/node is currently applied.
  */
-function ToolButton({ icon, label, active, disabled, onPress }: ToolButtonProps) {
+const ToolButton = forwardRef<HTMLButtonElement, ToolButtonProps>(function ToolButton(
+  { icon, label, active, disabled, onPress, buttonRef },
+  ref,
+) {
   return (
     <Button
+      ref={buttonRef ?? ref}
       type="button"
       variant="ghost"
       size="icon-sm"
@@ -96,7 +106,7 @@ function ToolButton({ icon, label, active, disabled, onPress }: ToolButtonProps)
       {icon}
     </Button>
   );
-}
+});
 
 /**
  * EditorToolbar renders formatting controls for the given `editor` instance.
@@ -114,6 +124,10 @@ export function EditorToolbar({
   onAddComment,
   onOpenComments,
   commentBadgeCount = 0,
+  citationButtonRef,
+  templatesButtonRef,
+  aiPanelButtonRef,
+  commentsButtonRef,
 }: EditorToolbarProps) {
   const { t } = useTranslation();
 
@@ -221,6 +235,7 @@ export function EditorToolbar({
 
       {/* Citations: typed legal citation (#599) + plain blockquote */}
       <ToolButton
+        buttonRef={citationButtonRef}
         icon={<Scale className="size-3.5" />}
         label={t('editor.toolbar.insertCitation')}
         onPress={onInsertCitation}
@@ -236,6 +251,7 @@ export function EditorToolbar({
 
       {/* Templates (#600) */}
       <ToolButton
+        buttonRef={templatesButtonRef}
         icon={<LayoutTemplate className="size-3.5" />}
         label={t('editor.toolbar.templates')}
         onPress={onOpenTemplates}
@@ -243,6 +259,7 @@ export function EditorToolbar({
 
       {/* AI drafting assistant (#601) */}
       <ToolButton
+        buttonRef={aiPanelButtonRef}
         icon={<Sparkles className="size-3.5" />}
         label={t('editor.toolbar.aiDraft')}
         onPress={onOpenAiPanel}
@@ -275,6 +292,7 @@ export function EditorToolbar({
       />
       <div className="relative">
         <ToolButton
+          buttonRef={commentsButtonRef}
           icon={<MessageSquare className="size-3.5" />}
           label={t('editor.toolbar.viewComments')}
           onPress={onOpenComments}

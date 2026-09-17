@@ -19,10 +19,27 @@ const VARIABLE_RE = /\{\{\s*([\w.]+)\s*\}\}/g;
 /** Built-in corpus variables filled from a picked law's metadata. */
 export const LAW_VARIABLE_FIELDS = ['law.id', 'law.title', 'law.short', 'law.boe', 'law.publicada'] as const;
 
-/** Visit every text node in a TipTap document, depth-first. */
-function walkText(node: JSONContent, visit: (text: string) => void): void {
-  if (typeof node.text === 'string') visit(node.text);
-  node.content?.forEach((child) => walkText(child, visit));
+/** Block-level nodes whose text is scanned as one string for placeholder discovery. */
+const BLOCK_TYPES = new Set(['paragraph', 'heading', 'blockquote', 'listItem', 'codeBlock']);
+
+/** Concatenate all text fragments inside a block-level node (handles split marks). */
+function collectBlockText(node: JSONContent): string {
+  const parts: string[] = [];
+  const walk = (n: JSONContent) => {
+    if (typeof n.text === 'string') parts.push(n.text);
+    n.content?.forEach(walk);
+  };
+  walk(node);
+  return parts.join('');
+}
+
+/** Visit each block-level node in a TipTap document, depth-first. */
+function walkBlocks(node: JSONContent, visit: (blockText: string) => void): void {
+  if (node.type && BLOCK_TYPES.has(node.type)) {
+    visit(collectBlockText(node));
+    return;
+  }
+  node.content?.forEach((child) => walkBlocks(child, visit));
 }
 
 /** Deep-clone a document, transforming the text of every text node. */
@@ -36,7 +53,7 @@ function mapText(node: JSONContent, transform: (text: string) => string): JSONCo
 /** Collect the unique `{{variable}}` names used anywhere in the template body. */
 export function extractVariables(content: JSONContent): string[] {
   const names = new Set<string>();
-  walkText(content, (text) => {
+  walkBlocks(content, (text) => {
     for (const match of text.matchAll(VARIABLE_RE)) {
       names.add(match[1]);
     }

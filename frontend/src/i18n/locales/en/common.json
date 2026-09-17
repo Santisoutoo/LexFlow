@@ -93,6 +93,18 @@
       "resultCount_one": "{{count}} result",
       "resultCount_other": "{{count}} results"
     },
+    "citationChip": {
+      "openTitle": "{{label}} — open preview",
+      "popoverAria": "Citation preview for {{label}}",
+      "articleLabel": "Article {{num}}",
+      "previewError": "Could not load preview.",
+      "openLaw": "Open law"
+    },
+    "emptyState": {
+      "template": "Template",
+      "ai": "AI assistant",
+      "citation": "Citation"
+    },
     "templates": {
       "dialogAria": "Document templates",
       "title": "Templates",
@@ -107,6 +119,9 @@
       "apply": "Apply",
       "deleteAria": "Delete template {{name}}",
       "delete": "Delete",
+      "deleteConfirmTitle": "Delete template",
+      "deleteConfirmMessage": "Delete the template \"{{name}}\"? This cannot be undone.",
+      "applyNewDocument": "Apply in new document",
       "variable": "variable",
       "variables": "variables",
       "noVariables": "No variables"
